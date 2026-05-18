@@ -989,8 +989,9 @@ class HaFrigatePrivacy extends HTMLElement {
       }
       return;
     }
-    // Auto-create HA helpers on first load
-    if (!this._helpersChecked) this._ensureHAHelpers();
+    // (HA helper auto-create moved to _pauseFrigate / _saveScheduleFromForm.
+    //  This avoids silent server-side side effects on render — frenck (HACS)
+    //  reasonably closes plugins that mutate HA state without a user action.)
     // Check schedules every 60s
     if (now - this._lastScheduleCheck > 60000) {
       this._lastScheduleCheck = now;
@@ -1646,6 +1647,10 @@ class HaFrigatePrivacy extends HTMLElement {
   async _pauseFrigate(minutes) {
     const t = this._t;
     if (!this._hass) return;
+    // Create HA-native helpers (timer + input_text + resume-automation) on first
+    // user-initiated pause. OOTB: nothing happens on render; helpers appear when
+    // the user actually exercises a privacy action.
+    await this._ensureHAHelpers();
     // Guard: block pause if Frigate version is unsupported — otherwise privacy
     // toggle gives false sense of security (camera keeps working silently).
     if (this._frigateSupported === false) {
@@ -1792,7 +1797,11 @@ class HaFrigatePrivacy extends HTMLElement {
     this._editingScheduleIdx = null;
   }
 
-  _saveScheduleFromForm() {
+  async _saveScheduleFromForm() {
+    // Create HA-native helpers (timer + input_text + resume-automation) on first
+    // schedule save — without these, scheduled pause cannot resume the cameras
+    // server-side when the user's browser is closed.
+    await this._ensureHAHelpers();
     const f = this._scheduleForm;
     const schedule = {
       enabled: f.enabled,

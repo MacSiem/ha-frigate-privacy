@@ -1,3 +1,9 @@
+## v4.1.5 — 2026-05-18
+
+### Fixed
+
+- **HACS reviewer concern.** Moved `_ensureHAHelpers()` (timer + input_text + resume-automation) out of the render loop and into the first user-initiated pause/schedule save. The render path is now stateless; HA-native helpers appear only when the user actually exercises a privacy action.
+
 # Changelog — Frigate Privacy
 
 ## [4.1.3] - 2026-05-12
