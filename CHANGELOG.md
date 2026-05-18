@@ -1,3 +1,18 @@
+## v4.1.6 — 2026-05-18
+
+### Added
+
+- **Per-stream privacy mode.** New `What to pause` selector lets you choose which switches go off when you hit Quick pause:
+  - **All** — full Frigate pipeline offline (every available switch). Previous v4.1.5 behaviour.
+  - **Recording only (main)** — turns off `_recordings` + `_snapshots`; `_detect` / `_motion` / `_audio` keep running so motion / object detection still fire while no video is saved.
+  - **Detection only (sub)** — turns off `_detect` / `_motion` / `_audio_detection` (or `_audio` on Frigate 0.14-0.16); recording the current stream continues passively.
+- Stream type is persisted to `localStorage` and stored in the active privacy session, so resume restores exactly the subset that was paused (it no longer flips ON switches the user had intentionally left disabled).
+- Timer-expiry auto-resume automation is rebuilt with the same stream-type filter, so server-side restore matches the pause.
+
+### Notes
+
+- Schedule windows (Schedule tab) keep the previous behaviour and still pause everything. Stream type for schedules is a follow-up enhancement.
+
 ## v4.1.5 — 2026-05-18
 
 ### Fixed

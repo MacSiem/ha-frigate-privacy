@@ -727,7 +727,15 @@ class HaFrigatePrivacy extends HTMLElement {
     this._notifyBeforeEndMin = 5;
     this._warningSent = false;
     this._privacyCameras = 'all'; // cameras string for active session
+    this._privacyStreamType = 'all'; // 'all' | 'main' | 'sub' — which RTSP stream's switches are paused
     this._privacyStartedMin = 0;
+    // User-selected stream type for the NEXT pause action (persists across renders).
+    // Default 'all' = pre-v4.1.6 behaviour (every switch goes off).
+    this._pauseStreamType = 'all';
+    try {
+      const saved = localStorage.getItem('ha-frigate-privacy-pause-stream-type');
+      if (saved === 'main' || saved === 'sub' || saved === 'all') this._pauseStreamType = saved;
+    } catch(e) { /* ignore */ }
   }
 
   static getConfigElement() {
@@ -764,6 +772,13 @@ class HaFrigatePrivacy extends HTMLElement {
         unknown: 'Nieznany',
         selectCameras: 'Wybierz kamery',
         allCameras: 'Wszystkie kamery',
+        pauseType: 'Co pauzowac',
+        pauseTypeAll: 'Wszystko',
+        pauseTypeMain: 'Tylko nagrywanie (main)',
+        pauseTypeSub: 'Tylko detekcja (sub)',
+        pauseTypeAllHint: 'Caly pipeline Frigate offline',
+        pauseTypeMainHint: 'Stop nagrywania i snapshotow; detekcja dziala dalej',
+        pauseTypeSubHint: 'Stop detekcji/motion/audio; nagrywanie biezace dziala',
         quickPause: 'Szybka pauza',
         customDuration: 'Wlasny czas (min)',
         pauseFrigate: 'Wstrzymaj Frigate',
@@ -831,6 +846,13 @@ class HaFrigatePrivacy extends HTMLElement {
         unknown: 'Unknown',
         selectCameras: 'Select cameras',
         allCameras: 'All cameras',
+        pauseType: 'What to pause',
+        pauseTypeAll: 'All',
+        pauseTypeMain: 'Recording only (main)',
+        pauseTypeSub: 'Detection only (sub)',
+        pauseTypeAllHint: 'Full Frigate pipeline offline',
+        pauseTypeMainHint: 'Stop recording + snapshots; detection still runs',
+        pauseTypeSubHint: 'Stop detect/motion/audio; recording still runs',
         quickPause: 'Quick pause',
         customDuration: 'Custom duration (min)',
         pauseFrigate: 'Pause Frigate',
@@ -933,7 +955,7 @@ class HaFrigatePrivacy extends HTMLElement {
           this._privacyEndTime = null;
           this._savePrivacyState();
           if (this._privacyTimerInterval) { clearInterval(this._privacyTimerInterval); this._privacyTimerInterval = null; }
-          this._setCameraStreams(camsToResume, true);
+          this._setCameraStreams(camsToResume, true, this._privacyStreamType || 'all');
           this._addHistoryEntry('resumed', 0);
           const t = this._t;
           this._sendNotification('▶️ ' + t.frigateResumed + ' (auto)', t.forCameras + ': ' + (this._privacyCameras || 'all'));
@@ -945,7 +967,7 @@ class HaFrigatePrivacy extends HTMLElement {
         const camsRestart = this._privacyCameras && this._privacyCameras !== 'all'
           ? this._privacyCameras.split(', ')
           : this._cameras.map(c => c.entity_id);
-        this._setCameraStreams(camsRestart, true);
+        this._setCameraStreams(camsRestart, true, this._privacyStreamType || 'all');
         const t = this._t;
         this._sendNotification('\u25B6\uFE0F ' + t.frigateResumed + ' (auto)', t.forCameras + ': ' + (this._privacyCameras || 'all'));
         this._showToast(t.frigateResumed + ' (auto - timer expired)', 'success');
@@ -958,7 +980,7 @@ class HaFrigatePrivacy extends HTMLElement {
         this._privacyActive = false;
         this._privacyEndTime = null;
         this._savePrivacyState();
-        this._setCameraStreams(camsExpired, true);
+        this._setCameraStreams(camsExpired, true, this._privacyStreamType || 'all');
         const t = this._t;
         this._sendNotification('\u25B6\uFE0F ' + t.frigateResumed + ' (auto)', t.forCameras + ': ' + (this._privacyCameras || 'all'));
       }
@@ -979,7 +1001,7 @@ class HaFrigatePrivacy extends HTMLElement {
             this._privacyActive = false;
             this._privacyEndTime = null;
             this._savePrivacyState();
-            this._setCameraStreams(camsDeferred, true);
+            this._setCameraStreams(camsDeferred, true, this._privacyStreamType || 'all');
             const t = this._t;
             this._sendNotification('\u25B6\uFE0F ' + t.frigateResumed + ' (auto)', t.forCameras + ': ' + (this._privacyCameras || 'all'));
           }
@@ -1244,6 +1266,7 @@ class HaFrigatePrivacy extends HTMLElement {
       active: true,
       endTime: this._privacyEndTime,
       cameras: this._privacyCameras || 'all',
+      streamType: this._privacyStreamType || 'all',
       startedMin: this._privacyStartedMin || 0,
       addonId: this._config?.frigate_addon_id || 'ccab4aaf_frigate'
     } : null;
@@ -1289,6 +1312,7 @@ class HaFrigatePrivacy extends HTMLElement {
       this._privacyActive = false;
       this._privacyEndTime = null;
       this._privacyCameras = s.cameras || 'all';
+      this._privacyStreamType = s.streamType || 'all';
       this._savePrivacyState(); // Clear persisted state
       // Defer addon restart until hass is available
       this._pendingAddonRestart = true;
@@ -1300,6 +1324,7 @@ class HaFrigatePrivacy extends HTMLElement {
       this._privacyActive = true;
       this._privacyEndTime = s.endTime;
       this._privacyCameras = s.cameras || 'all';
+      this._privacyStreamType = s.streamType || 'all';
       this._privacyStartedMin = s.startedMin || 0;
       this._warningSent = false;
       this._startCountdown();
@@ -1408,7 +1433,11 @@ class HaFrigatePrivacy extends HTMLElement {
     // _enabled / _audio on 0.14-0.16). Critical for HACS users — the auto-resume
     // automation must cover EVERY switch the tool toggles off, otherwise privacy
     // leaks audio/review processing back on after timer expires with browser closed.
-    const allSwitches = this._getAllFrigateSwitchesForKnownCameras();
+    // Filter by the same stream type we used to pause — auto-resume must only
+    // touch the switches we actually toggled off, otherwise it would also flip
+    // ON switches the user had intentionally left disabled.
+    const streamType = this._privacyStreamType || this._pauseStreamType || 'all';
+    const allSwitches = this._getAllFrigateSwitchesForKnownCameras(streamType);
     if (allSwitches.length === 0) return; // No Frigate switches found — skip
 
     // Resolve the storage id to write to:
@@ -1584,12 +1613,38 @@ class HaFrigatePrivacy extends HTMLElement {
     return ['_enabled', '_detect', '_recordings', '_snapshots', '_motion', '_audio', '_audio_detection', '_review_alerts', '_review_detections'];
   }
 
+  // --- Stream-type filter (v4.1.6) ---
+  // Frigate runs each camera with two RTSP streams: the main (record_role) stream
+  // is consumed by `_recordings` / `_snapshots`, the sub (detect_role) stream is
+  // consumed by `_detect` / `_motion` / `_audio`. The remaining switches
+  // (`_enabled`, `_review_alerts`, `_review_detections`) act on Frigate's processed
+  // result, not on a specific RTSP stream — they belong to 'all' only.
+  //
+  // streamType:
+  //   'all'  — every available switch suffix (full privacy)
+  //   'main' — only switches that consume the high-res record stream
+  //   'sub'  — only switches that consume the low-res detect stream
+  //
+  // Filter is applied on top of the version-aware suffix list so non-existent
+  // suffixes are silently dropped by the per-id existence check downstream.
+  _getSuffixesForStreamType(streamType) {
+    const all = this._getFrigateSwitchSuffixes();
+    if (streamType === 'main') {
+      return all.filter(s => s === '_recordings' || s === '_snapshots');
+    }
+    if (streamType === 'sub') {
+      return all.filter(s => s === '_detect' || s === '_motion' || s === '_audio' || s === '_audio_detection');
+    }
+    return all;
+  }
+
   // Returns all Frigate switch entity_ids belonging to detected cameras + version-appropriate suffixes.
   // Used when building auto-managed HA automations (timer expiry, schedules) so the entity list
   // always matches the user's actual setup without manual YAML editing.
-  _getAllFrigateSwitchesForKnownCameras() {
+  // streamType (optional) — 'all' | 'main' | 'sub'; defaults to 'all'.
+  _getAllFrigateSwitchesForKnownCameras(streamType) {
     if (!this._hass || !this._cameras) return [];
-    const suffixes = this._getFrigateSwitchSuffixes();
+    const suffixes = this._getSuffixesForStreamType(streamType || 'all');
     const out = [];
     for (const cam of this._cameras) {
       const name = cam.entity_id.replace('camera.', '');
@@ -1602,7 +1657,11 @@ class HaFrigatePrivacy extends HTMLElement {
   }
 
   // --- Camera stream control helper ---
-  async _setCameraStreams(camIds, turnOn) {
+  // streamType (optional) — 'all' | 'main' | 'sub'.
+  //   pause (turnOn=false) honours streamType so the user can pause recordings only,
+  //   detection only, or everything; resume (turnOn=true) honours streamType too,
+  //   so we only restore what we paused (preserves manual user toggles on the rest).
+  async _setCameraStreams(camIds, turnOn, streamType) {
     if (!this._hass) return;
     // NOTE: We intentionally do NOT call camera.turn_off/turn_on.
     // Turning off the camera entity stops the entire Frigate camera pipeline,
@@ -1611,7 +1670,7 @@ class HaFrigatePrivacy extends HTMLElement {
     // Instead, we only toggle the per-feature Frigate switches, which pauses
     // processing without stopping the camera stream or releasing the TPU.
     const switchAction = turnOn ? 'turn_on' : 'turn_off';
-    const suffixes = this._getFrigateSwitchSuffixes();
+    const suffixes = this._getSuffixesForStreamType(streamType || 'all');
     let toggledCount = 0;
     const missingPerCam = [];
     for (const camId of camIds) {
@@ -1663,10 +1722,12 @@ class HaFrigatePrivacy extends HTMLElement {
     try {
       // Pause selected cameras
       const selectedCams = this._selectedCameras.size > 0 ? [...this._selectedCameras] : this._cameras.map(c => c.entity_id);
-      await this._setCameraStreams(selectedCams, false);
+      const streamType = this._pauseStreamType || 'all';
+      await this._setCameraStreams(selectedCams, false, streamType);
       this._privacyActive = true;
       this._privacyEndTime = Date.now() + (parseInt(minutes) * 60 * 1000);
       this._privacyCameras = selectedCams.join(', ');
+      this._privacyStreamType = streamType;
       this._privacyStartedMin = parseInt(minutes);
       this._warningSent = false;
       this._addHistoryEntry('manual', minutes, this._privacyCameras);
@@ -1702,9 +1763,10 @@ class HaFrigatePrivacy extends HTMLElement {
       const camsToResume = this._privacyCameras && this._privacyCameras !== 'all'
         ? this._privacyCameras.split(', ')
         : this._cameras.map(c => c.entity_id);
-      await this._setCameraStreams(camsToResume, true);
+      await this._setCameraStreams(camsToResume, true, this._privacyStreamType || 'all');
       this._privacyActive = false;
       this._privacyEndTime = null;
+      this._privacyStreamType = 'all';
       if (this._privacyTimerInterval) {
         clearInterval(this._privacyTimerInterval);
         this._privacyTimerInterval = null;
@@ -1743,7 +1805,7 @@ class HaFrigatePrivacy extends HTMLElement {
           const camsToResume = this._privacyCameras && this._privacyCameras !== 'all'
             ? this._privacyCameras.split(', ')
             : this._cameras.map(c => c.entity_id);
-          this._setCameraStreams(camsToResume, true);
+          this._setCameraStreams(camsToResume, true, this._privacyStreamType || 'all');
           const t = this._t;
           this._addHistoryEntry('resumed', 0);
           this._sendNotification('\u25B6\uFE0F ' + t.frigateResumed, t.forCameras + ': ' + this._getCameraLabel());
@@ -1988,6 +2050,18 @@ class HaFrigatePrivacy extends HTMLElement {
 
     const allSelected = this._selectedCameras.size === 0;
 
+    // Pause type selector (v4.1.6)
+    const pauseType = this._pauseStreamType || 'all';
+    const typeBtn = (key, label, hint) => `<button class="btn btn-quick stream-type-btn ${pauseType === key ? 'selected' : ''}" data-stream-type="${key}" title="${hint}" aria-pressed="${pauseType === key}">${label}</button>`;
+    const pauseTypeButtons = `
+      ${typeBtn('all', t.pauseTypeAll, t.pauseTypeAllHint)}
+      ${typeBtn('main', t.pauseTypeMain, t.pauseTypeMainHint)}
+      ${typeBtn('sub', t.pauseTypeSub, t.pauseTypeSubHint)}
+    `;
+    const pauseTypeHint = pauseType === 'main' ? t.pauseTypeMainHint
+      : pauseType === 'sub' ? t.pauseTypeSubHint
+      : t.pauseTypeAllHint;
+
     // Quick pause buttons
     const quickButtons = [15, 30, 60, 120].map(m => {
       const label = m >= 60 ? (m / 60) + 'h' : m + 'min';
@@ -2007,6 +2081,14 @@ class HaFrigatePrivacy extends HTMLElement {
           </div>
           ${cameraCards}
         </div>
+      </div>
+
+      <div class="section">
+        <h3>${t.pauseType}</h3>
+        <div class="quick-buttons stream-type-row">
+          ${pauseTypeButtons}
+        </div>
+        <div class="stream-type-hint">${pauseTypeHint}</div>
       </div>
 
       <div class="section">
@@ -2309,8 +2391,23 @@ tap_action:
       });
     });
 
-    // Quick pause buttons
+    // Stream-type buttons (v4.1.6) — must run BEFORE the quick-pause handler
+    // so it can early-return on stream-type clicks (they share .btn-quick).
+    sr.querySelectorAll('.stream-type-btn').forEach(btn => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const t = btn.dataset.streamType;
+        if (t === 'main' || t === 'sub' || t === 'all') {
+          this._pauseStreamType = t;
+          try { localStorage.setItem('ha-frigate-privacy-pause-stream-type', t); } catch(_) { /* ignore */ }
+          this._updateUI();
+        }
+      });
+    });
+
+    // Quick pause buttons (skip stream-type buttons — they have their own handler above)
     sr.querySelectorAll('.btn-quick').forEach(btn => {
+      if (btn.classList.contains('stream-type-btn')) return;
       btn.addEventListener('click', () => {
         this._pauseFrigate(parseInt(btn.dataset.minutes));
       });
@@ -2609,6 +2706,30 @@ tap_action:
 .btn-extend:hover {
   background: rgba(59,130,246,0.15);
   border-color: var(--bento-primary);
+}
+
+/* Stream-type selector (v4.1.6) */
+.stream-type-row {
+  flex-wrap: wrap;
+}
+.stream-type-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.stream-type-btn.selected {
+  background: var(--bento-primary);
+  color: #fff;
+  border-color: var(--bento-primary);
+}
+.stream-type-hint {
+  margin-top: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--bento-text-secondary);
+  background: rgba(59,130,246,0.06);
+  border-left: 3px solid var(--bento-primary);
+  border-radius: 0 var(--bento-radius-xs) var(--bento-radius-xs) 0;
+  line-height: 1.4;
 }
 
 .countdown { display: flex; align-items: center; gap: 8px; }
