@@ -1,3 +1,9 @@
+## v4.1.7 — 2026-05-18
+
+### Fixed
+
+- **Pause re-entrancy + immediate user feedback.** The Quick Pause / Custom Pause flow could feel unresponsive on first click — the first `_ensureHAHelpers()` call on a fresh session issues a `config/automation/config` WS update to register the auto-resume automation, which can take ~1-2s on a busy HA. While that promise was in flight nothing visible happened, so users hit the button again. Now: a `_pauseInFlight` guard short-circuits re-entrant clicks, and a toast (`⏳ Pausing…`) fires synchronously the moment the button is clicked.
+
 ## v4.1.6 — 2026-05-18
 
 ### Added
