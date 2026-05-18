@@ -1706,6 +1706,19 @@ class HaFrigatePrivacy extends HTMLElement {
   async _pauseFrigate(minutes) {
     const t = this._t;
     if (!this._hass) return;
+    // Re-entrancy guard. The previous behaviour was "first click silently does
+    // nothing, second click works" — that was actually two clicks racing through
+    // a long `_ensureHAHelpers()` await (the automation/config WS call can take
+    // ~1–2s on a busy HA). The first click WAS running; the user just couldn't
+    // tell, so they clicked again. The second click queued behind the first and
+    // visually appeared instant.
+    //
+    // Fix: short-circuit if a pause is already in flight, AND give the button
+    // an immediate visual signal that something is happening.
+    if (this._pauseInFlight) return;
+    this._pauseInFlight = true;
+    try { this._showToast && this._showToast('⏳ ' + (t.pauseFrigate || 'Pausing…'), 'info'); } catch(_) {}
+    try {
     // Create HA-native helpers (timer + input_text + resume-automation) on first
     // user-initiated pause. OOTB: nothing happens on render; helpers appear when
     // the user actually exercises a privacy action.
@@ -1751,6 +1764,9 @@ class HaFrigatePrivacy extends HTMLElement {
     } catch(e) {
       console.warn('[Frigate Privacy]', e);
       this._showToast(t.errorStopAddon, 'error');
+    }
+    } finally {
+      this._pauseInFlight = false;
     }
   }
 
