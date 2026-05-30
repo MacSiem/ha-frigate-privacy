@@ -3,6 +3,7 @@
 ### Fixed
 
 - **Pause re-entrancy + immediate user feedback.** The Quick Pause / Custom Pause flow could feel unresponsive on first click — the first `_ensureHAHelpers()` call on a fresh session issues a `config/automation/config` WS update to register the auto-resume automation, which can take ~1-2s on a busy HA. While that promise was in flight nothing visible happened, so users hit the button again. Now: a `_pauseInFlight` guard short-circuits re-entrant clicks, and a toast (`⏳ Pausing…`) fires synchronously the moment the button is clicked.
+- **Full privacy now stops live camera streaming.** The `All` pause mode turns off the selected `camera.*` entity after disabling Frigate feature switches, and resume turns the camera entity back on before restoring switches. Timer-expiry and schedule automations include the same hard-stop/hard-resume behavior so it works without an open browser.
 
 ## v4.1.6 — 2026-05-18
 

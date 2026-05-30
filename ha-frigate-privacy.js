@@ -776,7 +776,7 @@ class HaFrigatePrivacy extends HTMLElement {
         pauseTypeAll: 'Wszystko',
         pauseTypeMain: 'Tylko nagrywanie (main)',
         pauseTypeSub: 'Tylko detekcja (sub)',
-        pauseTypeAllHint: 'Caly pipeline Frigate offline',
+        pauseTypeAllHint: 'Caly pipeline Frigate + streaming kamery offline',
         pauseTypeMainHint: 'Stop nagrywania i snapshotow; detekcja dziala dalej',
         pauseTypeSubHint: 'Stop detekcji/motion/audio; nagrywanie biezace dziala',
         quickPause: 'Szybka pauza',
@@ -850,7 +850,7 @@ class HaFrigatePrivacy extends HTMLElement {
         pauseTypeAll: 'All',
         pauseTypeMain: 'Recording only (main)',
         pauseTypeSub: 'Detection only (sub)',
-        pauseTypeAllHint: 'Full Frigate pipeline offline',
+        pauseTypeAllHint: 'Full Frigate pipeline + camera streaming offline',
         pauseTypeMainHint: 'Stop recording + snapshots; detection still runs',
         pauseTypeSubHint: 'Stop detect/motion/audio; recording still runs',
         quickPause: 'Quick pause',
@@ -1438,6 +1438,7 @@ class HaFrigatePrivacy extends HTMLElement {
     // ON switches the user had intentionally left disabled.
     const streamType = this._privacyStreamType || this._pauseStreamType || 'all';
     const allSwitches = this._getAllFrigateSwitchesForKnownCameras(streamType);
+    const allCameras = this._cameras.map(c => c.entity_id);
     if (allSwitches.length === 0) return; // No Frigate switches found — skip
 
     // Resolve the storage id to write to:
@@ -1458,10 +1459,12 @@ class HaFrigatePrivacy extends HTMLElement {
       mode: 'single',
       triggers: [{ trigger: 'event', event_type: 'timer.finished', event_data: { entity_id: 'timer.frigate_privacy' } }],
       conditions: [],
-      actions: [
-        { action: 'switch.turn_on', target: { entity_id: allSwitches } }
-      ]
+      actions: []
     };
+    if (streamType === 'all' && allCameras.length > 0) {
+      config.actions.push({ action: 'camera.turn_on', target: { entity_id: allCameras } });
+    }
+    config.actions.push({ action: 'switch.turn_on', target: { entity_id: allSwitches } });
     // Add input_text clear if helper exists
     if (this._hass.states['input_text.frigate_privacy_cameras']) {
       config.actions.push({ action: 'input_text.set_value', target: { entity_id: 'input_text.frigate_privacy_cameras' }, data: { value: '' } });
@@ -1544,12 +1547,16 @@ class HaFrigatePrivacy extends HTMLElement {
     // Get all camera switches (version-aware — covers 0.14-0.17 surface,
     // so the schedule automation pauses every relevant feature switch).
     const switches = this._getAllFrigateSwitchesForKnownCameras();
+    const allCameras = this._cameras.map(c => c.entity_id);
 
     // Build actions
     const actions = [
-      { action: 'switch.turn_off', target: { entity_id: switches } },
-      { action: 'timer.start', target: { entity_id: 'timer.frigate_privacy' }, data: { duration: durStr } }
+      { action: 'switch.turn_off', target: { entity_id: switches } }
     ];
+    if (allCameras.length > 0) {
+      actions.push({ action: 'camera.turn_off', target: { entity_id: allCameras } });
+    }
+    actions.push({ action: 'timer.start', target: { entity_id: 'timer.frigate_privacy' }, data: { duration: durStr } });
     if (this._hass.states['input_text.frigate_privacy_cameras']) {
       actions.push({ action: 'input_text.set_value', target: { entity_id: 'input_text.frigate_privacy_cameras' }, data: { value: 'all (schedule)' } });
     }
@@ -1663,19 +1670,28 @@ class HaFrigatePrivacy extends HTMLElement {
   //   so we only restore what we paused (preserves manual user toggles on the rest).
   async _setCameraStreams(camIds, turnOn, streamType) {
     if (!this._hass) return;
-    // NOTE: We intentionally do NOT call camera.turn_off/turn_on.
-    // Turning off the camera entity stops the entire Frigate camera pipeline,
-    // which can cause Google Coral TPU to be released. On turn_on, Frigate may
-    // fail to re-acquire the Coral (USB race condition) and fall back to CPU.
-    // Instead, we only toggle the per-feature Frigate switches, which pauses
-    // processing without stopping the camera stream or releasing the TPU.
+    // Full privacy mode must stop the live camera stream too. The narrower
+    // main/sub modes only toggle Frigate feature switches.
     const switchAction = turnOn ? 'turn_on' : 'turn_off';
+    const cameraAction = turnOn ? 'turn_on' : 'turn_off';
     const suffixes = this._getSuffixesForStreamType(streamType || 'all');
+    const hardStopCamera = (streamType || 'all') === 'all';
     let toggledCount = 0;
+    let cameraToggledCount = 0;
     const missingPerCam = [];
+    const toggleCamera = async (camId) => {
+      if (!hardStopCamera || !this._hass.states[camId]) return;
+      try {
+        await this._hass.callService('camera', cameraAction, { entity_id: camId });
+        cameraToggledCount++;
+      } catch(e) {
+        console.warn('[Frigate Privacy] camera.' + cameraAction + ' failed for ' + camId + ':', e.message || e);
+      }
+    };
     for (const camId of camIds) {
       const camName = camId.replace('camera.', '');
       let camToggled = 0;
+      if (turnOn) await toggleCamera(camId);
       for (const suffix of suffixes) {
         const switchId = 'switch.' + camName + suffix;
         if (this._hass.states[switchId]) {
@@ -1688,6 +1704,7 @@ class HaFrigatePrivacy extends HTMLElement {
           }
         }
       }
+      if (!turnOn) await toggleCamera(camId);
       if (camToggled === 0) missingPerCam.push(camId);
     }
     const verLabel = this._frigateVersion ? this._frigateVersion.raw : 'unknown';
@@ -1698,7 +1715,7 @@ class HaFrigatePrivacy extends HTMLElement {
     } else if (missingPerCam.length) {
       console.warn('[Frigate Privacy] No switches found for: ' + missingPerCam.join(', '));
     } else {
-      console.info('[Frigate Privacy] Toggled ' + toggledCount + ' switches (' + switchAction + ') for ' + camIds.length + ' camera(s) on Frigate ' + verLabel);
+      console.info('[Frigate Privacy] Toggled ' + toggledCount + ' switches and ' + cameraToggledCount + ' camera stream(s) (' + switchAction + ') for ' + camIds.length + ' camera(s) on Frigate ' + verLabel);
     }
   }
 
