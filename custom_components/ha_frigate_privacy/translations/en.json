@@ -1,0 +1,20 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Frigate Privacy",
+        "description": "Registers the Frigate Privacy integration. Schedules and paused-camera state are stored server-side, and the bundled Lovelace card is loaded automatically."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only a single instance of this integration is allowed."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "privacy_active": {
+        "name": "Privacy active"
+      }
+    }
+  }
+}

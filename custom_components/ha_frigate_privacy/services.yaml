@@ -1,0 +1,58 @@
+pause_camera:
+  name: Pause camera
+  description: >-
+    Pause Frigate privacy switches for one camera, a list of cameras, or all
+    discovered Frigate cameras when no camera is provided.
+  fields:
+    camera:
+      name: Camera
+      description: Camera entity ID, Frigate camera ID, or a list of IDs.
+      example: camera.front_door
+      selector:
+        text:
+    camera_entity_id:
+      name: Camera entity ID
+      description: Alias for camera. Kept for automations that prefer explicit naming.
+      example: camera.front_door
+      selector:
+        text:
+    duration_minutes:
+      name: Duration
+      description: Optional duration in minutes before the server tries to resume.
+      example: 30
+      selector:
+        number:
+          min: 1
+          max: 1440
+          mode: box
+          unit_of_measurement: min
+    stream_type:
+      name: Stream type
+      description: Which Frigate switch group to pause.
+      default: all
+      selector:
+        select:
+          options:
+            - all
+            - main
+            - sub
+
+resume_camera:
+  name: Resume camera
+  description: >-
+    Resume one camera, a list of cameras, or all paused cameras. If any expected
+    switch is unavailable or a resume call fails, the camera remains paused and a
+    persistent notification is created.
+  fields:
+    camera:
+      name: Camera
+      description: Camera entity ID, Frigate camera ID, or a list of IDs.
+      example: camera.front_door
+      selector:
+        text:
+    camera_entity_id:
+      name: Camera entity ID
+      description: Alias for camera. Kept for automations that prefer explicit naming.
+      example: camera.front_door
+      selector:
+        text:

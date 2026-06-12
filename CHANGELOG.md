@@ -1,3 +1,12 @@
+## v5.0.0 — 2026-06-12
+
+### Changed
+
+- Migrated from a Lovelace-card-only HACS plugin to a full Home Assistant integration with a bundled card.
+- Added config flow, WebSocket API, server-side schedule/paused-state storage, services, scheduler, and binary sensors.
+- Added privacy-first fail-safe resume handling: failed or uncertain resume keeps cameras marked paused and creates a persistent notification.
+- The bundled card migrates existing browser-local schedules to integration storage on first successful WebSocket connection, while the root card remains usable in legacy localStorage mode.
+
 ## v4.1.7 — 2026-05-18
 
 ### Fixed

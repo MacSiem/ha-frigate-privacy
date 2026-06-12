@@ -1,0 +1,20 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Frigate Privacy",
+        "description": "Rejestruje integracje Frigate Privacy. Harmonogramy i stan zapauzowanych kamer sa zapisywane po stronie serwera, a wbudowana karta Lovelace laduje sie automatycznie."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Dozwolona jest tylko jedna instancja tej integracji."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "privacy_active": {
+        "name": "Prywatnosc aktywna"
+      }
+    }
+  }
+}

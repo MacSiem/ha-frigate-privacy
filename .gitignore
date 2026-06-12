@@ -13,9 +13,12 @@ Thumbs.db
 node_modules/
 dist/
 build/
+__pycache__/
+*.py[cod]
 *.log
 *.tmp
 
 # Local
 .env
 .env.local
+codex-runs/
