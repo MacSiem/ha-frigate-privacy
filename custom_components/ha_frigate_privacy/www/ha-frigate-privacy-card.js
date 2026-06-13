@@ -748,6 +748,8 @@ class HaFrigatePrivacy extends HTMLElement {
 
   getCardSize() { return 6; }
 
+  getGridOptions() { return { rows: 10, columns: 12, min_rows: 3, min_columns: 6 }; }
+
   static getStubConfig() {
     return {
       type: 'custom:ha-frigate-privacy',
