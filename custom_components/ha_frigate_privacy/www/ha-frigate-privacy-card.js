@@ -1,4 +1,4 @@
-/* HA Tools split — ha-frigate-privacy v5.0.3 (2026-05-12) — single-tool standalone repo */
+/* HA Tools split — ha-frigate-privacy v5.0.5 (2026-07-12) — single-tool standalone repo */
 (function() {
 'use strict';
 
@@ -840,6 +840,7 @@ class HaFrigatePrivacy extends HTMLElement {
         scheduleReminder: 'Przypomnienie: zaplanowana prywatnosc',
         startsIn: 'zaczyna sie za',
         endsIn: 'konczy sie za',
+        invalidDuration: 'Nieprawidlowy czas trwania — dozwolony zakres to 1-1440 min',
         integrationLegacyTitle: 'Tryb przegladarki',
         integrationLegacyHint: 'Zainstaluj integracje Frigate Privacy, aby synchronizowac harmonogramy i uzywac serwerowego fail-safe. Teraz karta korzysta z lokalnego trybu zgodnosci.',
       },
@@ -916,6 +917,7 @@ class HaFrigatePrivacy extends HTMLElement {
         scheduleReminder: 'Reminder: scheduled privacy',
         startsIn: 'starts in',
         endsIn: 'ends in',
+        invalidDuration: 'Invalid duration — allowed range is 1-1440 min',
         integrationLegacyTitle: 'Browser legacy mode',
         integrationLegacyHint: 'Install the Frigate Privacy integration to sync schedules and use server-side fail-safe resume. This card is using local compatibility mode.',
       }
@@ -1886,6 +1888,13 @@ class HaFrigatePrivacy extends HTMLElement {
   async _pauseFrigate(minutes) {
     const t = this._t;
     if (!this._hass) return;
+    // Client-side guard mirroring the server-side vol.Range(min=1, max=1440)
+    // in websocket_api.py — reject out-of-range values before the WS call.
+    minutes = parseInt(minutes, 10);
+    if (!Number.isFinite(minutes) || minutes < 1 || minutes > 1440) {
+      try { this._showToast && this._showToast(t.invalidDuration || 'Invalid duration — allowed range is 1-1440 min', 'error'); } catch(_) {}
+      return;
+    }
     const selectedCams = this._selectedCameras.size > 0 ? [...this._selectedCameras] : this._cameras.map(c => c.entity_id);
     const streamType = this._pauseStreamType || 'all';
     // Re-entrancy guard. The previous behaviour was "first click silently does
@@ -2107,6 +2116,19 @@ class HaFrigatePrivacy extends HTMLElement {
     toast.textContent = msg;
     toast.className = 'toast toast-' + (type || 'info') + ' toast-show';
     setTimeout(() => { toast.className = 'toast'; }, 3000);
+  }
+
+  // Clamp a user-entered pause duration to the server-accepted range
+  // (websocket_api.py: vol.Range(min=1, max=1440)). Shows a toast and
+  // reflects the corrected value back into the input when out of range.
+  _clampPauseMinutes(value, inputEl) {
+    const raw = parseInt(value, 10);
+    const clamped = Number.isFinite(raw) ? Math.min(1440, Math.max(1, raw)) : 30;
+    if (raw !== clamped) {
+      if (inputEl) inputEl.value = clamped;
+      try { this._showToast && this._showToast(this._t.invalidDuration || 'Invalid duration — allowed range is 1-1440 min', 'error'); } catch(_) {}
+    }
+    return clamped;
   }
 
   // --- Schedule management ---
@@ -2729,7 +2751,7 @@ tap_action:
     if (pauseCustom) {
       pauseCustom.addEventListener('click', () => {
         const input = sr.querySelector('.input-minutes');
-        const mins = parseInt(input?.value) || 30;
+        const mins = this._clampPauseMinutes(input?.value, input);
         this._customMinutes = mins;
         this._pauseFrigate(mins);
       });
@@ -2751,7 +2773,7 @@ tap_action:
     const minutesInput = sr.querySelector('.input-minutes');
     if (minutesInput) {
       minutesInput.addEventListener('change', (e) => {
-        this._customMinutes = parseInt(e.target.value) || 30;
+        this._customMinutes = this._clampPauseMinutes(e.target.value, e.target);
       });
     }
 

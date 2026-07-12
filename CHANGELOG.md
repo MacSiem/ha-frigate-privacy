@@ -1,5 +1,13 @@
 # Changelog
 
+## [5.0.5] - 2026-07-12
+
+- Fix: pause-duration input is now clamped client-side to the server-accepted
+  range (1-1440 min, matching `vol.Range` in `websocket_api.py`); out-of-range
+  or non-numeric values are corrected and a clear error toast (EN/PL) is shown
+  instead of a silent server rejection.
+- Chore: aligned card JS version header with `manifest.json`/`const.py` (5.0.5).
+
 ## [5.0.4] - 2026-07-12
 
 - Fix: the card now renders for non-admin Home Assistant users — read-only websocket
