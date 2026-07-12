@@ -2,103 +2,110 @@
 
 ![Preview](banner.png)
 
-Pause and resume Frigate camera privacy switches from Home Assistant, with server-side schedules and fail-safe resume handling.
+Pause and resume Frigate camera detection and recordings on a schedule or on demand —
+for household privacy moments, guests, or work-from-home hours. Ships as a Home
+Assistant integration with a bundled Lovelace card, server-side privacy schedules,
+fail-safe resume handling, and per-camera binary sensors for automations.
 
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1+-blue.svg?logo=homeassistant)](https://www.home-assistant.io/) [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![Version](https://img.shields.io/github/v/release/MacSiem/ha-frigate-privacy)](https://github.com/MacSiem/ha-frigate-privacy/releases)
 
-## Screenshots
+## How it works
+
+**Short version: it works automatically.** After you install the integration and add
+the card, your Frigate cameras are discovered and ready to pause — no YAML.
+
+1. **Auto-discovery.** The integration finds Frigate cameras from the
+   `switch.<cam>_detect` / `switch.<cam>_recordings` entities the Frigate
+   integration already creates. Works across Frigate versions (0.14–0.17+).
+2. **Pause / resume.** Pausing turns the relevant Frigate switches off (detection,
+   recordings, or all — your choice); resuming turns them back on. An optional
+   duration (1 min – 24 h) auto-resumes the camera.
+3. **Privacy schedules.** Create recurring windows (e.g. weekday mornings) during
+   which selected cameras pause automatically. Schedules are stored server-side
+   (HA Store, included in backups) and survive restarts.
+4. **Fail-safe resume.** Resume decisions are guarded: missing or unavailable
+   switches block auto-resume before anything is toggled, and service failures
+   never silently clear a privacy window — a camera never ends up in a wrong state.
+5. **Entities for automations.** Each camera gets
+   `binary_sensor.<camera>_privacy_active` reflecting its privacy state, so you can
+   drive lights, notifications or dashboards from it.
+
+### What is automatic vs. manual
+
+| Automatic | Manual (optional) |
+|---|---|
+| Discovering Frigate cameras | Pressing pause / resume in the card |
+| Auto-resume after a timed pause | Creating privacy schedules |
+| Fail-safe checks before resume | Choosing stream type (detect/record/all) |
+| Per-camera `*_privacy_active` sensor | — |
+
+> **Non-admin users:** since v5.0.4 the card renders for every logged-in user.
+> Pausing/resuming and editing schedules remain admin-only on purpose — disabling
+> camera recording is a privileged, security-relevant action.
+
+## Screenshot
 
 ![Screenshot](screenshot.png)
 
 ## Installation
 
-Until this repository is available in the default HACS store:
+1. Open HACS → Custom repositories.
+2. Add `https://github.com/MacSiem/ha-frigate-privacy` as category **Integration**.
+3. Install **Frigate Privacy** and restart Home Assistant.
+4. Go to Settings → Devices & services → Add integration → **Frigate Privacy**.
 
-1. Open HACS -> Integrations -> three-dot menu -> Custom repositories.
-2. Add `https://github.com/MacSiem/ha-frigate-privacy` with category **Integration**.
-3. Install **Frigate Privacy**.
-4. Restart Home Assistant.
-5. Go to Settings -> Devices & services -> Add integration -> **Frigate Privacy**.
+The integration registers the bundled Lovelace card automatically — no manual
+resource needed.
 
-The integration registers the bundled Lovelace card automatically. Add it to a dashboard with:
+## Quick start
 
 ```yaml
 type: custom:ha-frigate-privacy
 ```
 
-The legacy root `ha-frigate-privacy.js` file remains available for manual Lovelace resource installs. In that mode the card keeps using browser-local storage and shows a hint to install the integration for server-side schedules.
+That's it. The card lists every discovered Frigate camera with pause/resume buttons,
+timers and the schedule editor.
 
-## What It Adds
+## Entities for automations
 
-- A Home Assistant integration under `custom_components/ha_frigate_privacy`.
-- A bundled Lovelace card served from `/ha_frigate_privacy/ha-frigate-privacy-card.js?v=5.0.0`.
-- Server-side storage for schedules and paused-camera state.
-- WebSocket APIs used by the bundled card.
-- Services for automations.
-- Binary sensors for active privacy state.
+| Entity | Meaning |
+|---|---|
+| `binary_sensor.<camera>_privacy_active` | `on` while the camera is privacy-paused |
 
-## Services
+**Example — light up an indicator while a camera is paused:**
 
-### `ha_frigate_privacy.pause_camera`
-
-Pauses one camera, a list of cameras, or all discovered Frigate cameras when no camera is provided.
-
-Fields:
-
-- `camera` or `camera_entity_id`: camera entity ID or Frigate camera ID, for example `camera.front_door`.
-- `duration_minutes`: optional duration before the server tries to resume.
-- `stream_type`: `all`, `main`, or `sub`.
-
-### `ha_frigate_privacy.resume_camera`
-
-Resumes one camera, a list of cameras, or all paused cameras when no camera is provided.
-
-Fields:
-
-- `camera` or `camera_entity_id`: camera entity ID or Frigate camera ID.
-
-## Binary Sensors
-
-For discovered/configured Frigate cameras, the integration creates:
-
-```text
-binary_sensor.<camera_id>_privacy_active
+```yaml
+alias: Privacy indicator
+trigger:
+  - platform: state
+    entity_id: binary_sensor.living_room_privacy_active
+    to: "on"
+action:
+  - service: light.turn_on
+    target: { entity_id: light.privacy_indicator }
+mode: single
 ```
 
-The sensor is on while that camera remains privacy-paused. Attributes include stream type, source, schedule ID, skipped switches, and resume-blocked state.
+## FAQ
 
-## Frigate Compatibility
+**Do I have to configure anything?**
+No. Install → add integration → add card. Cameras are discovered from Frigate's own
+switches.
 
-Camera discovery uses Frigate switch entities such as:
+**Which Frigate versions are supported?**
+0.14 – 0.17+. The integration tracks switch-entity renames across versions
+(e.g. 0.17 removed `_enabled` and renamed `_audio`).
 
-- `switch.<camera>_detect`
-- `switch.<camera>_recordings`
+**What happens if something fails during resume?**
+The fail-safe logic refuses to clear a privacy window when switches are missing,
+unavailable, or a service call fails — so state stays consistent.
 
-Pause/resume supports the pre-0.17 and 0.17+ switch surfaces. Missing optional switches are skipped and reported in WebSocket/service results instead of failing the whole camera operation.
+**Can guests (non-admin users) pause cameras?**
+No — by design. They can see the card (view-only); pausing requires an admin account.
 
-## Fail-Safe Behaviour
-
-Privacy-first resume is explicit in the integration code:
-
-- Before exiting a privacy window, the integration checks that every switch it paused still exists and is available.
-- If a switch is missing/unavailable, auto-resume is blocked before toggling anything.
-- If a resume service call fails after any switch was turned on, the integration attempts to turn it back off.
-- The camera remains marked paused in storage.
-- A persistent notification is created with the affected entities.
-
-This prevents the integration from silently clearing privacy state when the actual camera state is uncertain.
-
-## Migrating From v4 Lovelace Card
-
-The bundled v5 card migrates existing browser-local schedules once, on first successful WebSocket connection to the integration. It pushes existing `ha-frigate-privacy-schedules` entries to server storage through `ha_frigate_privacy/set_schedule`, then sets a local migration flag.
-
-If the integration is not installed or not configured, the card continues in legacy mode with browser-local schedules.
-
-## Privacy
-
-- No telemetry, analytics, or tracking.
-- No external network calls or CDN assets.
-- State is stored locally in Home Assistant via the integration store, or in browser `localStorage` only when using the standalone legacy card.
+**Does this send data anywhere?**
+No. No telemetry, no CDN assets. Schedules and state are stored locally by Home
+Assistant and included in backups.
 
 ## Changelog
 
@@ -106,11 +113,9 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 ## Support
 
-If this tool makes your Home Assistant life easier, consider supporting development:
-
 - [Buy Me a Coffee](https://buymeacoffee.com/macsiem)
 - [PayPal](https://www.paypal.com/donate/?hosted_button_id=Y967H4PLRBN8W)
 
 ## License
 
-MIT - see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).
