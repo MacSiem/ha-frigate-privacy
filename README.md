@@ -43,9 +43,14 @@ the card, your Frigate cameras are discovered and ready to pause — no YAML.
 > Pausing/resuming and editing schedules remain admin-only on purpose — disabling
 > camera recording is a privileged, security-relevant action.
 
-## Screenshot
+## Screenshots
 
-![Screenshot](screenshot.png)
+| Light | Dark |
+|---|---|
+| ![Control tab, light theme](docs/screenshots/card-cameras-light.png) | ![Control tab, dark theme](docs/screenshots/card-cameras-dark.png) |
+
+*The Control tab: discovered cameras, what-to-pause selector and quick pause.
+Dark mode follows your Home Assistant theme automatically.*
 
 ## Installation
 

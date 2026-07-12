@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FP screenshot harness</title>
+<style>
+  html, body { margin: 0; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body.light { background: #f4f5f7; }
+  body.light ha-frigate-privacy { --card-background-color: #ffffff; --primary-background-color: #f4f5f7; }
+  body.dark { background: #111318; }
+  body.dark ha-frigate-privacy { --card-background-color: #1c1e26; --primary-background-color: #111318; }
+  ha-frigate-privacy { display: block; width: 480px; }
+</style>
+</head>
+<body>
+<ha-frigate-privacy id="card"></ha-frigate-privacy>
+<script>
+  try { localStorage.setItem('ha-intro-dismissed-ha-frigate-privacy', '1'); } catch (e) {}
+</script>
+<script src="../../ha-frigate-privacy.js"></script>
+<script>
+(function () {
+  const params = new URLSearchParams(location.search);
+  const theme = params.get('theme') === 'dark' ? 'dark' : 'light';
+  document.body.className = theme;
+  const now = Date.now(); const h = 3600000;
+
+  const states = {};
+  const cam = (base, name, detect, recordings) => {
+    states['camera.' + base] = { entity_id: 'camera.' + base, state: 'recording',
+      attributes: { friendly_name: name }, last_changed: new Date(now - h).toISOString(), last_updated: new Date(now - h).toISOString() };
+    states['switch.' + base + '_detect'] = { entity_id: 'switch.' + base + '_detect', state: detect,
+      attributes: { friendly_name: name + ' Detect' }, last_changed: new Date(now - h).toISOString(), last_updated: new Date(now - h).toISOString() };
+    states['switch.' + base + '_recordings'] = { entity_id: 'switch.' + base + '_recordings', state: recordings,
+      attributes: { friendly_name: name + ' Recordings' }, last_changed: new Date(now - h).toISOString(), last_updated: new Date(now - h).toISOString() };
+  };
+  cam('front_door', 'Front Door', 'on', 'on');
+  cam('driveway', 'Driveway', 'on', 'on');
+  cam('backyard', 'Backyard', 'on', 'on');
+  cam('living_room', 'Living Room', 'off', 'off');
+
+  const serverState = { schedules: [
+    { schedule_id: 'sch-1', name: 'Family evening', days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+      start: '17:00', end: '21:00', cameras: ['living_room'], stream_type: 'all', enabled: true },
+  ], paused: {} };
+
+  const hass = {
+    language: 'en',
+    themes: { darkMode: theme === 'dark' },
+    states,
+    services: {},
+    user: { is_admin: true },
+    connection: { subscribeEvents: () => Promise.resolve(() => {}) },
+    callWS: async (msg) => {
+      const t = String(msg && msg.type || '');
+      if (t === 'ha_frigate_privacy/list_cameras') {
+        return { cameras: ['front_door', 'driveway', 'backyard', 'living_room'].map(b => ({
+          camera_id: b, entity_id: 'camera.' + b,
+          name: states['camera.' + b].attributes.friendly_name,
+          switches: [], available_switches: ['switch.' + b + '_detect', 'switch.' + b + '_recordings'],
+          missing_switches: [],
+        })) };
+      }
+      if (t === 'ha_frigate_privacy/get_schedules') return { schedules: serverState.schedules };
+      if (t === 'ha_frigate_privacy/get_state') return serverState;
+      return {};
+    },
+    callApi: async () => ({}),
+    callService: async () => ({}),
+  };
+
+  const card = document.getElementById('card');
+  card.setConfig({ type: 'custom:ha-frigate-privacy' });
+  card.hass = hass;
+  setTimeout(() => { card.hass = { ...hass }; }, 400);
+  const scrub = () => { try {
+    if (!card.shadowRoot) return;
+    card.shadowRoot.querySelectorAll('#tip-banner, [class*="banner"], .donate-section, [class*="donate"], [class*="support"]').forEach(n => {
+      const p = n.parentElement && n.parentElement.children.length === 1 ? n.parentElement : n;
+      p.remove();
+    });
+    card.shadowRoot.querySelectorAll('div,section').forEach(n => {
+      const t = n.textContent || '';
+      if (n.children.length && t.length < 700 && /Support HA Tools Development/.test(t)) n.remove();
+    });
+    if (!card.shadowRoot.getElementById('harness-hacard-fix')) {
+      const st = document.createElement('style');
+      st.id = 'harness-hacard-fix';
+      st.textContent = 'ha-card { background: transparent !important; box-shadow: none !important; border: none !important; }';
+      card.shadowRoot.appendChild(st);
+    }
+  } catch (e) {} };
+  setInterval(scrub, 150);
+  setTimeout(() => { scrub(); document.title = 'FP-READY'; }, 1500);
+})();
+</script>
+</body>
+</html>
