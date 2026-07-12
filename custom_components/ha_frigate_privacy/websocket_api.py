@@ -31,8 +31,11 @@ def _storage(hass: HomeAssistant) -> FrigatePrivacyStorage:
     return hass.data[DOMAIN][DATA_STORAGE]
 
 
+# NOTE: read-only commands (list_cameras, get_schedules, get_state) are open to
+# every logged-in user so the card renders for non-admin household members.
+# Mutating commands (set_schedule, pause_camera, resume_camera) stay admin-only:
+# disabling camera recording/detection is a privileged, security-relevant action.
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/list_cameras"})
-@websocket_api.require_admin
 @websocket_api.async_response
 async def _ws_list_cameras(
     hass: HomeAssistant,
@@ -44,7 +47,6 @@ async def _ws_list_cameras(
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/get_schedules"})
-@websocket_api.require_admin
 @websocket_api.async_response
 async def _ws_get_schedules(
     hass: HomeAssistant,
@@ -163,7 +165,6 @@ async def _ws_resume_camera(
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/get_state"})
-@websocket_api.require_admin
 @websocket_api.async_response
 async def _ws_get_state(
     hass: HomeAssistant,

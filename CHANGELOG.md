@@ -1,5 +1,14 @@
 # Changelog
 
+## [5.0.4] - 2026-07-12
+
+- Fix: the card now renders for non-admin Home Assistant users — read-only websocket
+  commands (`list_cameras`, `get_schedules`, `get_state`) no longer require admin.
+  Mutating commands (`set_schedule`, `pause_camera`, `resume_camera`) stay admin-only
+  on purpose: disabling camera recording/detection is a privileged, security-relevant
+  action, so non-admins get a view-only card.
+- Chore: aligned `const.VERSION` (was stale at 5.0.1) with `manifest.json` (5.0.4).
+
 ## [5.0.3] - 2026-06-15
 
 - Theme: dark/light now follows the active Home Assistant theme (luminance of --card-background-color) instead of OS prefers-color-scheme.
