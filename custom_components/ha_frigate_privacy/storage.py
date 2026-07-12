@@ -144,6 +144,29 @@ class FrigatePrivacyStorage:
             await self._store.async_save(data)
             return deepcopy(paused)
 
+    async def async_mark_overridden(
+        self,
+        camera_id: str,
+        *,
+        on_switches: list[str],
+    ) -> dict[str, Any] | None:
+        """Record that a pause was overridden manually (switches re-enabled).
+
+        Used for schedule-sourced pauses: the entry is kept so the scheduler
+        does not immediately re-apply the window against the user's explicit
+        choice, but the state honestly reflects that privacy is no longer
+        enforced.
+        """
+        async with self._lock:
+            data = await self._ensure_loaded_locked()
+            paused = data["paused"].get(camera_id)
+            if not paused:
+                return None
+            paused["overridden"] = True
+            paused["overridden_switches"] = list(on_switches)
+            await self._store.async_save(data)
+            return deepcopy(paused)
+
     async def _ensure_loaded_locked(self) -> dict[str, Any]:
         """Load storage while the caller holds the lock."""
         if self._data is None:

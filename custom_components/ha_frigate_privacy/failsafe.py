@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from datetime import datetime
 from typing import Any
+
+#: Seconds after pause start during which 'on' switch states are attributed to
+#: MQTT/Frigate confirmation lag rather than a manual override.
+OVERRIDE_GRACE_SECONDS = 90
 
 
 def _stable_list(values: Iterable[str] | None) -> list[str]:
@@ -60,4 +65,36 @@ def decide_resume_exit(
         "attempted": attempted_list,
         "unavailable": unavailable_list,
         "failed": failed_list,
+    }
+
+
+def decide_manual_override(
+    *,
+    started_at: datetime | None,
+    now: datetime,
+    switch_states: Mapping[str, str | None],
+    grace_seconds: int = OVERRIDE_GRACE_SECONDS,
+) -> dict[str, Any]:
+    """Decide whether an active pause was overridden outside the integration.
+
+    A pause is considered manually overridden when, past a short grace period
+    after it started (MQTT/Frigate confirmation lag), at least one of the
+    switches it turned off reports ``on`` again. ``unavailable``/``unknown``/
+    missing states never count as an override — only a positive ``on`` does.
+    """
+    on_switches = _stable_list(
+        entity_id
+        for entity_id, state in switch_states.items()
+        if state == "on"
+    )
+
+    in_grace = False
+    if started_at is not None:
+        elapsed = (now - started_at).total_seconds()
+        in_grace = elapsed < grace_seconds
+
+    return {
+        "override": bool(on_switches) and not in_grace,
+        "in_grace": in_grace,
+        "on_switches": on_switches,
     }

@@ -139,6 +139,7 @@ async def _ws_pause_camera(
         stream_type=msg["stream_type"],
         source="manual",
     )
+    _kick_scheduler_watch(hass)
     result["state"] = await _storage(hass).async_get_state()
     connection.send_result(msg["id"], result)
 
@@ -160,8 +161,20 @@ async def _ws_resume_camera(
 ) -> None:
     """Resume one or more paused cameras."""
     result = await async_resume_cameras(hass, _storage(hass), _camera_refs(msg))
+    _kick_scheduler_watch(hass)
     result["state"] = await _storage(hass).async_get_state()
     connection.send_result(msg["id"], result)
+
+
+def _kick_scheduler_watch(hass: HomeAssistant) -> None:
+    """Refresh the scheduler's instant override listener after pause/resume.
+
+    Keeps manual-override detection armed from the moment a pause starts
+    instead of waiting for the next minute tick.
+    """
+    scheduler = hass.data.get(DOMAIN, {}).get(DATA_SCHEDULER)
+    if scheduler is not None:
+        hass.async_create_task(scheduler._async_refresh_override_watch())  # noqa: SLF001
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/get_state"})

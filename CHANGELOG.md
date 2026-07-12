@@ -1,5 +1,19 @@
 # Changelog
 
+## 5.0.6 (2026-07-12)
+
+- **Manual-override detection (rock-solid pause state).** When switches that a
+  privacy pause turned off are re-enabled outside the integration (Frigate UI,
+  HA dashboard, another automation), the pause no longer stays "active" as a
+  phantom: manual pauses are cancelled (remaining switches restored, state
+  cleared), scheduled windows are marked `overridden` (not re-applied against
+  the user's choice). Both fire a `ha_frigate_privacy_pause_interrupted` event
+  and create a persistent notification explaining what happened.
+- Detection is instant (state listener on the paused switches) with a
+  per-minute tick as backstop, and a 90 s grace period so MQTT/Frigate
+  confirmation lag is never misread as an override.
+- New pure helper `decide_manual_override` in `failsafe.py` + 4 unit tests.
+
 ## [5.0.5] - 2026-07-12
 
 - Fix: pause-duration input is now clamped client-side to the server-accepted
