@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.0.7 (2026-07-17)
+
+- Fix (UI): responsive tab bar — tabs now stretch to fill the card width and wrap on narrow layouts instead of being pinned to content width and clipped (shared HA Tools tab styling; was `flex:none`+`width:fit-content`).
+
 ## 5.0.6 (2026-07-12)
 
 - **Manual-override detection (rock-solid pause state).** When switches that a
