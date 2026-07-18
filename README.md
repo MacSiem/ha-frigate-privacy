@@ -36,7 +36,7 @@ the card, your Frigate cameras are discovered and ready to pause — no YAML.
 |---|---|
 | Discovering Frigate cameras | Pressing pause / resume in the card |
 | Auto-resume after a timed pause | Creating privacy schedules |
-| Fail-safe checks before resume | Choosing stream type (detect/record/all) |
+| Fail-safe checks before resume | Choosing stream type (`all` / `main` / `sub`) |
 | Per-camera `*_privacy_active` sensor | — |
 
 > **Non-admin users:** since v5.0.4 the card renders for every logged-in user.

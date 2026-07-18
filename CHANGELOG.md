@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.0.10 (2026-07-18)
+
+- Docs: correct the stream-type values in the feature table (all / main / sub, not detect/record/all).
+
 ## 5.0.9 (2026-07-18)
 
 - Fix (UI): the small accent dot before section titles no longer detaches from the title text (it was pushed to the opposite edge by the header's flex space-between); it is now pinned next to the title.
