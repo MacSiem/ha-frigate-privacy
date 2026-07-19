@@ -1,4 +1,4 @@
-/* HA Tools split — ha-frigate-privacy v5.0.11 (2026-07-12) — single-tool standalone repo */
+/* HA Tools split — ha-frigate-privacy v5.1.0 (2026-07-19) — single-tool standalone repo */
 (function() {
 'use strict';
 
@@ -791,6 +791,8 @@ class HaFrigatePrivacy extends HTMLElement {
         running: 'Dziala',
         stopped: 'Zatrzymany',
         unknown: 'Nieznany',
+        statusRecording: 'Nagrywa',
+        statusPrivacyOn: 'Prywatnosc wl.',
         selectCameras: 'Wybierz kamery',
         allCameras: 'Wszystkie kamery',
         pauseType: 'Co pauzowac',
@@ -801,6 +803,8 @@ class HaFrigatePrivacy extends HTMLElement {
         pauseTypeMainHint: 'Stop nagrywania i snapshotow; detekcja dziala dalej',
         pauseTypeSubHint: 'Stop detekcji/motion/audio; nagrywanie biezace dziala',
         quickPause: 'Szybka pauza',
+        pauseDurationTitle: 'Na jak dlugo',
+        pauseFor: 'Wstrzymaj na',
         customDuration: 'Wlasny czas (min)',
         pauseFrigate: 'Wstrzymaj Frigate',
         resumeFrigate: 'Wznow Frigate',
@@ -868,6 +872,8 @@ class HaFrigatePrivacy extends HTMLElement {
         running: 'Running',
         stopped: 'Stopped',
         unknown: 'Unknown',
+        statusRecording: 'Recording',
+        statusPrivacyOn: 'Privacy on',
         selectCameras: 'Select cameras',
         allCameras: 'All cameras',
         pauseType: 'What to pause',
@@ -878,6 +884,8 @@ class HaFrigatePrivacy extends HTMLElement {
         pauseTypeMainHint: 'Stop recording + snapshots; detection still runs',
         pauseTypeSubHint: 'Stop detect/motion/audio; recording still runs',
         quickPause: 'Quick pause',
+        pauseDurationTitle: 'For how long',
+        pauseFor: 'Pause for',
         customDuration: 'Custom duration (min)',
         pauseFrigate: 'Pause Frigate',
         resumeFrigate: 'Resume Frigate',
@@ -2319,9 +2327,9 @@ class HaFrigatePrivacy extends HTMLElement {
           <span class="header-icon">\uD83D\uDD12</span>
           <h2>${t.title}</h2>
         </div>
-        <div class="status-badge ${this._frigateRunning === true ? 'status-running' : this._frigateRunning === false ? 'status-stopped' : 'status-unknown'}">
+        <div class="status-badge ${this._privacyActive ? 'status-paused' : this._frigateRunning === false ? 'status-stopped' : this._frigateRunning === true ? 'status-running' : 'status-unknown'}" title="${this._privacyActive ? t.privacyActive : this._frigateRunning === false ? t.stopped : this._frigateRunning === true ? t.statusRecording : t.unknown}">
           <span class="status-dot"></span>
-          ${this._frigateRunning === true ? t.running : this._frigateRunning === false ? t.stopped : t.unknown}
+          ${this._privacyActive ? t.statusPrivacyOn : this._frigateRunning === false ? t.stopped : this._frigateRunning === true ? t.statusRecording : t.unknown}
         </div>
       </div>
 
@@ -2410,10 +2418,12 @@ class HaFrigatePrivacy extends HTMLElement {
       : pauseType === 'sub' ? t.pauseTypeSubHint
       : t.pauseTypeAllHint;
 
-    // Quick pause buttons
+    // Quick-duration chips — SELECT the pause length; they no longer pause on
+    // their own. The single Pause button below is the only trigger.
     const quickButtons = [15, 30, 60, 120].map(m => {
       const label = m >= 60 ? (m / 60) + 'h' : m + 'min';
-      return `<button class="btn btn-quick" data-minutes="${m}" aria-label="Pause for ${label}">${label}</button>`;
+      const sel = m === this._customMinutes ? ' selected' : '';
+      return `<button class="btn btn-quick${sel}" data-minutes="${m}" aria-pressed="${m === this._customMinutes}" aria-label="${label}">${label}</button>`;
     }).join('');
 
     return `
@@ -2440,19 +2450,15 @@ class HaFrigatePrivacy extends HTMLElement {
       </div>
 
       <div class="section">
-        <h3>${t.quickPause}</h3>
+        <h3>${t.pauseDurationTitle}</h3>
         <div class="quick-buttons">
           ${quickButtons}
         </div>
-      </div>
-
-      <div class="section">
-        <h3>${t.customDuration}</h3>
         <div class="custom-pause">
-          <input type="number" class="input-minutes" min="1" max="1440" value="${this._customMinutes}" />
+          <input type="number" class="input-minutes" min="1" max="1440" value="${this._customMinutes}" aria-label="${t.customDuration}" />
           <span class="input-suffix">${t.min}</span>
           <button class="btn btn-primary btn-pause" data-action="pause-custom" ${this._privacyActive ? 'disabled' : ''}>
-            ${t.pauseFrigate}
+            ${t.pauseFor} ${this._customMinutes} ${t.min}
           </button>
         </div>
       </div>
@@ -2643,7 +2649,10 @@ class HaFrigatePrivacy extends HTMLElement {
             : 'You can add Frigate Privacy as a card in your dashboard or as a Bubble Card button.'}
         </p>
 
-        <div class="code-block">
+        <details class="integration-docs" style="margin-top:4px;">
+          <summary style="cursor:pointer;font-weight:600;color:var(--bento-primary);padding:8px 0;user-select:none;font-size:0.92em;">${this._lang === 'pl' ? 'Jak dodac te karte do dashboardu (YAML, Bubble Card, automatyzacja)' : 'How to add this card (YAML, Bubble Card, automation)'}</summary>
+
+        <div class="code-block" style="margin-top:8px;">
           <div class="code-label">${this._lang === 'pl' ? 'Karta Lovelace (manual YAML)' : 'Lovelace Card (manual YAML)'}</div>
           <pre style="background:var(--bento-card);padding:10px;border-radius:6px;font-size:0.85em;overflow-x:auto;color:var(--bento-text);">type: custom:ha-frigate-privacy
 # ${this._lang === 'pl' ? 'Opcjonalna konfiguracja:' : 'Optional config:'}
@@ -2705,6 +2714,7 @@ tap_action:
         target:
           entity_id: input_boolean.frigate_privacy_mode</pre>
         </div>
+        </details>
       </div>
     `;
   }
@@ -2753,11 +2763,13 @@ tap_action:
       });
     });
 
-    // Quick pause buttons (skip stream-type buttons — they have their own handler above)
+    // Quick-duration chips: SELECT the pause length (no immediate pause).
+    // Removes the old two-competing-paths flow; the single Pause button fires.
     sr.querySelectorAll('.btn-quick').forEach(btn => {
       if (btn.classList.contains('stream-type-btn')) return;
       btn.addEventListener('click', () => {
-        this._pauseFrigate(parseInt(btn.dataset.minutes));
+        this._customMinutes = parseInt(btn.dataset.minutes, 10);
+        this._updateUI();
       });
     });
 
@@ -2943,6 +2955,8 @@ tap_action:
 .status-stopped .status-dot { background: var(--bento-error, #EF4444); }
 .status-unknown { background: rgba(148,163,184,0.12); color: var(--bento-text-secondary, #94a3b8); }
 .status-unknown .status-dot { background: var(--bento-text-secondary, #94a3b8); }
+.status-paused { background: rgba(245,158,11,0.14); color: var(--bento-warning, #F59E0B); }
+.status-paused .status-dot { background: var(--bento-warning, #F59E0B); }
 
 /* Tabs */
 .tabs {
@@ -3162,6 +3176,11 @@ tap_action:
   border-color: var(--bento-primary);
   background: rgba(59,130,246,0.06);
   color: var(--bento-primary);
+}
+.btn-quick.selected {
+  background: var(--bento-primary);
+  color: #fff;
+  border-color: var(--bento-primary);
 }
 
 .btn-primary { background: var(--bento-primary); color: #fff; }

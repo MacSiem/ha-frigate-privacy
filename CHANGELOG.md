@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.1.0 (2026-07-19)
+
+UX clarity pass on the Control tab and Settings (no functional/entity changes):
+
+- Header status badge now reflects **privacy state**, not the Frigate add-on process. It shows green "Recording" when cameras are live, amber "Privacy on" while a privacy pause is active, red "Stopped" when Frigate is down, and grey "Unknown" when the state can't be determined. Previously the badge could read "Running" (green) while the card's own privacy banner said privacy was active — a direct contradiction.
+- Unified the pause flow. The quick-duration chips (15 min / 30 min / 1 h / 2 h) now **select** a duration and highlight the choice; they no longer start a pause on their own. A single primary button ("Pause for N min", label updates with the selection) is the one and only trigger, and it stays in sync with the custom-minutes field. Removes the previous two-competing-paths confusion where chips paused instantly while a separate button did too.
+- Settings: the "Dashboard Integration" YAML / Bubble Card / automation snippets are now tucked inside a collapsed "How to add this card" disclosure, so the Settings tab opens compact instead of a wall of code.
+
 ## 5.0.11 (2026-07-18)
 
 - Fix: cameras added to Frigate after this integration loads now get their `binary_sensor.<camera>_privacy_active` entity automatically. Previously entities were only created once at startup, so cameras discovered later (Frigate booting after HA, or a newly added camera) had no privacy sensor until a reload. Pause/resume already handled late cameras; this closes the gap for the sensors.

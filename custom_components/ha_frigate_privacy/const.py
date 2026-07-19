@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 DOMAIN = "ha_frigate_privacy"
-VERSION = "5.0.11"
+VERSION = "5.1.0"
 
 EVENT_STATE_CHANGED = f"{DOMAIN}_state_changed"
 
