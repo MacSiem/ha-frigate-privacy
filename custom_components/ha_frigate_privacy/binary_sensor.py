@@ -6,11 +6,12 @@ from typing import Any
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EVENT_STATE_CHANGED as HA_EVENT_STATE_CHANGED
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DATA_STORAGE, DOMAIN, EVENT_STATE_CHANGED
-from .control import discover_frigate_cameras
+from .control import DISCOVERY_SUFFIXES, discover_frigate_cameras
 from .storage import FrigatePrivacyStorage
 
 
@@ -19,18 +20,53 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up binary_sensor.<cam>_privacy_active entities."""
+    """Set up binary_sensor.<cam>_privacy_active entities.
+
+    Cameras added to Frigate after this integration loads (Frigate booted
+    later, or a camera was added) create their switch.<cam>_detect entities
+    afterwards. A one-shot discovery at setup would miss them, so we also
+    listen for new Frigate switches and add the missing sensors on the fly.
+    """
     storage: FrigatePrivacyStorage = hass.data[DOMAIN][DATA_STORAGE]
     paused = await storage.async_get_paused(None) or {}
     discovered = discover_frigate_cameras(hass)
     names = {item["camera_id"]: item["name"] for item in discovered}
     camera_ids = sorted(set(names) | set(paused))
+    known: set[str] = set(camera_ids)
     async_add_entities(
         [
             FrigatePrivacyActiveSensor(storage, camera_id, names.get(camera_id))
             for camera_id in camera_ids
         ],
         True,
+    )
+
+    @callback
+    def _async_add_new_cameras(event: Event) -> None:
+        """Create sensors for cameras discovered after setup."""
+        entity_id = event.data.get("entity_id", "")
+        if not entity_id.startswith("switch.") or event.data.get("new_state") is None:
+            return
+        name = entity_id.split(".", 1)[1]
+        if not any(name.endswith(suffix) for suffix in DISCOVERY_SUFFIXES):
+            return
+        current = {item["camera_id"]: item["name"] for item in discover_frigate_cameras(hass)}
+        new_ids = [cid for cid in current if cid not in known]
+        if not new_ids:
+            return
+        known.update(new_ids)
+        async_add_entities(
+            [
+                FrigatePrivacyActiveSensor(storage, cid, current.get(cid))
+                for cid in sorted(new_ids)
+            ],
+            True,
+        )
+
+    # We cannot know the future switch entity ids, so listen on the state bus
+    # and filter for newly-created Frigate switches inside the callback.
+    entry.async_on_unload(
+        hass.bus.async_listen(HA_EVENT_STATE_CHANGED, _async_add_new_cameras)
     )
 
 

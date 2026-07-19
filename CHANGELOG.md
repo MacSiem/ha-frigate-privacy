@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.0.11 (2026-07-18)
+
+- Fix: cameras added to Frigate after this integration loads now get their `binary_sensor.<camera>_privacy_active` entity automatically. Previously entities were only created once at startup, so cameras discovered later (Frigate booting after HA, or a newly added camera) had no privacy sensor until a reload. Pause/resume already handled late cameras; this closes the gap for the sensors.
+
 ## 5.0.10 (2026-07-18)
 
 - Docs: correct the stream-type values in the feature table (all / main / sub, not detect/record/all).
