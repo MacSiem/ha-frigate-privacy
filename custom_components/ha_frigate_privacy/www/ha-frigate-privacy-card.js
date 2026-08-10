@@ -733,6 +733,8 @@ class HaFrigatePrivacy extends HTMLElement {
     this._schedules = [];
     this._scheduleForm = { enabled: true, days: [1,2,3,4,5], startHour: 18, startMin: 0, endHour: 20, endMin: 0, repeat: true, label: '' };
     this._editingScheduleIdx = null;
+    this._scheduleFormDirty = false;
+    this._scheduleFormDirty = false;
     this._helpersChecked = false;
     this._lastScheduleCheck = 0;
     this._history = [];
@@ -750,6 +752,8 @@ class HaFrigatePrivacy extends HTMLElement {
     try {
       const saved = localStorage.getItem('ha-frigate-privacy-pause-stream-type');
       if (saved === 'main' || saved === 'sub' || saved === 'all') this._pauseStreamType = saved;
+      const savedMin = parseInt(localStorage.getItem('ha-frigate-privacy-pause-minutes'), 10);
+      if (Number.isFinite(savedMin) && savedMin >= 1 && savedMin <= 1440) this._customMinutes = savedMin;
     } catch(e) { /* ignore */ }
     this._integrationAvailable = false;
     this._integrationChecked = false;
@@ -805,6 +809,12 @@ class HaFrigatePrivacy extends HTMLElement {
         quickPause: 'Szybka pauza',
         pauseDurationTitle: 'Na jak dlugo',
         pauseFor: 'Wstrzymaj na',
+        choiceHint: 'Wybory ponizej zadzialaja dopiero po nacisnieciu przycisku ponizej',
+        willPause: 'Zostanie wstrzymane',
+        appliesImmediately: 'Zmiany zapisuja sie od razu',
+        savedWithButton: 'Zmiany zapisza sie dopiero po nacisnieciu Zapisz',
+        settingsSaved: 'Ustawienia zapisane',
+        unsavedChanges: 'Niezapisane zmiany',
         customDuration: 'Wlasny czas (min)',
         pauseFrigate: 'Wstrzymaj Frigate',
         resumeFrigate: 'Wznow Frigate',
@@ -886,6 +896,12 @@ class HaFrigatePrivacy extends HTMLElement {
         quickPause: 'Quick pause',
         pauseDurationTitle: 'For how long',
         pauseFor: 'Pause for',
+        choiceHint: 'These choices take effect only when you press the button below',
+        willPause: 'Will pause',
+        appliesImmediately: 'Changes apply immediately',
+        savedWithButton: 'Changes are only saved when you press Save',
+        settingsSaved: 'Settings saved',
+        unsavedChanges: 'Unsaved changes',
         customDuration: 'Custom duration (min)',
         pauseFrigate: 'Pause Frigate',
         resumeFrigate: 'Resume Frigate',
@@ -2133,6 +2149,14 @@ class HaFrigatePrivacy extends HTMLElement {
     }
   }
 
+  // Reveals the "unsaved changes" chip without a re-render, so typing in a
+  // text/number field never loses focus (see network-map focus-loss lesson).
+  _markScheduleDirty() {
+    this._scheduleFormDirty = true;
+    const chip = this.shadowRoot?.querySelector('.dirty-chip');
+    if (chip) chip.hidden = false;
+  }
+
   _showToast(msg, type) {
     const toast = this.shadowRoot?.querySelector('.toast');
     if (!toast) return;
@@ -2158,9 +2182,11 @@ class HaFrigatePrivacy extends HTMLElement {
   _resetScheduleForm() {
     this._scheduleForm = { enabled: true, days: [1,2,3,4,5], startHour: 18, startMin: 0, endHour: 20, endMin: 0, repeat: true, label: '' };
     this._editingScheduleIdx = null;
+    this._scheduleFormDirty = false;
   }
 
   async _saveScheduleFromForm() {
+    this._scheduleFormDirty = false;
     // Create HA-native helpers (timer + input_text + resume-automation) on first
     // schedule save — without these, scheduled pause cannot resume the cameras
     // server-side when the user's browser is closed.
@@ -2408,7 +2434,7 @@ class HaFrigatePrivacy extends HTMLElement {
 
     // Pause type selector (v4.1.6)
     const pauseType = this._pauseStreamType || 'all';
-    const typeBtn = (key, label, hint) => `<button class="btn btn-quick stream-type-btn ${pauseType === key ? 'selected' : ''}" data-stream-type="${key}" title="${hint}" aria-pressed="${pauseType === key}">${label}</button>`;
+    const typeBtn = (key, label, hint) => `<button class="seg-item stream-type-btn ${pauseType === key ? 'selected' : ''}" data-stream-type="${key}" title="${hint}" role="radio" aria-checked="${pauseType === key}">${label}</button>`;
     const pauseTypeButtons = `
       ${typeBtn('all', t.pauseTypeAll, t.pauseTypeAllHint)}
       ${typeBtn('main', t.pauseTypeMain, t.pauseTypeMainHint)}
@@ -2418,13 +2444,23 @@ class HaFrigatePrivacy extends HTMLElement {
       : pauseType === 'sub' ? t.pauseTypeSubHint
       : t.pauseTypeAllHint;
 
-    // Quick-duration chips — SELECT the pause length; they no longer pause on
-    // their own. The single Pause button below is the only trigger.
+    // Quick-duration chips — a CHOICE feeding the Pause button (never an action
+    // on their own). Rendered as a segmented control so they cannot be mistaken
+    // for the filled action button below.
     const quickButtons = [15, 30, 60, 120].map(m => {
       const label = m >= 60 ? (m / 60) + 'h' : m + 'min';
       const sel = m === this._customMinutes ? ' selected' : '';
-      return `<button class="btn btn-quick${sel}" data-minutes="${m}" aria-pressed="${m === this._customMinutes}" aria-label="${label}">${label}</button>`;
+      return `<button class="seg-item duration-btn${sel}" data-minutes="${m}" role="radio" aria-checked="${m === this._customMinutes}" aria-label="${label}">${label}</button>`;
     }).join('');
+
+    // What the Pause button will actually do, spelled out.
+    const camSummary = this._selectedCameras.size === 0
+      ? t.allCameras
+      : this._cameras.filter(c => this._selectedCameras.has(c.entity_id))
+          .map(c => this._sanitize(c.name)).join(', ');
+    const streamSummary = pauseType === 'main' ? t.pauseTypeMain
+      : pauseType === 'sub' ? t.pauseTypeSub
+      : t.pauseTypeAll;
 
     return `
       ${privacyBanner}
@@ -2443,7 +2479,7 @@ class HaFrigatePrivacy extends HTMLElement {
 
       <div class="section">
         <h3>${t.pauseType}</h3>
-        <div class="quick-buttons stream-type-row">
+        <div class="seg stream-type-row" role="radiogroup" aria-label="${t.pauseType}">
           ${pauseTypeButtons}
         </div>
         <div class="stream-type-hint">${pauseTypeHint}</div>
@@ -2451,16 +2487,21 @@ class HaFrigatePrivacy extends HTMLElement {
 
       <div class="section">
         <h3>${t.pauseDurationTitle}</h3>
-        <div class="quick-buttons">
+        <div class="seg" role="radiogroup" aria-label="${t.pauseDurationTitle}">
           ${quickButtons}
         </div>
+        <div class="apply-note apply-note-deferred">${t.choiceHint}</div>
         <div class="custom-pause">
           <input type="number" class="input-minutes" min="1" max="1440" value="${this._customMinutes}" aria-label="${t.customDuration}" />
           <span class="input-suffix">${t.min}</span>
-          <button class="btn btn-primary btn-pause" data-action="pause-custom" ${this._privacyActive ? 'disabled' : ''}>
-            ${t.pauseFor} ${this._customMinutes} ${t.min}
-          </button>
         </div>
+        <div class="apply-summary">
+          <span class="apply-summary-label">${t.willPause}:</span>
+          <span class="apply-summary-value">${_esc(camSummary)} \u00B7 ${streamSummary} \u00B7 ${this._customMinutes} ${t.min}</span>
+        </div>
+        <button class="btn btn-primary btn-pause btn-full" data-action="pause-custom" ${this._privacyActive ? 'disabled' : ''}>
+          ${t.pauseFor} ${this._customMinutes} ${t.min}
+        </button>
       </div>
 
       ${!this._privacyActive && this._frigateRunning === false ? `
@@ -2505,7 +2546,7 @@ class HaFrigatePrivacy extends HTMLElement {
     const f = this._scheduleForm;
     const dayButtons = [1,2,3,4,5,6,7].map(d => {
       const active = f.days.includes(d);
-      return `<button class="day-btn ${active ? 'active' : ''}" data-day="${d}">${t.days[d-1]}</button>`;
+      return `<button class="seg-item day-btn ${active ? 'selected' : ''}" data-day="${d}" role="checkbox" aria-checked="${active}">${t.days[d-1]}</button>`;
     }).join('');
 
     return `
@@ -2524,7 +2565,7 @@ class HaFrigatePrivacy extends HTMLElement {
 
         <div class="form-row">
           <label>${t.days[0]} - ${t.days[6]}</label>
-          <div class="day-selector">${dayButtons}</div>
+          <div class="day-selector seg" role="group">${dayButtons}</div>
         </div>
 
         <div class="form-row time-row">
@@ -2549,9 +2590,12 @@ class HaFrigatePrivacy extends HTMLElement {
           </label>
         </div>
 
+        <div class="apply-note apply-note-deferred">${t.savedWithButton}</div>
+
         <div class="form-buttons">
           <button class="btn btn-primary" data-action="save-schedule">${t.saveSchedule}</button>
           ${isEditing ? `<button class="btn btn-secondary" data-action="cancel-edit">${t.cancelEdit}</button>` : ''}
+          <span class="dirty-chip" ${this._scheduleFormDirty ? '' : 'hidden'}>${t.unsavedChanges}</span>
         </div>
       </div>
     `;
@@ -2610,25 +2654,27 @@ class HaFrigatePrivacy extends HTMLElement {
     return `
       <div class="section">
         <h3>\uD83D\uDD14 ${t.notifications}</h3>
+        <div class="apply-note apply-note-instant">${t.appliesImmediately}</div>
 
         <div class="form-row">
-          <label class="toggle-row">
-            <input type="checkbox" class="input-notify-enabled" ${this._notifyEnabled ? 'checked' : ''} />
-            <span>${t.notifyEnabled}</span>
+          <label class="switch-row">
+            <input type="checkbox" class="input-notify-enabled switch-input" role="switch" aria-checked="${!!this._notifyEnabled}" ${this._notifyEnabled ? 'checked' : ''} />
+            <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+            <span class="switch-label">${t.notifyEnabled}</span>
           </label>
         </div>
 
-        <div class="form-row">
+        <div class="form-row ${this._notifyEnabled ? '' : 'is-disabled'}">
           <label>${t.notifyService}</label>
-          <select class="input-notify-service setting-select">
+          <select class="input-notify-service setting-select" ${this._notifyEnabled ? '' : 'disabled'}>
             ${serviceOptions.join('')}
           </select>
         </div>
 
-        <div class="form-row">
+        <div class="form-row ${this._notifyEnabled ? '' : 'is-disabled'}">
           <label>${t.notifyBeforeEnd}</label>
           <div class="inline-input">
-            <input type="number" class="input-time input-notify-before" min="1" max="30" value="${this._notifyBeforeEndMin}" />
+            <input type="number" class="input-time input-notify-before" min="1" max="30" value="${this._notifyBeforeEndMin}" ${this._notifyEnabled ? '' : 'disabled'} />
             <span>${t.min}</span>
           </div>
         </div>
@@ -2727,7 +2773,9 @@ tap_action:
     sr.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         this._activeTab = btn.dataset.tab;
-        history.replaceState(null, '', location.pathname + '#' + this._toolId + '/' + this._activeTab);
+        // Never let a blocked History API (sandboxed/embedded contexts) stop the
+        // tab from actually switching.
+        try { history.replaceState(null, '', location.pathname + '#' + this._toolId + '/' + this._activeTab); } catch(_) { /* ignore */ }
         this._updateUI();
       });
     });
@@ -2764,11 +2812,12 @@ tap_action:
     });
 
     // Quick-duration chips: SELECT the pause length (no immediate pause).
-    // Removes the old two-competing-paths flow; the single Pause button fires.
-    sr.querySelectorAll('.btn-quick').forEach(btn => {
-      if (btn.classList.contains('stream-type-btn')) return;
+    // Same persistence semantics as the stream-type chips above, so the two
+    // visually identical rows also behave identically.
+    sr.querySelectorAll('.duration-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         this._customMinutes = parseInt(btn.dataset.minutes, 10);
+        try { localStorage.setItem('ha-frigate-privacy-pause-minutes', String(this._customMinutes)); } catch(_) { /* ignore */ }
         this._updateUI();
       });
     });
@@ -2807,12 +2856,13 @@ tap_action:
     // Schedule form inputs
     const labelInput = sr.querySelector('.input-label');
     if (labelInput) {
-      labelInput.addEventListener('input', (e) => { this._scheduleForm.label = e.target.value; });
+      labelInput.addEventListener('input', (e) => { this._scheduleForm.label = e.target.value; this._markScheduleDirty(); });
     }
 
     sr.querySelectorAll('.day-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const day = parseInt(btn.dataset.day);
+        this._scheduleFormDirty = true;
         const idx = this._scheduleForm.days.indexOf(day);
         if (idx >= 0) {
           this._scheduleForm.days.splice(idx, 1);
@@ -2827,14 +2877,14 @@ tap_action:
     const startMin = sr.querySelector('.input-start-min');
     const endHour = sr.querySelector('.input-end-hour');
     const endMin = sr.querySelector('.input-end-min');
-    if (startHour) startHour.addEventListener('change', (e) => { this._scheduleForm.startHour = parseInt(e.target.value); });
-    if (startMin) startMin.addEventListener('change', (e) => { this._scheduleForm.startMin = parseInt(e.target.value); });
-    if (endHour) endHour.addEventListener('change', (e) => { this._scheduleForm.endHour = parseInt(e.target.value); });
-    if (endMin) endMin.addEventListener('change', (e) => { this._scheduleForm.endMin = parseInt(e.target.value); });
+    if (startHour) startHour.addEventListener('change', (e) => { this._scheduleForm.startHour = parseInt(e.target.value); this._markScheduleDirty(); });
+    if (startMin) startMin.addEventListener('change', (e) => { this._scheduleForm.startMin = parseInt(e.target.value); this._markScheduleDirty(); });
+    if (endHour) endHour.addEventListener('change', (e) => { this._scheduleForm.endHour = parseInt(e.target.value); this._markScheduleDirty(); });
+    if (endMin) endMin.addEventListener('change', (e) => { this._scheduleForm.endMin = parseInt(e.target.value); this._markScheduleDirty(); });
 
     const repeatInput = sr.querySelector('.input-repeat');
     if (repeatInput) {
-      repeatInput.addEventListener('change', (e) => { this._scheduleForm.repeat = e.target.checked; });
+      repeatInput.addEventListener('change', (e) => { this._scheduleForm.repeat = e.target.checked; this._markScheduleDirty(); });
     }
 
     // Save schedule
@@ -2868,6 +2918,10 @@ tap_action:
       notifyEnabledCb.addEventListener('change', (e) => {
         this._notifyEnabled = e.target.checked;
         this._saveNotifySettings();
+        // Re-render first (dependent rows enable/disable), then toast — a
+        // re-render replaces the toast node and would swallow the message.
+        this._updateUI();
+        this._showToast(this._t.settingsSaved, 'success');
       });
     }
 
@@ -2877,6 +2931,7 @@ tap_action:
       notifyServiceSel.addEventListener('change', (e) => {
         this._notifyService = e.target.value;
         this._saveNotifySettings();
+        this._showToast(this._t.settingsSaved, 'success');
       });
     }
 
@@ -2886,6 +2941,7 @@ tap_action:
       notifyBeforeInput.addEventListener('change', (e) => {
         this._notifyBeforeEndMin = parseInt(e.target.value) || 5;
         this._saveNotifySettings();
+        this._showToast(this._t.settingsSaved, 'success');
       });
     }
   }
@@ -3182,6 +3238,185 @@ tap_action:
   color: #fff;
   border-color: var(--bento-primary);
 }
+
+/* --- Interaction language (v5.2.0) -------------------------------------
+   .seg / .seg-item -> a CHOICE that feeds the action button below it
+   .switch-row      -> APPLIES IMMEDIATELY
+   plain checkbox   -> form field, committed by an explicit Save button
+   filled .btn      -> performs an action NOW
+   Shape encodes behaviour, so nothing has to be discovered by clicking.
+----------------------------------------------------------------------- */
+.seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bento-bg);
+  border: 1px solid var(--bento-border);
+  border-radius: var(--bento-radius-sm);
+  max-width: 100%;
+}
+
+.seg-item {
+  flex: 1 1 auto;
+  min-width: 64px;
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--bento-radius-sm) - 2px);
+  background: transparent;
+  color: var(--bento-text-secondary);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--bento-transition);
+}
+
+.seg-item:hover {
+  color: var(--bento-primary);
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.seg-item.selected {
+  background: var(--bento-card);
+  border-color: var(--bento-primary);
+  color: var(--bento-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.seg-item:focus-visible {
+  outline: 2px solid var(--bento-primary);
+  outline-offset: 2px;
+}
+
+.seg-item.day-btn {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 48px;
+  height: auto;
+  padding: 8px 10px;
+}
+
+.apply-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 8px 0 12px;
+  font-size: 0.82em;
+  line-height: 1.45;
+  color: var(--bento-text-secondary);
+}
+
+.apply-note::before {
+  flex: none;
+  font-size: 1em;
+  line-height: 1.45;
+}
+
+.apply-note-deferred::before { content: '\u21B3'; }
+.apply-note-instant::before { content: '\u26A1'; }
+
+.apply-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  background: var(--bento-bg);
+  border: 1px dashed var(--bento-border);
+  border-radius: var(--bento-radius-sm);
+  font-size: 0.9em;
+}
+
+.apply-summary-label { color: var(--bento-text-secondary); }
+.apply-summary-value { color: var(--bento-text); font-weight: 600; }
+
+/* Switch = applies immediately */
+.switch-row {
+  /* !important beats the generic .form-row label display:block rule */
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 0 !important;
+  cursor: pointer;
+  min-height: 44px;
+  font-size: 0.95em !important;
+  color: var(--bento-text) !important;
+}
+
+.switch-row .switch-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switch-track {
+  position: relative;
+  flex: none;
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--bento-border);
+  transition: var(--bento-transition);
+}
+
+.switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: var(--bento-transition);
+}
+
+.switch-input:checked + .switch-track { background: var(--bento-primary); }
+.switch-input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+.switch-input:focus-visible + .switch-track {
+  outline: 2px solid var(--bento-primary);
+  outline-offset: 2px;
+}
+
+.switch-label { font-size: 0.95em; font-weight: 500; color: var(--bento-text); }
+
+.form-row.is-disabled { opacity: 0.5; }
+.form-row.is-disabled select,
+.form-row.is-disabled input { cursor: not-allowed; }
+
+.dirty-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bento-warning-light);
+  border: 1px solid var(--bento-warning-border);
+  color: var(--bento-warning);
+  font-size: 0.8em;
+  font-weight: 600;
+}
+
+.dirty-chip[hidden] { display: none; }
+
+/* Expander affordance: a chevron that rotates, so "this opens" is visible */
+.integration-docs > summary { list-style: none; display: flex; align-items: center; gap: 8px; }
+.integration-docs > summary::-webkit-details-marker { display: none; }
+.integration-docs > summary::before {
+  content: '\u203A';
+  display: inline-block;
+  flex: none;
+  font-size: 1.4em;
+  line-height: 1;
+  transition: transform 0.18s ease;
+}
+.integration-docs[open] > summary::before { transform: rotate(90deg); }
 
 .btn-primary { background: var(--bento-primary); color: #fff; }
 .btn-primary:hover { background: var(--bento-primary-hover); }

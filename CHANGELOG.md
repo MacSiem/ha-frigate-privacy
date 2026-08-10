@@ -1,5 +1,18 @@
 # Changelog
 
+## 5.2.0 (2026-08-10)
+
+- **UX (clarity): one consistent interaction language across the whole card.** Controls now look like what they do, so nothing has to be discovered by clicking:
+  - **Segmented chips** (What to pause, For how long, weekdays) = a *choice* that feeds the button below. They previously rendered as solid filled buttons, visually identical to the real action button, which made selections look like they had already done something.
+  - **Switch** (Settings) = *applies immediately*.
+  - **Plain checkbox** (schedule Repeat) = a form field, committed by Save.
+  - **Filled button** = performs the action now. The Control tab has exactly one.
+- Control tab: added a "Will pause: <cameras> / <stream type> / <duration>" summary plus an explicit note that the choices only take effect when the Pause button is pressed.
+- Settings tab: notification changes are labelled "Changes apply immediately" and now confirm with a toast (previously they saved silently, with no feedback at all). Service and lead-time fields are disabled while notifications are off.
+- Schedule tab: added a "Changes are only saved when you press Save" note and an "Unsaved changes" chip that appears as soon as the form is edited (revealed without a re-render, so typing never loses focus).
+- The quick-duration choice is now remembered across reloads, exactly like the stream-type choice (previously only one of the two identical-looking rows persisted).
+- Tab switching no longer depends on the History API succeeding (a blocked `replaceState` in a sandboxed/embedded context used to stop the tab from switching).
+
 ## 5.1.0 (2026-07-19)
 
 UX clarity pass on the Control tab and Settings (no functional/entity changes):
