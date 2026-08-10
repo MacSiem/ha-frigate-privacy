@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.2.1 (2026-08-10)
+
+- Fix: `VERSION` in `const.py` still read `5.1.0` in 5.2.0. That constant builds the card's cache-busting URL (`add_extra_js_url(... ?v={VERSION})`), so upgrading browsers would have kept serving the cached pre-5.2.0 card and none of the UX changes would have appeared. Version constants are now aligned across `const.py`, `manifest.json` and the card header. Use this release instead of 5.2.0.
+
 ## 5.2.0 (2026-08-10)
 
 - **UX (clarity): one consistent interaction language across the whole card.** Controls now look like what they do, so nothing has to be discovered by clicking:

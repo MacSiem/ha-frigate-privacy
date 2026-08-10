@@ -1,4 +1,4 @@
-/* HA Tools split — ha-frigate-privacy v5.1.0 (2026-07-19) — single-tool standalone repo */
+/* HA Tools split — ha-frigate-privacy v5.2.1 (2026-08-10) — single-tool standalone repo */
 (function() {
 'use strict';
 
