@@ -12,6 +12,7 @@ from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import Unauthorized
 
 from .const import (
     DATA_FRONTEND_REGISTERED,
@@ -103,7 +104,7 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
     card_path = os.path.join(
         os.path.dirname(__file__), _CARD_PACKAGE_DIR, _CARD_FILENAME
     )
-    if not os.path.isfile(card_path):
+    if not await hass.async_add_executor_job(os.path.isfile, card_path):
         _LOGGER.error("Bundled Frigate Privacy card missing at %s", card_path)
         return
 
@@ -126,6 +127,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
         return
 
     async def _handle_pause(call: ServiceCall) -> None:
+        await _async_require_admin(hass, call)
         await async_pause_cameras(
             hass,
             hass.data[DOMAIN][DATA_STORAGE],
@@ -136,6 +138,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
         )
 
     async def _handle_resume(call: ServiceCall) -> None:
+        await _async_require_admin(hass, call)
         await async_resume_cameras(
             hass,
             hass.data[DOMAIN][DATA_STORAGE],
@@ -149,6 +152,16 @@ def _async_register_services(hass: HomeAssistant) -> None:
         DOMAIN, SERVICE_RESUME_CAMERA, _handle_resume, schema=_SERVICE_RESUME_SCHEMA
     )
     bucket[DATA_SERVICES_REGISTERED] = True
+
+
+async def _async_require_admin(
+    hass: HomeAssistant, call: ServiceCall
+) -> None:
+    """Reject service calls that cannot be attributed to an administrator."""
+    user_id = call.context.user_id
+    user = await hass.auth.async_get_user(user_id) if user_id else None
+    if user is None or not user.is_admin:
+        raise Unauthorized()
 
 
 def _service_camera_refs(call: ServiceCall) -> list[str] | None:

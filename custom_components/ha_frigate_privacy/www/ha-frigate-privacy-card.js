@@ -1,4 +1,4 @@
-/* HA Tools split — ha-frigate-privacy v5.2.1 (2026-08-10) — single-tool standalone repo */
+/* HA Tools split — ha-frigate-privacy v5.2.2 (2026-08-20) — single-tool standalone repo */
 (function() {
 'use strict';
 
@@ -779,7 +779,7 @@ class HaFrigatePrivacy extends HTMLElement {
     };
   }
 
-  _sanitize(str) {
+  _repairMojibake(str) {
     if (!str) return str;
     try { return decodeURIComponent(escape(str)); } catch(e) { return str; }
   }
@@ -2423,9 +2423,9 @@ class HaFrigatePrivacy extends HTMLElement {
       const selected = this._selectedCameras.has(cam.entity_id);
       const state = this._hass?.states[cam.entity_id];
       const statusIcon = state?.state === 'idle' || state?.state === 'streaming' ? '\uD83D\uDFE2' : '\u26AA';
-      return `<div class="camera-card ${selected ? 'selected' : ''}" data-camera="${cam.entity_id}" role="button" tabindex="0" aria-pressed="${!!selected}" aria-label="Camera: ${this._sanitize(cam.name)}">
+      return `<div class="camera-card ${selected ? 'selected' : ''}" data-camera="${_esc(cam.entity_id)}" role="button" tabindex="0" aria-pressed="${!!selected}" aria-label="Camera: ${_esc(this._repairMojibake(cam.name))}">
         <span class="camera-status" aria-hidden="true">${statusIcon}</span>
-        <span class="camera-name">${this._sanitize(cam.name)}</span>
+        <span class="camera-name">${_esc(this._repairMojibake(cam.name))}</span>
         <span class="camera-check" aria-hidden="true">${selected ? '\u2713' : ''}</span>
       </div>`;
     }).join('');
@@ -2457,7 +2457,7 @@ class HaFrigatePrivacy extends HTMLElement {
     const camSummary = this._selectedCameras.size === 0
       ? t.allCameras
       : this._cameras.filter(c => this._selectedCameras.has(c.entity_id))
-          .map(c => this._sanitize(c.name)).join(', ');
+          .map(c => this._repairMojibake(c.name)).join(', ');
     const streamSummary = pauseType === 'main' ? t.pauseTypeMain
       : pauseType === 'sub' ? t.pauseTypeSub
       : t.pauseTypeAll;
@@ -2560,7 +2560,7 @@ class HaFrigatePrivacy extends HTMLElement {
 
         <div class="form-row">
           <label>${t.label}</label>
-          <input type="text" class="input-label" value="${f.label}" placeholder="${this._lang === 'pl' ? 'np. Wieczorna prywatnosc' : 'e.g. Evening privacy'}" />
+          <input type="text" class="input-label" value="${_esc(f.label)}" placeholder="${this._lang === 'pl' ? 'np. Wieczorna prywatnosc' : 'e.g. Evening privacy'}" />
         </div>
 
         <div class="form-row">

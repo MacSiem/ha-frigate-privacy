@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.2.2 (2026-08-20)
+
+- Security: the `pause_camera` and `resume_camera` services now fail closed unless the service-call context resolves to a Home Assistant administrator.
+- Security: camera names, entity IDs, and editable schedule labels are escaped at HTML/attribute sinks; mojibake repair remains a separate, clearly named text transformation.
+- Performance: the bundled-card file check now runs through Home Assistant's executor instead of blocking the event loop.
+
 ## 5.2.1 (2026-08-10)
 
 - Fix: `VERSION` in `const.py` still read `5.1.0` in 5.2.0. That constant builds the card's cache-busting URL (`add_extra_js_url(... ?v={VERSION})`), so upgrading browsers would have kept serving the cached pre-5.2.0 card and none of the UX changes would have appeared. Version constants are now aligned across `const.py`, `manifest.json` and the card header. Use this release instead of 5.2.0.
