@@ -1,5 +1,10 @@
 # Changelog
 
+## 5.2.3 (2026-08-21)
+
+- Compatibility: raised the Home Assistant floor to 2024.7 for `StaticPathConfig`, `async_register_static_paths`, and the config-flow result type.
+- Security consistency: refreshed the legacy root card from the packaged build so manual users receive the same escaping fixes as HACS users.
+
 ## 5.2.2 (2026-08-20)
 
 - Security: the `pause_camera` and `resume_camera` services now fail closed unless the service-call context resolves to a Home Assistant administrator.

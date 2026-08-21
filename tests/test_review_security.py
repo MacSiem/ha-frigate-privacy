@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import json
 from pathlib import Path
 
 
@@ -58,3 +59,10 @@ def test_user_controlled_card_text_is_repaired_then_escaped() -> None:
     assert 'aria-label="Camera: ${_esc(this._repairMojibake(cam.name))}"' in source
     assert 'data-camera="${_esc(cam.entity_id)}"' in source
     assert 'value="${_esc(f.label)}"' in source
+
+
+def test_declared_floor_and_legacy_card_match_shipped_build() -> None:
+    hacs = json.loads((ROOT / "hacs.json").read_text())
+
+    assert hacs["homeassistant"] == "2024.7.0"
+    assert (ROOT / "ha-frigate-privacy.js").read_bytes() == CARD_PATH.read_bytes()
