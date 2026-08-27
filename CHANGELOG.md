@@ -1,5 +1,12 @@
 # Changelog
 
+## 5.2.4 (2026-08-27)
+
+- Isolation/performance: removed the shared injector that scanned the full document and open shadow roots, modified 21 unrelated HA Tools cards, registered global route listeners, and polled for five minutes.
+- UX: first-run guidance and the support footer now render locally inside Frigate Privacy, survive normal card re-renders without observers, and keep the existing dismiss preference.
+- Security consistency: scalar-normalized every value before HTML escaping so non-string camera data cannot bypass the card's sinks.
+- Tests: added foreign-card isolation, observer, dismiss/re-render, support-footer, and hostile non-string runtime regressions.
+
 ## 5.2.3 (2026-08-21)
 
 - Compatibility: raised the Home Assistant floor to 2024.7 for `StaticPathConfig`, `async_register_static_paths`, and the config-flow result type.

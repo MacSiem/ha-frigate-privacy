@@ -54,6 +54,9 @@ def test_user_controlled_card_text_is_repaired_then_escaped() -> None:
     source = CARD_PATH.read_text()
 
     assert "_sanitize(" not in source
+    assert "sharedEsc(String(s == null ? '' : s))" in source
+    assert "String(s == null ? '' : s).replace" in source
+    assert "typeof s === 'string' ? s.replace" not in source
     assert "_repairMojibake(str)" in source
     assert '${_esc(this._repairMojibake(cam.name))}' in source
     assert 'aria-label="Camera: ${_esc(this._repairMojibake(cam.name))}"' in source
@@ -66,3 +69,21 @@ def test_declared_floor_and_legacy_card_match_shipped_build() -> None:
 
     assert hacs["homeassistant"] == "2024.7.0"
     assert (ROOT / "ha-frigate-privacy.js").read_bytes() == CARD_PATH.read_bytes()
+
+
+def test_card_does_not_mutate_other_ha_tools_cards() -> None:
+    source = CARD_PATH.read_text()
+
+    for global_injector_fragment in (
+        "SPLIT_TAGS",
+        "deepFindAll",
+        "__haToolsSplitDonateInjector",
+        "window.addEventListener('hashchange'",
+        "window.addEventListener('popstate'",
+        "pollCount >= 100",
+    ):
+        assert global_injector_fragment not in source
+
+    assert "_buildIntroBanner()" in source
+    assert "_buildDonateFooter()" in source
+    assert 'data-intro="ha-frigate-privacy"' in source

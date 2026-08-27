@@ -70,6 +70,28 @@ const delay = (ms) => new Promise(r => setTimeout(r, ms));
       const dom = new JSDOM('<!DOCTYPE html><html><head></head><body></body></html>', { runScripts: 'dangerously', pretendToBeVisual: true, url: 'http://localhost/' });
       const { window } = dom;
       stub(window);
+      const NativeMutationObserver = window.MutationObserver;
+      let documentWideObservers = 0;
+      window.MutationObserver = class extends NativeMutationObserver {
+        observe(target, options) {
+          if (target === window.document.body && options && options.subtree) documentWideObservers++;
+          return super.observe(target, options);
+        }
+      };
+      class ForeignCard extends window.HTMLElement {
+        constructor() {
+          super();
+          this.attachShadow({ mode: 'open' });
+          this.shadowRoot.innerHTML = '<div data-foreign-marker="true">foreign card</div>';
+        }
+      }
+      window.customElements.define('ha-yaml-checker', ForeignCard);
+      const foreign = window.document.createElement('ha-yaml-checker');
+      window.document.body.appendChild(foreign);
+      const foreignHtml = foreign.shadowRoot.innerHTML;
+      window._haToolsEsc = (s) => typeof s === 'string'
+        ? s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+        : (s == null ? '' : s);
       let asyncErr = null;
       window.addEventListener('error', e => { asyncErr = asyncErr || (e.error && e.error.message) || e.message; });
       window.onerror = (m) => { asyncErr = asyncErr || m; };
@@ -79,11 +101,42 @@ const delay = (ms) => new Promise(r => setTimeout(r, ms));
       el.hass = mockHass();
       window.document.body.appendChild(el);
       el.hass = mockHass();
-      await delay(250);
+      await delay(350);
       const len = el.shadowRoot ? el.shadowRoot.innerHTML.length : 0;
       if (!el.shadowRoot) problem = 'no shadowRoot';
       else if (len < 50) problem = 'empty render (len=' + len + ')';
       else if (asyncErr) problem = 'async error: ' + asyncErr;
+      else if (foreign.shadowRoot.innerHTML !== foreignHtml) problem = 'foreign HA Tools card was mutated';
+      else if (documentWideObservers !== 0) problem = 'document-wide MutationObserver was registered';
+      else {
+        el._cameras = [{
+          entity_id: ['camera.safe', '\"><img data-hostile-entity src=x onerror=alert(1)>'],
+          name: ['Kitchen', '</span><img data-hostile-name src=x onerror=alert(1)>']
+        }];
+        el._lastHtml = '';
+        if (typeof el._updateUI === 'function') el._updateUI();
+        await delay(20);
+        if (el.shadowRoot.querySelector('[data-hostile-entity], [data-hostile-name]')) problem = 'non-string camera data bypassed HTML escaping';
+      }
+      if (!problem && el.shadowRoot.querySelectorAll('.intro-banner[data-intro="ha-frigate-privacy"]').length !== 1) problem = 'local first-run intro missing or duplicated';
+      else if (!problem && el.shadowRoot.querySelectorAll('.donate-section').length !== 1) problem = 'local support footer missing or duplicated';
+      else if (!problem) {
+        const dismiss = el.shadowRoot.querySelector('.intro-banner[data-intro="ha-frigate-privacy"] .intro-dismiss');
+        if (!dismiss) problem = 'local intro dismiss control missing';
+        else {
+          dismiss.click();
+          await delay(20);
+          if (window.localStorage.getItem('ha-intro-dismissed-ha-frigate-privacy') !== '1') problem = 'intro dismissal was not persisted';
+          else if (el.shadowRoot.querySelector('.intro-banner[data-intro="ha-frigate-privacy"]')) problem = 'dismissed intro remained visible';
+          else {
+            el._lastHtml = '';
+            if (typeof el._updateUI === 'function') el._updateUI();
+            await delay(20);
+            if (el.shadowRoot.querySelector('.intro-banner[data-intro="ha-frigate-privacy"]')) problem = 'dismissed intro returned after rerender';
+            else if (el.shadowRoot.querySelectorAll('.donate-section').length !== 1) problem = 'support footer did not survive rerender';
+          }
+        }
+      }
       window.close();
     } catch (e) { problem = (e && e.message) ? e.message : String(e); }
     if (problem) fail.push(`${t.tag}  (${path.basename(t.file)})  -> ${problem}`); else pass++;
