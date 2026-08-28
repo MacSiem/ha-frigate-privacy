@@ -1,19 +1,18 @@
-/* HA Tools split — ha-frigate-privacy v5.2.4 (2026-08-27) — single-tool standalone repo */
+/* HA Tools split — ha-frigate-privacy v5.2.5 (2026-08-28) — single-tool standalone repo */
 (function() {
 'use strict';
 
 // XSS protection helper (reuse global from panel, fallback for standalone)
-const sharedEsc = window._haToolsEsc || ((s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]));
+const sharedEsc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
 const _esc = (s) => sharedEsc(String(s == null ? '' : s));
 
-// -- HA Tools Persistence (stub -- full impl in ha-tools-panel.js) --
-window._haToolsPersistence = window._haToolsPersistence || { _cache: {}, _hass: null, setHass(h) { this._hass = h; }, async save(k, d) { try { localStorage.setItem('ha-frigate-privacy-' + k, JSON.stringify(d)); } catch(e) { console.debug('[ha-frigate-privacy] caught:', e); } }, async load(k) { try { const r = localStorage.getItem('ha-frigate-privacy-' + k); return r ? JSON.parse(r) : null; } catch(e) { return null; } }, loadSync(k) { try { const r = localStorage.getItem('ha-frigate-privacy-' + k); return r ? JSON.parse(r) : null; } catch(e) { return null; } } };
+// Component-local persistence retains this card's existing localStorage keys.
+const haToolsPersistence = { _cache: {}, _hass: null, setHass(h) { this._hass = h; }, async save(k, d) { try { localStorage.setItem('ha-frigate-privacy-' + k, JSON.stringify(d)); } catch(e) { console.debug('[ha-frigate-privacy] caught:', e); } }, async load(k) { try { const r = localStorage.getItem('ha-frigate-privacy-' + k); return r ? JSON.parse(r) : null; } catch(e) { return null; } }, loadSync(k) { try { const r = localStorage.getItem('ha-frigate-privacy-' + k); return r ? JSON.parse(r) : null; } catch(e) { return null; } } };
 
 
 /* ===== HA Tools split — inline shared infrastructure ===== */
 // Bento Design System CSS (inline copy — keeps tool standalone)
-if (typeof window !== 'undefined' && !window.HAToolsBentoCSS) {
-  window.HAToolsBentoCSS = `
+const HA_FRIGATE_PRIVACY_BENTO_CSS = `
 /* ═══════════════════════════════════════════════
    HA Tools — Bento Design System v2.0 (Premium)
    ═══════════════════════════════════════════════ */
@@ -503,19 +502,6 @@ pre {
   .stat-value, .stat-val, .kpi-val { font-size: 18px; }
 }
 `;
-}
-// XSS escape singleton (idempotent)
-if (typeof window !== 'undefined') {
-  window._haToolsEsc = window._haToolsEsc || (function(){
-    var MAP = {};
-    MAP[String.fromCharCode(38)] = '&amp;';
-    MAP[String.fromCharCode(60)] = '&lt;';
-    MAP[String.fromCharCode(62)] = '&gt;';
-    MAP[String.fromCharCode(34)] = '&quot;';
-    MAP[String.fromCharCode(39)] = '&#39;';
-    return function(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return MAP[c]; }); };
-  })();
-}
 
 class HaFrigatePrivacy extends HTMLElement {
   constructor() {
@@ -1222,9 +1208,9 @@ class HaFrigatePrivacy extends HTMLElement {
     // Keep max 50 entries
     if (this._history.length > 50) this._history = this._history.slice(-50);
     try { localStorage.setItem(this._storageKey('history'), JSON.stringify(this._history)); } catch(e) { console.debug('[ha-frigate-privacy] caught:', e); }
-    if (window._haToolsPersistence && this._hass) {
-      window._haToolsPersistence.setHass(this._hass);
-      window._haToolsPersistence.save('frigate-privacy-history', this._history).catch(() => {});
+    if (haToolsPersistence && this._hass) {
+      haToolsPersistence.setHass(this._hass);
+      haToolsPersistence.save('frigate-privacy-history', this._history).catch(() => {});
     }
   }
 
@@ -1243,9 +1229,9 @@ class HaFrigatePrivacy extends HTMLElement {
   _saveNotifySettings() {
     const data = { enabled: this._notifyEnabled, service: this._notifyService, beforeEndMin: this._notifyBeforeEndMin };
     try { localStorage.setItem(this._storageKey('notify'), JSON.stringify(data)); } catch(e) { console.debug('[ha-frigate-privacy] caught:', e); }
-    if (window._haToolsPersistence && this._hass) {
-      window._haToolsPersistence.setHass(this._hass);
-      window._haToolsPersistence.save('frigate-privacy-notify', data).catch(() => {});
+    if (haToolsPersistence && this._hass) {
+      haToolsPersistence.setHass(this._hass);
+      haToolsPersistence.save('frigate-privacy-notify', data).catch(() => {});
     }
   }
 
@@ -1261,9 +1247,9 @@ class HaFrigatePrivacy extends HTMLElement {
     } : null;
     // Save to both localStorage (fast) and HA server (cross-device)
     try { localStorage.setItem(this._storageKey('active'), data ? JSON.stringify(data) : ''); } catch(e) { console.debug('[ha-frigate-privacy] caught:', e); }
-    if (window._haToolsPersistence && this._hass) {
-      window._haToolsPersistence.setHass(this._hass);
-      window._haToolsPersistence.save('frigate-privacy-active', data).catch(() => {});
+    if (haToolsPersistence && this._hass) {
+      haToolsPersistence.setHass(this._hass);
+      haToolsPersistence.save('frigate-privacy-active', data).catch(() => {});
     }
   }
 
@@ -1277,9 +1263,9 @@ class HaFrigatePrivacy extends HTMLElement {
     } catch(e) { console.debug('[ha-frigate-privacy] caught:', e); }
 
     // 2. Also try server-side data (async, will update later)
-    if (window._haToolsPersistence && this._hass) {
-      window._haToolsPersistence.setHass(this._hass);
-      window._haToolsPersistence.load('frigate-privacy-active').then(serverData => {
+    if (haToolsPersistence && this._hass) {
+      haToolsPersistence.setHass(this._hass);
+      haToolsPersistence.load('frigate-privacy-active').then(serverData => {
         if (serverData && serverData.active && serverData.endTime) {
           // Server data is newer/authoritative — use it
           this._applyPrivacyState(serverData);
@@ -2150,7 +2136,7 @@ class HaFrigatePrivacy extends HTMLElement {
 
   _buildHTML() {
     const t = this._t;
-    return `<style>${window.HAToolsBentoCSS || ''}
+    return `<style>${HA_FRIGATE_PRIVACY_BENTO_CSS}
 /* === HA Tools split — premium banners (donate / intro / prereq) === */
 
 /* Donation footer — diamond top */

@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.2.5 (2026-08-28)
+
+- Isolation: Bento CSS is component-local in both frontend copies and cannot be captured from `window.HAToolsBentoCSS` by load order.
+- Isolation: persistence is now card-local in both frontend copies, removing `window._haToolsPersistence` load-order coupling while retaining existing localStorage keys.
+- Isolation: removed the last shared global escape-helper dependency from both frontend copies.
+- Security: retained local String-before-escape behavior and byte-identical packaging.
+- Tests: prevent future `window._haToolsEsc` coupling.
+
 ## 5.2.4 (2026-08-27)
 
 - Isolation/performance: removed the shared injector that scanned the full document and open shadow roots, modified 21 unrelated HA Tools cards, registered global route listeners, and polled for five minutes.

@@ -54,7 +54,8 @@ def test_user_controlled_card_text_is_repaired_then_escaped() -> None:
     source = CARD_PATH.read_text()
 
     assert "_sanitize(" not in source
-    assert "sharedEsc(String(s == null ? '' : s))" in source
+    assert "const sharedEsc = (s) => String(s == null ? '' : s)" in source
+    assert "window._haToolsEsc" not in source
     assert "String(s == null ? '' : s).replace" in source
     assert "typeof s === 'string' ? s.replace" not in source
     assert "_repairMojibake(str)" in source
