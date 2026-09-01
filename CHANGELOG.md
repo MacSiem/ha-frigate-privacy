@@ -1,5 +1,45 @@
 # Changelog
 
+## 6.0.0 (2026-09-01)
+
+- Security: replaced all browser-owned compatibility, token, REST-config and direct
+  entity/service control paths with admin-only integration WebSocket commands.
+- Privacy: discovery and persisted resume targets now require Frigate-owned Entity
+  Registry entries; unrelated suffix collisions fail closed.
+- Reliability: added persisted per-camera transition intent, exact-target outcomes,
+  terminal evidence, bounded retry metadata and crash-safe recovery.
+- Reliability: cancellation during resume now completes a shielded privacy restore,
+  persists fail-safe evidence, and only then propagates cancellation. Missing
+  recovery targets block every automatic resume path.
+- Persistence: Home Assistant Store writes are atomic/private and swallowed write
+  failures are surfaced transactionally, with the in-memory snapshot rolled back.
+- Idempotency: pause/resume use a bounded per-camera generation ledger, preventing
+  delayed retries from reversing newer privacy decisions; schedule mutations use an
+  atomic bounded operation ledger. Corrupt replay evidence and filter saturation
+  fail closed before any camera or schedule side effect.
+- Lifecycle: recovery waits for late Frigate entities without erasing exact targets,
+  then converts permanently missing inputs into an isolated evidence-rich error.
+  Scheduler-owned ticks, listeners, deadlines and startup grace callbacks are all
+  cancelled on unload.
+- Scheduling: overlapping windows use union coverage, manual deadlines cannot resume
+  inside active schedule coverage, and deadline callbacks recompute local wall time.
+- UI/UX: added truthful recovery gating, partial/error handling, per-target evidence,
+  last verified terminal operations and a backend-owned safe retry action.
+- UI/UX: increased base text, metadata, labels and action sizes; added relaxed line
+  height, wider spacing and single-column narrow-card layouts so state evidence and
+  schedules no longer render as compressed 11px text.
+- Manual override: an external target re-enable is evidence, never authority. Both
+  manual and scheduled pauses become truthful terminal `manual_override` records
+  without enabling any additional target; unchanged schedule coverage is suppressed
+  until that coverage ends.
+- Privacy: operational logs no longer include camera/entity identifiers or target
+  lists, and replay/storage failures return stable redacted error codes to the card.
+- Tests: added adversarial regression coverage for permissions, stale retries,
+  persistence failures, late discovery, missing targets, restart phases, overlap,
+  lifecycle cleanup, XSS sinks, forbidden legacy paths and packaged-card parity.
+- Documentation: regenerated light and dark screenshots from the exact current card
+  with synthetic fixtures, source hashes, OCR privacy review and a tested manifest.
+
 ## 5.2.5 (2026-08-28)
 
 - Isolation: Bento CSS is component-local in both frontend copies and cannot be captured from `window.HAToolsBentoCSS` by load order.

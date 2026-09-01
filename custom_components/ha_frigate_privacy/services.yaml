@@ -36,6 +36,12 @@ pause_camera:
             - all
             - main
             - sub
+    operation_id:
+      name: Operation ID
+      description: Optional idempotency key for safe retries (maximum 128 characters).
+      example: pause-front-door-20260831T120000Z
+      selector:
+        text:
 
 resume_camera:
   name: Resume camera
@@ -54,5 +60,11 @@ resume_camera:
       name: Camera entity ID
       description: Alias for camera. Kept for automations that prefer explicit naming.
       example: camera.front_door
+      selector:
+        text:
+    operation_id:
+      name: Operation ID
+      description: Optional idempotency key for safe retries (maximum 128 characters).
+      example: resume-front-door-20260831T123000Z
       selector:
         text:

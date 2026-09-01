@@ -52,6 +52,8 @@ def _load():
             self._d = data
 
     storage_h.Store = _Store
+    registry_h = types.ModuleType("homeassistant.helpers.entity_registry")
+    registry_h.async_get = lambda hass: hass.entity_registry
     for n, m in {
         "homeassistant": ha,
         "homeassistant.components": comp,
@@ -61,6 +63,7 @@ def _load():
         "homeassistant.core": core,
         "homeassistant.helpers": helpers,
         "homeassistant.helpers.entity_platform": ep,
+        "homeassistant.helpers.entity_registry": registry_h,
         "homeassistant.helpers.storage": storage_h,
     }.items():
         sys.modules.setdefault(n, m)
@@ -99,6 +102,15 @@ class _States:
         self._ids.append(entity_id)
 
 
+class _RegistryEntry:
+    platform = "frigate"
+
+
+class _Registry:
+    def async_get(self, entity_id):
+        return _RegistryEntry() if entity_id.startswith("switch.") else None
+
+
 class _Bus:
     def __init__(self):
         self._listeners = []
@@ -122,7 +134,7 @@ class _Entry:
 
 
 class _Storage:
-    async def async_get_paused(self, camera_id):
+    async def async_get_paused(self, camera_id, *, include_inactive=False):
         return {} if camera_id is None else None
 
 
@@ -131,6 +143,7 @@ class LateCameraDiscoveryTest(unittest.TestCase):
         async def scenario():
             hass = types.SimpleNamespace()
             hass.states = _States()
+            hass.entity_registry = _Registry()
             hass.bus = _Bus()
             hass.data = {binary_sensor.DOMAIN: {}}
             # one camera exists at setup

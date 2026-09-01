@@ -12,10 +12,11 @@ from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import Unauthorized
+from homeassistant.exceptions import HomeAssistantError, Unauthorized
 
 from .const import (
     DATA_FRONTEND_REGISTERED,
+    DATA_RECOVERY_READY,
     DATA_SCHEDULER,
     DATA_SERVICES_REGISTERED,
     DATA_STORAGE,
@@ -27,7 +28,7 @@ from .const import (
     VERSION,
 )
 from .control import async_pause_cameras, async_resume_cameras
-from .scheduler import async_start_scheduler
+from .scheduler import FrigatePrivacyScheduler
 from .storage import FrigatePrivacyStorage
 from .websocket_api import async_register_commands
 
@@ -39,7 +40,11 @@ _CARD_FILENAME = "ha-frigate-privacy-card.js"
 _CARD_URL_PATH = f"/{DOMAIN}/{_CARD_FILENAME}"
 _CARD_PACKAGE_DIR = "www"
 
-_CAMERA_FIELD = vol.Any(str, [str])
+_CAMERA_REF = vol.All(str, vol.Length(min=1, max=255))
+_CAMERA_FIELD = vol.Any(
+    _CAMERA_REF,
+    vol.All([_CAMERA_REF], vol.Length(min=1, max=64)),
+)
 _SERVICE_PAUSE_SCHEMA = vol.Schema(
     {
         vol.Optional("camera"): _CAMERA_FIELD,
@@ -48,12 +53,18 @@ _SERVICE_PAUSE_SCHEMA = vol.Schema(
             vol.Coerce(int), vol.Range(min=1, max=1440)
         ),
         vol.Optional("stream_type", default="all"): vol.In(STREAM_TYPES),
+        vol.Optional("operation_id"): vol.All(
+            str, vol.Length(min=1, max=128)
+        ),
     }
 )
 _SERVICE_RESUME_SCHEMA = vol.Schema(
     {
         vol.Optional("camera"): _CAMERA_FIELD,
         vol.Optional("camera_entity_id"): _CAMERA_FIELD,
+        vol.Optional("operation_id"): vol.All(
+            str, vol.Length(min=1, max=128)
+        ),
     }
 )
 
@@ -64,6 +75,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     storage = FrigatePrivacyStorage(hass)
     await storage.async_load()
     bucket[DATA_STORAGE] = storage
+    bucket[DATA_RECOVERY_READY] = False
+
+    scheduler = FrigatePrivacyScheduler(hass, storage)
+    bucket[DATA_SCHEDULER] = scheduler
+
+    # Frigate entities can appear after config entries are loaded. Never run
+    # authoritative recovery before HA has started, because treating a load-
+    # order absence as target removal would destroy exact-target evidence.
+    # When HA is already running, finish a full schedule/deadline reconcile
+    # before exposing mutation endpoints.
+    if hass.is_running:
+        await scheduler.async_tick()
 
     if not bucket.get(DATA_WS_REGISTERED):
         async_register_commands(hass)
@@ -72,8 +95,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await _async_register_frontend(hass)
     _async_register_services(hass)
 
-    if DATA_SCHEDULER not in bucket:
-        bucket[DATA_SCHEDULER] = async_start_scheduler(hass, storage)
+    scheduler.async_start()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -86,7 +108,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     bucket = hass.data.get(DOMAIN, {})
     if scheduler := bucket.pop(DATA_SCHEDULER, None):
-        scheduler.async_stop()
+        await scheduler.async_stop()
     bucket.pop(DATA_STORAGE, None)
     if bucket.pop(DATA_SERVICES_REGISTERED, None):
         hass.services.async_remove(DOMAIN, SERVICE_PAUSE_CAMERA)
@@ -128,21 +150,27 @@ def _async_register_services(hass: HomeAssistant) -> None:
 
     async def _handle_pause(call: ServiceCall) -> None:
         await _async_require_admin(hass, call)
+        _require_recovery_ready(hass)
         await async_pause_cameras(
             hass,
             hass.data[DOMAIN][DATA_STORAGE],
             _service_camera_refs(call),
             duration_minutes=call.data.get("duration_minutes"),
             stream_type=call.data.get("stream_type", "all"),
-            source="service",
+            source="manual",
+            context=call.context,
+            operation_id=call.data.get("operation_id"),
         )
 
     async def _handle_resume(call: ServiceCall) -> None:
         await _async_require_admin(hass, call)
+        _require_recovery_ready(hass)
         await async_resume_cameras(
             hass,
             hass.data[DOMAIN][DATA_STORAGE],
             _service_camera_refs(call),
+            context=call.context,
+            operation_id=call.data.get("operation_id"),
         )
 
     hass.services.async_register(
@@ -162,6 +190,14 @@ async def _async_require_admin(
     user = await hass.auth.async_get_user(user_id) if user_id else None
     if user is None or not user.is_admin:
         raise Unauthorized()
+
+
+def _require_recovery_ready(hass: HomeAssistant) -> None:
+    """Reject mutations until startup recovery has reliable Frigate inputs."""
+    if not hass.data.get(DOMAIN, {}).get(DATA_RECOVERY_READY, False):
+        raise HomeAssistantError(
+            "Frigate Privacy is still reconciling persisted privacy state"
+        )
 
 
 def _service_camera_refs(call: ServiceCall) -> list[str] | None:

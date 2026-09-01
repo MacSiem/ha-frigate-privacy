@@ -73,19 +73,31 @@ def decide_manual_override(
     started_at: datetime | None,
     now: datetime,
     switch_states: Mapping[str, str | None],
+    camera_entity_id: str | None = None,
+    camera_state: str | None = None,
+    camera_toggled: bool = False,
     grace_seconds: int = OVERRIDE_GRACE_SECONDS,
 ) -> dict[str, Any]:
     """Decide whether an active pause was overridden outside the integration.
 
     A pause is considered manually overridden when, past a short grace period
     after it started (MQTT/Frigate confirmation lag), at least one of the
-    switches it turned off reports ``on`` again. ``unavailable``/``unknown``/
-    missing states never count as an override — only a positive ``on`` does.
+    switches it turned off reports ``on`` again, or a camera entity that it
+    explicitly turned off becomes available in an enabled state. Missing,
+    ``unavailable`` and ``unknown`` states never count as an override.
     """
     on_switches = _stable_list(
         entity_id
         for entity_id, state in switch_states.items()
         if state == "on"
+    )
+    camera_reenabled = bool(
+        camera_toggled
+        and camera_entity_id
+        and camera_state not in {None, "off", "unavailable", "unknown"}
+    )
+    on_targets = _stable_list(
+        [*on_switches, *([camera_entity_id] if camera_reenabled else [])]
     )
 
     in_grace = False
@@ -94,7 +106,9 @@ def decide_manual_override(
         in_grace = elapsed < grace_seconds
 
     return {
-        "override": bool(on_switches) and not in_grace,
+        "override": bool(on_targets) and not in_grace,
         "in_grace": in_grace,
         "on_switches": on_switches,
+        "on_targets": on_targets,
+        "camera_reenabled": camera_reenabled,
     }

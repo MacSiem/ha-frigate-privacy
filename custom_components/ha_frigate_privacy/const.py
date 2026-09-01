@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 DOMAIN = "ha_frigate_privacy"
-VERSION = "5.2.5"
+VERSION = "6.0.0"
 
 EVENT_STATE_CHANGED = f"{DOMAIN}_state_changed"
 
 DATA_FRONTEND_REGISTERED = "_frontend_registered"
+DATA_RECOVERY_READY = "recovery_ready"
 DATA_SCHEDULER = "scheduler"
 DATA_SERVICES_REGISTERED = "_services_registered"
 DATA_STORAGE = "storage"

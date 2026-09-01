@@ -96,19 +96,12 @@ class FrigatePrivacyActiveSensor(BinarySensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return paused state metadata."""
-        if not self._paused:
-            return {"camera_id": self._camera_id}
+        """Return the minimum non-sensitive state needed for automation."""
+        if not self._paused or not self._paused.get("active"):
+            return {"phase": "active"}
         return {
-            "camera_id": self._camera_id,
-            "stream_type": self._paused.get("stream_type"),
-            "source": self._paused.get("source"),
-            "schedule_id": self._paused.get("schedule_id"),
-            "ends_at": self._paused.get("ends_at"),
-            "resume_blocked": self._paused.get("resume_blocked", False),
-            "resume_blocked_reason": self._paused.get("resume_blocked_reason"),
-            "switches": self._paused.get("switches", []),
-            "skipped": self._paused.get("skipped", []),
+            "phase": self._paused.get("phase", "paused"),
+            "resume_blocked": bool(self._paused.get("resume_blocked")),
         }
 
     async def async_added_to_hass(self) -> None:
@@ -119,7 +112,9 @@ class FrigatePrivacyActiveSensor(BinarySensorEntity):
 
     async def async_update(self) -> None:
         """Refresh paused state from storage."""
-        self._paused = await self._storage.async_get_paused(self._camera_id)
+        self._paused = await self._storage.async_get_paused(
+            self._camera_id, include_inactive=True
+        )
 
     @callback
     def _handle_event(self, event: Event) -> None:
