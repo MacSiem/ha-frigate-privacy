@@ -101,6 +101,16 @@ def _load_init():
     websocket.async_register_commands = lambda *_args, **_kwargs: None
     sys.modules["fpr_service_auth.websocket_api"] = websocket
 
+    frontend_module = types.ModuleType("fpr_service_auth.frontend")
+    async def _noop(*_args, **_kwargs):
+        return None
+    frontend_module.async_register_card = _noop
+    frontend_module.async_register_panel = _noop
+    frontend_module.async_register_static = _noop
+    frontend_module.async_unregister_card = _noop
+    frontend_module.async_unregister_panel = lambda *_args, **_kwargs: None
+    sys.modules["fpr_service_auth.frontend"] = frontend_module
+
     spec = importlib.util.spec_from_file_location(
         "fpr_service_auth.__init__", PKG / "__init__.py"
     )

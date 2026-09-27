@@ -7,7 +7,7 @@ The Home Assistant integration is the only control authority: the bundled card s
 admin-only WebSocket requests, while schedules, deadlines, state transitions, and
 restart recovery stay server-side.
 
-[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.7+-blue.svg?logo=homeassistant)](https://www.home-assistant.io/) [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![Version](https://img.shields.io/github/v/release/MacSiem/ha-frigate-privacy)](https://github.com/MacSiem/ha-frigate-privacy/releases)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2025.2+-blue.svg?logo=homeassistant)](https://www.home-assistant.io/) [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![Version](https://img.shields.io/github/v/release/MacSiem/ha-frigate-privacy)](https://github.com/MacSiem/ha-frigate-privacy/releases)
 
 ## How it works
 
@@ -95,9 +95,11 @@ pause scope and duration. Dark mode follows your Home Assistant theme automatica
 2. Add `https://github.com/MacSiem/ha-frigate-privacy` as category **Integration**.
 3. Install **Frigate Privacy** and restart Home Assistant.
 4. Go to Settings → Devices & services → Add integration → **Frigate Privacy**.
+5. Administrators can open **Frigate Privacy** from the sidebar, or add the card below.
 
-The integration registers the bundled Lovelace card automatically — no manual
-resource needed.
+The integration registers one bundled Lovelace resource in storage mode; an
+existing HACS card resource is preserved. YAML mode uses Home Assistant's
+frontend fallback. No manual resource is needed.
 
 ## Quick start
 

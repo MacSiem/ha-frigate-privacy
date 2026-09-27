@@ -66,11 +66,11 @@ def test_startup_recovery_is_gated_before_external_mutations() -> None:
 
 
 def test_frontend_file_check_runs_in_executor() -> None:
-    tree = ast.parse(INIT_PATH.read_text())
-    register_frontend = _function(tree, "_async_register_frontend")
+    tree = ast.parse((ROOT / "custom_components/ha_frigate_privacy/frontend.py").read_text())
+    register_frontend = _function(tree, "async_register_static")
     source = ast.unparse(register_frontend)
 
-    assert "await hass.async_add_executor_job(os.path.isfile, card_path)" in source
+    assert "await hass.async_add_executor_job((www / CARD_FILENAME).is_file)" in source
 
 
 def test_user_controlled_card_text_is_repaired_then_escaped() -> None:
@@ -119,7 +119,7 @@ def test_service_path_uses_same_idempotent_manual_coordinator() -> None:
 def test_declared_floor_and_legacy_card_match_shipped_build() -> None:
     hacs = json.loads((ROOT / "hacs.json").read_text())
 
-    assert hacs["homeassistant"] == "2024.7.0"
+    assert hacs["homeassistant"] == "2025.2.0"
     assert (ROOT / "ha-frigate-privacy.js").read_bytes() == CARD_PATH.read_bytes()
 
 
