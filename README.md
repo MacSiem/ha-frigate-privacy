@@ -101,6 +101,10 @@ The integration registers one bundled Lovelace resource in storage mode; an
 existing HACS card resource is preserved. YAML mode uses Home Assistant's
 frontend fallback. No manual resource is needed.
 
+The one-line support link is visible only to administrators. Set
+`show_support: false` in the card configuration to hide it; dismissing it is
+remembered in this browser.
+
 ## Quick start
 
 ```yaml

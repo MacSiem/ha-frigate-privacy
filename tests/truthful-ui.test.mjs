@@ -36,6 +36,21 @@ const initial = {
 };
 
 {
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.ok(card.shadowRoot.querySelector('.donate-section'));
+  card.setConfig({ type: 'custom:ha-frigate-privacy', show_support: false });
+  assert.equal(card.shadowRoot.querySelector('.donate-section'), null);
+  card.setConfig({ type: 'custom:ha-frigate-privacy' });
+  card.shadowRoot.querySelector('[data-action="dismiss-support"]').click();
+  assert.equal(card.shadowRoot.querySelector('.donate-section'), null);
+  assert.equal(dom.window.localStorage.getItem('ha-frigate-privacy-support-dismissed'), '1');
+  card.hass = { ...card._hass, user: { id: 'member', is_admin: false } };
+  assert.equal(card.shadowRoot.querySelector('.donate-section'), null);
+  dom.window.close();
+}
+
+{
   const switchOnly = {
     ...initial,
     cameras: [
