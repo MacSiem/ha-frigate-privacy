@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-01",
+  "generated_at": "2026-09-27",
   "fixture": "privacy-safe-generic-home",
   "source": {
     "path": "ha-frigate-privacy.js",
-    "sha256": "d6c1703166f9193712c7178d304ca41c64e1d3f644b6128de60b69ede5371edb"
+    "sha256": "91db4a3672527231587c04d112803a66703d9b6efa7270b109639ebbf33fbdf8"
   },
   "harness": {
     "path": "docs/screenshots/_harness.html",
@@ -16,7 +16,7 @@
       "theme": "light",
       "width": 560,
       "height": 1100,
-      "sha256": "b1d57b45886a9e217c2135d2f50e618be3e8b4dc95b419dce956a196714a9246"
+      "sha256": "3109d4675426e772145f1eb8e1bd6c77846fc7b8f822c9e0b99afa5685676615"
     },
     {
       "path": "docs/screenshots/card-cameras-dark.png",
