@@ -1,4 +1,4 @@
-/* Frigate Privacy v6.0.6 — integration-owned Home Assistant card */
+/* Frigate Privacy v6.0.7 — integration-owned Home Assistant card */
 (function () {
   'use strict';
 
