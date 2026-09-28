@@ -4,6 +4,7 @@
 
 - Ignore Frigate `camera.*` entities without Home Assistant's ON_OFF capability when pausing. Continue controlling and verifying their supported Frigate switches instead of reporting a false camera readback failure.
 - Show current video entity, recording, and sound-detection states for each discovered camera. Open HA's native camera preview only after an administrator clicks Preview; screenshots remain synthetic.
+- Wait up to two seconds for Frigate switch state events after service calls before reporting a readback mismatch, including pause extensions and resume. Fetch the full integration state after a card action so the camera list and channel status stay visible.
 - Keep the full card visible while refreshing integration state; bound routine polling so Home Assistant state broadcasts cannot make the card blink or change height.
 - Show the one-line support link only to administrators, with `show_support: false` and a remembered dismiss action.
 - Register one storage-mode Lovelace resource and an administrator-only sidebar panel; preserve an existing HACS resource, refresh the owned resource on upgrade and remove owned UI entries on unload. YAML mode keeps the frontend fallback.

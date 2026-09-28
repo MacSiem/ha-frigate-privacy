@@ -1,4 +1,4 @@
-/* Frigate Privacy v6.0.3 — integration-owned Home Assistant card */
+/* Frigate Privacy v6.0.4 — integration-owned Home Assistant card */
 (function () {
   'use strict';
 
@@ -139,7 +139,7 @@
     _newOperationId(action) { const random = globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`; return `${action}-${random}`.slice(0, 128); }
     async _runMutation(command, payload) {
       if (this._busy || !this._integrationAvailable || !this._recoveryReady) return false; const epoch = this._requestEpoch; this._busy = true; this._error = ''; this._updateUI();
-      try { const result = await this._callIntegration(command, payload); if (epoch !== this._requestEpoch) return false; let nextState = result?.state; if (!nextState) { nextState = await this._callIntegration('get_state'); if (epoch !== this._requestEpoch) return false; } this._applyState(nextState); if (result?.ok === false) { this._error = this._safeError({ code: result.phase || 'operation_failed' }); this._showToast(this._t.failed, 'error'); return false; } this._showToast(this._t.saved, 'success'); return true; }
+      try { const result = await this._callIntegration(command, payload); if (epoch !== this._requestEpoch) return false; const nextState = await this._callIntegration('get_state'); if (epoch !== this._requestEpoch) return false; this._applyState(nextState); if (result?.ok === false) { this._error = this._safeError({ code: result.phase || 'operation_failed' }); this._showToast(this._t.failed, 'error'); return false; } this._showToast(this._t.saved, 'success'); return true; }
       catch (error) { if (epoch !== this._requestEpoch) return false; this._error = this._safeError(error); this._showToast(this._t.failed, 'error'); return false; }
       finally { if (epoch === this._requestEpoch) { this._busy = false; this._updateUI(); } }
     }

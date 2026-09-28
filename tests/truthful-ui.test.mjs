@@ -14,6 +14,7 @@ function createCard(initialState, mutationResult = null) {
   window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
   window.eval(source);
   const card = window.document.createElement('ha-frigate-privacy');
+  let mutated = false;
   card.setConfig({ type: 'custom:ha-frigate-privacy' });
   card.hass = {
     states: {},
@@ -21,7 +22,8 @@ function createCard(initialState, mutationResult = null) {
     language: 'en',
     user: { id: 'owner', is_admin: true },
     callWS: async (message) => {
-      if (message.type.endsWith('/get_state')) return initialState;
+      if (message.type.endsWith('/get_state')) return mutated && mutationResult?.state ? { ...initialState, ...mutationResult.state } : initialState;
+      mutated = true;
       return mutationResult || { ok: true, phase: 'paused', state: initialState };
     },
   };
@@ -125,7 +127,6 @@ const initial = {
     ok: false,
     phase: 'partial',
     state: {
-      ...initial,
       paused: { front: { camera_id: 'front', phase: 'partial', active: true } },
     },
   };
@@ -139,6 +140,7 @@ const initial = {
   assert.equal(card._error, 'partial');
   assert.equal(toasts.at(-1)?.kind, 'error');
   assert.equal(card._paused.front.phase, 'partial');
+  assert.equal(card._cameras.length, 1, 'partial mutations must keep discovered cameras visible');
   dom.window.close();
 }
 

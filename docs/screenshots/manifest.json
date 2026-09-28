@@ -4,7 +4,7 @@
   "fixture": "privacy-safe-generic-home",
   "source": {
     "path": "ha-frigate-privacy.js",
-    "sha256": "072e15360234ba72550944f4b01ab321fe3cfa3ddaf10f1afad2c0658b0ad7a2"
+    "sha256": "e747223599160dd26eac52cf0909005e25d0a4e3abc662f5a0820e00da991c16"
   },
   "harness": {
     "path": "docs/screenshots/_harness.html",

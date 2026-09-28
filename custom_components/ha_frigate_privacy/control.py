@@ -47,6 +47,27 @@ CAMERA_FEATURE_ON_OFF = 1
 MAX_OPERATION_HISTORY = 16
 
 
+async def _confirm_state(hass: HomeAssistant, entity_id: str, expected: str) -> bool:
+    """Allow Frigate's state event to follow a completed HA service call."""
+    for attempt in range(21):
+        state = hass.states.get(entity_id)
+        if state is not None and state.state == expected:
+            return True
+        if attempt < 20:
+            await asyncio.sleep(0.1)
+    return False
+
+
+async def _confirm_camera_enabled(hass: HomeAssistant, entity_id: str) -> bool:
+    """Wait for an ON_OFF-capable camera to leave its off state."""
+    for attempt in range(21):
+        if _camera_is_enabled(hass, entity_id):
+            return True
+        if attempt < 20:
+            await asyncio.sleep(0.1)
+    return False
+
+
 class ResumeAuthority(StrEnum):
     """Explicit authority classes allowed to end a privacy pause."""
 
@@ -731,8 +752,7 @@ async def _async_pause_camera_locked(
             failed.append(entity_id)
             target_outcomes[entity_id] = "service_failed"
         else:
-            state = hass.states.get(entity_id)
-            if state is not None and state.state == "off":
+            if await _confirm_state(hass, entity_id, "off"):
                 toggled.append(entity_id)
                 target_outcomes[entity_id] = "paused"
             else:
@@ -757,8 +777,7 @@ async def _async_pause_camera_locked(
                 blocking=True,
                 context=context,
             )
-            camera_state = hass.states.get(cam_entity)
-            camera_toggled = bool(camera_state and camera_state.state == "off")
+            camera_toggled = await _confirm_state(hass, cam_entity, "off")
             camera_failed = not camera_toggled
             if camera_toggled:
                 target_outcomes[cam_entity] = "paused"
@@ -920,8 +939,7 @@ async def _async_extend_schedule_pause_locked(
             failed.append(entity_id)
             outcomes[entity_id] = "service_failed"
         else:
-            state = hass.states.get(entity_id)
-            if state is not None and state.state == "off":
+            if await _confirm_state(hass, entity_id, "off"):
                 toggled.append(entity_id)
                 outcomes[entity_id] = "paused"
             else:
@@ -946,9 +964,7 @@ async def _async_extend_schedule_pause_locked(
                 blocking=True,
                 context=context,
             )
-            camera_toggled = bool(
-                (state := hass.states.get(cam_entity)) and state.state == "off"
-            )
+            camera_toggled = await _confirm_state(hass, cam_entity, "off")
             outcomes[cam_entity] = (
                 "paused" if camera_toggled else "readback_failed"
             )
@@ -1269,7 +1285,7 @@ async def _async_resume_camera_locked(
                     blocking=True,
                     context=context,
                 )
-                camera_turned_on = _camera_is_enabled(hass, cam_entity)
+                camera_turned_on = await _confirm_camera_enabled(hass, cam_entity)
                 camera_reenabled = camera_turned_on
                 if not camera_turned_on:
                     failed.append(cam_entity)
@@ -1296,8 +1312,7 @@ async def _async_resume_camera_locked(
                 blocking=True,
                 context=context,
             )
-            state = hass.states.get(entity_id)
-            if state is not None and state.state == "on":
+            if await _confirm_state(hass, entity_id, "on"):
                 reenabled_switches.append(entity_id)
                 resume_completed.append(entity_id)
                 await _transition(
