@@ -63,6 +63,8 @@ class _State:
     def __init__(self, state: str, name: str | None = None) -> None:
         self.state = state
         self.attributes = {"friendly_name": name} if name else {}
+        if state in {"idle", "streaming", "recording"}:
+            self.attributes["supported_features"] = 1
 
 
 class _States:
@@ -267,6 +269,24 @@ def test_pause_persists_intent_before_control_and_reports_verified_phase():
         "switch.front_recordings": "off",
         "camera.front": "off",
     }
+
+
+def test_camera_without_on_off_feature_uses_switches_only():
+    async def scenario():
+        hass = _Hass()
+        hass.states.values["camera.front"].state = "idle"
+        hass.states.values["camera.front"].attributes["supported_features"] = 0
+        storage = _Storage()
+        paused = await control.async_pause_camera(hass, storage, "front")
+        resumed = await control.async_resume_camera(hass, storage, "front")
+        return hass, storage, paused, resumed
+
+    hass, storage, paused, resumed = asyncio.run(scenario())
+    assert paused["phase"] == "paused"
+    assert resumed["phase"] == "active"
+    assert not any(call[0] == "camera" for call in hass.services.calls)
+    assert [hass.states.get(f"switch.front_{suffix}").state for suffix in ("detect", "recordings")] == ["on", "on"]
+    assert storage.paused["front"]["camera_toggled"] is False
 
 
 def test_partial_pause_is_truthful_and_retains_evidence():

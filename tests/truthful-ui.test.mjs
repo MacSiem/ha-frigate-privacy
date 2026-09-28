@@ -36,6 +36,30 @@ const initial = {
 };
 
 {
+  const status = {
+    ...initial,
+    cameras: [{
+      camera_id: 'front', entity_id: 'camera.front', name: 'Front', camera_state: 'idle',
+      switches: [
+        { suffix: '_recordings', state: 'off' },
+        { suffix: '_detect', state: 'on' },
+        { suffix: '_audio_detection', state: 'unavailable' },
+      ],
+    }],
+  };
+  const { dom, card } = createCard(status);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.match(card.shadowRoot.textContent, /Video: Idle/);
+  assert.match(card.shadowRoot.textContent, /Recording: Off/);
+  assert.match(card.shadowRoot.textContent, /Sound detection: Unavailable/);
+  let previewEntity = null;
+  card.addEventListener('hass-more-info', (event) => { previewEntity = event.detail.entityId; });
+  card.shadowRoot.querySelector('[data-preview-camera="camera.front"]').click();
+  assert.equal(previewEntity, 'camera.front');
+  dom.window.close();
+}
+
+{
   const { dom, card } = createCard(initial);
   await new Promise((resolve) => setTimeout(resolve, 30));
   let polls = 0;

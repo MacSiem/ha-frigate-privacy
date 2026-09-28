@@ -112,7 +112,11 @@ type: custom:ha-frigate-privacy
 ```
 
 That's it. For an administrator, the card lists discovered Frigate cameras with
-pause/resume controls, backend-confirmed state, and the schedule editor.
+pause/resume controls, backend-confirmed state, and the schedule editor. Each
+camera shows the current HA camera entity, recording switch, and sound-detection
+switch status. **Preview in HA** opens Home Assistant's native camera view only
+when selected; the card never loads a live feed on its own. An unavailable
+sound-detection switch is shown as unavailable rather than assumed to be on.
 
 ## Entities for automations
 

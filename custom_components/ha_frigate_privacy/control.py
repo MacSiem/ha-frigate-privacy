@@ -41,6 +41,9 @@ CURRENT_SUFFIXES = (
 ALL_SUFFIXES = tuple(dict.fromkeys((*LEGACY_SUFFIXES, *CURRENT_SUFFIXES)))
 DISCOVERY_SUFFIXES = ("_detect", "_recordings")
 UNAVAILABLE_STATES = {"unavailable", "unknown"}
+# Home Assistant CameraEntityFeature.ON_OFF. Frigate camera entities can expose
+# an image while reporting supported_features=0; camera.turn_off cannot control them.
+CAMERA_FEATURE_ON_OFF = 1
 MAX_OPERATION_HISTORY = 16
 
 
@@ -412,6 +415,12 @@ def discover_frigate_cameras(hass: HomeAssistant) -> list[dict[str, Any]]:
                     if state is not None
                     else base.replace("_", " ").title()
                 ),
+                "camera_state": state.state if state is not None else None,
+                "camera_can_toggle": bool(
+                    state is not None
+                    and int(state.attributes.get("supported_features") or 0)
+                    & CAMERA_FEATURE_ON_OFF
+                ),
                 "switches": switches,
                 "available_switches": [item["entity_id"] for item in switches],
                 "missing_switches": [
@@ -632,6 +641,8 @@ async def _async_pause_camera_locked(
         and cam_entity
         and (camera_state := hass.states.get(cam_entity)) is not None
         and camera_state.state not in {*UNAVAILABLE_STATES, "off"}
+        and int(camera_state.attributes.get("supported_features") or 0)
+        & CAMERA_FEATURE_ON_OFF
     )
     if stream_type == "all" and cam_entity:
         camera_state = hass.states.get(cam_entity)
