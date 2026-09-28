@@ -38,6 +38,32 @@ const initial = {
 {
   const { dom, card } = createCard(initial);
   await new Promise((resolve) => setTimeout(resolve, 30));
+  let polls = 0;
+  const originalCall = card._hass.callWS;
+  const hass = { ...card._hass, callWS: async (message) => { polls += 1; return originalCall(message); } };
+  const originalPanel = card.shadowRoot.querySelector('.card');
+  for (let index = 0; index < 30; index += 1) card.hass = { ...hass, states: { [`sensor.tick_${index}`]: { state: index } } };
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(polls, 0, 'unrelated HA state updates must not poll or rebuild the card');
+  assert.equal(card.shadowRoot.querySelector('.card'), originalPanel);
+  card._lastStatePollAt -= 15000;
+  card.hass = hass;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(polls, 1, 'backend state refresh remains bounded');
+  assert.equal(card.shadowRoot.querySelector('.card'), originalPanel, 'routine refresh must preserve stable card content');
+  assert.equal(card.shadowRoot.querySelector('[data-action="retry"]'), null, 'routine refresh must not show a loading gate');
+  card.hass = { ...hass, user: { id: 'owner', is_admin: false } };
+  assert.equal(card._cameras.length, 0, 'revoking admin access must clear cached camera data');
+  assert.match(card.shadowRoot.textContent, /Administrator permission required/);
+  card.hass = hass;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(card._cameras.length, 1, 'restored admin access must reload integration state');
+  dom.window.close();
+}
+
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
   assert.ok(card.shadowRoot.querySelector('.donate-section'));
   card.setConfig({ type: 'custom:ha-frigate-privacy', show_support: false });
   assert.equal(card.shadowRoot.querySelector('.donate-section'), null);

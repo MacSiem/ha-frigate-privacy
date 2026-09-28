@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep the full card visible while refreshing integration state; bound routine polling so Home Assistant state broadcasts cannot make the card blink or change height.
 - Show the one-line support link only to administrators, with `show_support: false` and a remembered dismiss action.
 - Register one storage-mode Lovelace resource and an administrator-only sidebar panel; preserve an existing HACS resource, refresh the owned resource on upgrade and remove owned UI entries on unload. YAML mode keeps the frontend fallback.
 - Require Home Assistant 2025.2 for Lovelace resource and panel APIs.

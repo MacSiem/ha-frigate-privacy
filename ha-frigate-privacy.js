@@ -85,7 +85,7 @@
       super(); this.attachShadow({ mode: 'open' }); this._config = {}; this._hass = null;
       this._lang = (navigator.language || '').startsWith('pl') ? 'pl' : 'en'; this._activeTab = 'control';
       this._integrationChecked = false; this._integrationAvailable = false; this._recoveryReady = true; this._permissionDenied = false; this._busy = false; this._error = '';
-      this._requestEpoch = 0; this._connectPromise = null; this._cameras = []; this._schedules = []; this._paused = {}; this._lastOperations = {}; this._selectedCameras = new Set();
+      this._requestEpoch = 0; this._connectPromise = null; this._lastStatePollAt = 0; this._connection = null; this._userId = null; this._cameras = []; this._schedules = []; this._paused = {}; this._lastOperations = {}; this._selectedCameras = new Set();
       this._customMinutes = Number(haToolsPersistence.loadSync('ha-frigate-privacy-pause-minutes')) || 30;
       const storedScope = haToolsPersistence.loadSync('ha-frigate-privacy-pause-stream-type'); this._pauseStreamType = ['all','main','sub'].includes(storedScope) ? storedScope : 'all';
       this._editingScheduleIdx = null; this._scheduleForm = this._emptySchedule(); this._lastHtml = ''; this._toastTimer = null;
@@ -105,19 +105,23 @@
 
     setConfig(config) { this._config = { ...config }; this._updateUI(); }
     set hass(hass) {
+      const identityChanged = !!this._hass && (this._connection !== (hass?.connection || null) || this._userId !== (hass?.user?.id || null) || this._permissionDenied !== (hass?.user?.is_admin !== true));
       this._hass = hass; if (!hass) return; this._lang = String(hass.language || 'en').startsWith('pl') ? 'pl' : 'en';
+      if (identityChanged) { this._requestEpoch += 1; this._connectPromise = null; this._lastStatePollAt = 0; this._integrationChecked = false; this._integrationAvailable = false; this._cameras = []; this._schedules = []; this._paused = {}; this._lastOperations = {}; this._selectedCameras.clear(); }
+      this._connection = hass.connection || null; this._userId = hass.user?.id || null;
       this.classList.toggle('bento-dark', !!hass.themes?.darkMode); this._permissionDenied = hass.user?.is_admin !== true;
       if (this._permissionDenied) { this._integrationChecked = true; this._integrationAvailable = false; this._updateUI(); return; }
-      if (!this._connectPromise) this._connectIntegration(); this._updateUI();
+      if (!this._connectPromise && !this._busy && (!this._integrationChecked || Date.now() - this._lastStatePollAt >= 15000)) this._connectIntegration();
+      this._updateUI();
     }
-    disconnectedCallback() { this._requestEpoch += 1; this._connectPromise = null; this._busy = false; this._integrationChecked = false; this._integrationAvailable = false; if (this._toastTimer) clearTimeout(this._toastTimer); }
+    disconnectedCallback() { this._requestEpoch += 1; this._connectPromise = null; this._lastStatePollAt = 0; this._busy = false; this._integrationChecked = false; this._integrationAvailable = false; if (this._toastTimer) clearTimeout(this._toastTimer); }
     _emptySchedule() { return { enabled:true,days:[1,2,3,4,5],startHour:18,startMin:0,endHour:20,endMin:0,repeat:true,label:'' }; }
     async _callIntegration(command, payload = {}) {
       if (!this._hass || this._hass.user?.is_admin !== true) throw Object.assign(new Error('admin_required'), { code: 'unauthorized' });
       return this._hass.callWS({ type: `ha_frigate_privacy/${command}`, ...payload });
     }
     async _connectIntegration() {
-      const epoch = ++this._requestEpoch; this._integrationChecked = false; this._error = '';
+      const epoch = ++this._requestEpoch; const refresh = this._integrationChecked && this._integrationAvailable; this._lastStatePollAt = Date.now(); if (!refresh) this._integrationChecked = false; this._error = '';
       this._connectPromise = this._callIntegration('get_state').then((state) => { if (epoch !== this._requestEpoch) return; this._integrationAvailable = true; this._integrationChecked = true; this._applyState(state); })
         .catch((error) => { if (epoch !== this._requestEpoch) return; this._integrationAvailable = false; this._integrationChecked = true; this._permissionDenied = error?.code === 'unauthorized'; this._error = this._safeError(error); })
         .finally(() => { if (epoch === this._requestEpoch) { this._connectPromise = null; this._updateUI(); } });
