@@ -1324,13 +1324,33 @@ async def _async_resume_camera_locked(
                 )
             else:
                 failed.append(entity_id)
+        # Frigate may turn on a related switch as a side effect of resuming
+        # detection. Preserve the complete pre-pause off baseline as well.
+        if paused.get("preexisting_off"):
+            await asyncio.sleep(0.2)
+        for entity_id in paused.get("preexisting_off") or []:
+            state = hass.states.get(entity_id)
+            if state is None or state.state in UNAVAILABLE_STATES:
+                failed.append(entity_id)
+                continue
+            if state.state == "off":
+                continue
+            await hass.services.async_call(
+                "switch",
+                "turn_off",
+                {"entity_id": entity_id},
+                blocking=True,
+                context=context,
+            )
+            if not await _confirm_state(hass, entity_id, "off"):
+                failed.append(entity_id)
     except asyncio.CancelledError:
         # A service call can have completed before the caller observes task
         # cancellation. Re-read every exact persisted target and restore the
         # privacy/off state in a shielded task before propagating cancellation.
         restore_switches = [
             target
-            for target in expected
+            for target in [*expected, *(paused.get("preexisting_off") or [])]
             if (state := hass.states.get(target)) is not None
             and state.state == "on"
         ]
@@ -1402,6 +1422,7 @@ async def _async_resume_camera_locked(
         targets = [
             *([cam_entity] if paused.get("camera_toggled") and cam_entity else []),
             *expected,
+            *(paused.get("preexisting_off") or []),
         ]
         observed_at = datetime.now(timezone.utc).isoformat()
         actual = _actual_state_snapshot(hass, targets)
@@ -1442,7 +1463,7 @@ async def _async_resume_camera_locked(
             )
             restored = await _restore_pause_after_failed_resume(
                 hass,
-                reenabled_switches,
+                list(dict.fromkeys([*reenabled_switches, *(paused.get("preexisting_off") or [])])),
                 cam_entity if camera_reenabled else None,
                 context=context,
             )
@@ -1496,7 +1517,7 @@ async def _async_resume_camera_locked(
     # notify. We never clear paused state on uncertainty.
     restored = await _restore_pause_after_failed_resume(
         hass,
-        reenabled_switches,
+        list(dict.fromkeys([*reenabled_switches, *(paused.get("preexisting_off") or [])])),
         cam_entity if camera_reenabled else None,
         context=context,
     )

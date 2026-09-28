@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 DOMAIN = "ha_frigate_privacy"
-VERSION = "6.0.4"
+VERSION = "6.0.5"
 CARD_FILENAME = "ha-frigate-privacy-card.js"
 CARD_URL = f"/{DOMAIN}/{CARD_FILENAME}"
 STATIC_URL_BASE = f"/{DOMAIN}"
