@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Ignore Frigate `camera.*` entities without Home Assistant's ON_OFF capability when pausing. Continue controlling and verifying their supported Frigate switches instead of reporting a false camera readback failure.
+- Control Frigate `camera.*` through its working HA turn-on/turn-off actions in the Everything scope even though the integration advertises STREAM while on and no features while off. Verify `streaming` → `idle` on pause and `idle` → `streaming` on resume, including after a restart; preserve cameras that were off before the pause.
 - Show current video entity, recording, and sound-detection states for each discovered camera. Open HA's native camera preview only after an administrator clicks Preview; screenshots remain synthetic.
 - Wait up to two seconds for Frigate switch state events after service calls before reporting a readback mismatch, including pause extensions and resume. Fetch the full integration state after a card action so the camera list and channel status stay visible.
 - Restore switches that were off before privacy when Frigate turns them on indirectly during resume; keep the pause in fail-safe state if restoration fails.

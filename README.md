@@ -22,6 +22,10 @@ created.
 2. **Pause / resume.** Pausing records its intent first, turns off only the selected
    scope, and verifies the reported state. Resume re-enables only targets that this
    integration successfully changed; pre-existing manual-off targets remain off.
+   In the **Everything** scope, Frigate's camera entity is also stopped and
+   resumed. Frigate reports an off camera as `idle` with no supported features,
+   but its HA `camera.turn_on` action still works; the integration verifies the
+   resulting `streaming` state before claiming that resume succeeded.
 3. **Privacy schedules.** Create recurring windows (e.g. weekday mornings) during
    which all currently discovered Frigate cameras pause automatically. Overlapping
    windows are treated as union coverage, so privacy remains active until the last

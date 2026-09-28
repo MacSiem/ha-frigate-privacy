@@ -116,8 +116,11 @@ class _Services:
             async def apply_state():
                 if self.delay_state_seconds:
                     await asyncio.sleep(self.delay_state_seconds)
-                if domain == "camera" and service == "turn_on":
-                    # Camera entities report idle/streaming/recording when enabled.
+                if domain == "camera" and self.states.values[entity_id].attributes.get("supported_features") in {0, 2}:
+                    # Frigate advertises STREAM only while its camera is on.
+                    self.states.values[entity_id].state = "streaming" if service == "turn_on" else "idle"
+                    self.states.values[entity_id].attributes["supported_features"] = 2 if service == "turn_on" else 0
+                elif domain == "camera" and service == "turn_on":
                     self.states.values[entity_id].state = "idle"
                 else:
                     self.states.values[entity_id].state = "on" if service == "turn_on" else "off"
@@ -299,6 +302,28 @@ def test_camera_without_on_off_feature_uses_switches_only():
     assert not any(call[0] == "camera" for call in hass.services.calls)
     assert [hass.states.get(f"switch.front_{suffix}").state for suffix in ("detect", "recordings")] == ["on", "on"]
     assert storage.paused["front"]["camera_toggled"] is False
+
+
+def test_frigate_camera_streaming_to_idle_is_reenabled_after_privacy():
+    async def scenario():
+        hass = _Hass()
+        hass.states.values["camera.front"].attributes["supported_features"] = 2
+        hass.services.delay_state_seconds = 0.05
+        storage = _Storage()
+        paused = await control.async_pause_camera(hass, storage, "front")
+        after_pause = (hass.states.get("camera.front").state, hass.states.get("camera.front").attributes["supported_features"])
+        resumed = await control.async_resume_camera(hass, storage, "front")
+        return hass, storage, paused, after_pause, resumed
+
+    hass, storage, paused, after_pause, resumed = asyncio.run(scenario())
+    assert paused["phase"] == "paused"
+    assert paused["camera_toggled"] is True
+    assert after_pause == ("idle", 0)
+    assert resumed["phase"] == "active"
+    assert hass.states.get("camera.front").state == "streaming"
+    assert hass.states.get("camera.front").attributes["supported_features"] == 2
+    assert ("camera", "turn_off", "camera.front") in hass.services.calls
+    assert ("camera", "turn_on", "camera.front") in hass.services.calls
 
 
 def test_frigate_switch_state_can_arrive_after_service_returns():

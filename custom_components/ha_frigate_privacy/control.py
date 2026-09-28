@@ -41,8 +41,8 @@ CURRENT_SUFFIXES = (
 ALL_SUFFIXES = tuple(dict.fromkeys((*LEGACY_SUFFIXES, *CURRENT_SUFFIXES)))
 DISCOVERY_SUFFIXES = ("_detect", "_recordings")
 UNAVAILABLE_STATES = {"unavailable", "unknown"}
-# Home Assistant CameraEntityFeature.ON_OFF. Frigate camera entities can expose
-# an image while reporting supported_features=0; camera.turn_off cannot control them.
+# Frigate implements camera.turn_on/turn_off through MQTT but advertises only
+# STREAM while on, and no features while off. Its HA state is streaming/idle.
 CAMERA_FEATURE_ON_OFF = 1
 MAX_OPERATION_HISTORY = 16
 
@@ -59,9 +59,27 @@ async def _confirm_state(hass: HomeAssistant, entity_id: str, expected: str) -> 
 
 
 async def _confirm_camera_enabled(hass: HomeAssistant, entity_id: str) -> bool:
-    """Wait for an ON_OFF-capable camera to leave its off state."""
+    """Wait for Frigate's enabled MQTT state to reach Home Assistant."""
     for attempt in range(21):
         if _camera_is_enabled(hass, entity_id):
+            return True
+        if attempt < 20:
+            await asyncio.sleep(0.1)
+    return False
+
+
+async def _confirm_camera_disabled(hass: HomeAssistant, entity_id: str) -> bool:
+    """Wait for Frigate's idle/featureless state after camera.turn_off."""
+    for attempt in range(21):
+        state = hass.states.get(entity_id)
+        if state is not None and (
+            state.state == "off"
+            or (
+                state.state == "idle"
+                and not int(state.attributes.get("supported_features") or 0)
+                & CAMERA_FEATURE_ON_OFF
+            )
+        ):
             return True
         if attempt < 20:
             await asyncio.sleep(0.1)
@@ -438,9 +456,7 @@ def discover_frigate_cameras(hass: HomeAssistant) -> list[dict[str, Any]]:
                 ),
                 "camera_state": state.state if state is not None else None,
                 "camera_can_toggle": bool(
-                    state is not None
-                    and int(state.attributes.get("supported_features") or 0)
-                    & CAMERA_FEATURE_ON_OFF
+                    state is not None and _is_frigate_entity(hass, cam_entity)
                 ),
                 "switches": switches,
                 "available_switches": [item["entity_id"] for item in switches],
@@ -660,10 +676,8 @@ async def _async_pause_camera_locked(
     camera_planned = bool(
         stream_type == "all"
         and cam_entity
-        and (camera_state := hass.states.get(cam_entity)) is not None
-        and camera_state.state not in {*UNAVAILABLE_STATES, "off"}
-        and int(camera_state.attributes.get("supported_features") or 0)
-        & CAMERA_FEATURE_ON_OFF
+        and _is_frigate_entity(hass, cam_entity)
+        and _camera_is_enabled(hass, cam_entity)
     )
     if stream_type == "all" and cam_entity:
         camera_state = hass.states.get(cam_entity)
@@ -777,7 +791,7 @@ async def _async_pause_camera_locked(
                 blocking=True,
                 context=context,
             )
-            camera_toggled = await _confirm_state(hass, cam_entity, "off")
+            camera_toggled = await _confirm_camera_disabled(hass, cam_entity)
             camera_failed = not camera_toggled
             if camera_toggled:
                 target_outcomes[cam_entity] = "paused"
@@ -964,7 +978,7 @@ async def _async_extend_schedule_pause_locked(
                 blocking=True,
                 context=context,
             )
-            camera_toggled = await _confirm_state(hass, cam_entity, "off")
+            camera_toggled = await _confirm_camera_disabled(hass, cam_entity)
             outcomes[cam_entity] = (
                 "paused" if camera_toggled else "readback_failed"
             )
@@ -1815,9 +1829,17 @@ def _persisted_targets_are_valid(
 
 
 def _camera_is_enabled(hass: HomeAssistant, entity_id: str) -> bool:
-    """Return whether a camera is enabled across HA camera state variants."""
+    """Frigate off=idle/features 0, on=streaming; honor ON_OFF cameras too."""
     state = hass.states.get(entity_id)
-    return bool(state and state.state not in {*UNAVAILABLE_STATES, "off"})
+    if state is None or state.state in {*UNAVAILABLE_STATES, "off"}:
+        return False
+    if state.state in {"streaming", "recording", "on"}:
+        return True
+    return bool(
+        state.state == "idle"
+        and int(state.attributes.get("supported_features") or 0)
+        & CAMERA_FEATURE_ON_OFF
+    )
 
 
 async def _restore_pause_after_failed_resume(
@@ -1860,8 +1882,7 @@ async def _restore_pause_after_failed_resume(
                 blocking=True,
                 context=context,
             )
-            state = hass.states.get(camera_entity)
-            if state is not None and state.state == "off":
+            if await _confirm_camera_disabled(hass, camera_entity):
                 outcomes[camera_entity] = "repaused"
             else:
                 outcomes[camera_entity] = "re_pause_readback_failed"
