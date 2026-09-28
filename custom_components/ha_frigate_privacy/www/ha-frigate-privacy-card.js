@@ -93,7 +93,7 @@
 
     static getConfigElement() { return document.createElement('ha-frigate-privacy-editor'); }
     static getStubConfig() { return { type: 'custom:ha-frigate-privacy', title: 'Frigate Privacy' }; }
-    getCardSize() { return 7; } getGridOptions() { return { rows: 9, columns: 12, min_rows: 4, min_columns: 6 }; }
+    getCardSize() { return 7; } getGridOptions() { return { columns: 12, min_rows: 4, min_columns: 6 }; }
     _repairMojibake(str) { if (!str) return str; try { return decodeURIComponent(escape(str)); } catch (_) { return str; } }
 
     get _t() {
