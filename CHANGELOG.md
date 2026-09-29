@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 6.0.7 (2026-09-29)
 
 - Keep persisted privacy pauses across Home Assistant restarts when a disabled Frigate camera reports `idle` with no ON_OFF feature. Treat only a genuinely re-enabled camera as a manual override; the startup scheduler must not erase the pause while Frigate remains off.
 - Control Frigate `camera.*` through its working HA turn-on/turn-off actions in the Everything scope even though the integration advertises STREAM while on and no features while off. Verify `streaming` → `idle` on pause and `idle` → `streaming` on resume, including after a restart; preserve cameras that were off before the pause.
