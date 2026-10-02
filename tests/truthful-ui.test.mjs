@@ -81,6 +81,7 @@ const initial = {
   card.hass = { ...hass, user: { id: 'owner', is_admin: false } };
   assert.equal(card._cameras.length, 0, 'revoking admin access must clear cached camera data');
   assert.match(card.shadowRoot.textContent, /Administrator permission required/);
+  assert.equal(card.shadowRoot.querySelector('.status-pill').textContent.trim(), 'Administrator permission required', 'a denied household read must not claim integration readiness');
   card.hass = hass;
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(card._cameras.length, 1, 'restored admin access must reload integration state');
@@ -297,3 +298,13 @@ assert.doesNotMatch(
 );
 
 console.log('truthful state, readable layout, and disconnect assertions passed');
+
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  card.hass = { ...card._hass, connection: {}, callWS: async () => { throw new Error('integration unavailable'); } };
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(card.shadowRoot.querySelector('.status-pill').textContent.trim(), 'Frigate Privacy integration is unavailable', 'a failed state read must not claim integration readiness');
+  assert.equal(card.shadowRoot.querySelector('[data-action="pause"]'), null);
+  dom.window.close();
+}
