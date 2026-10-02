@@ -393,6 +393,13 @@ class FrigatePrivacyScheduler:
                     and (camera_state := self.hass.states.get(camera_entity))
                     else None
                 ),
+                camera_supported_features=(
+                    (getattr(camera_state, "attributes", {}) or {}).get(
+                        "supported_features"
+                    )
+                    if camera_entity and camera_state
+                    else None
+                ),
                 camera_toggled=bool(state.get("camera_toggled")),
             )
             if not decision["override"]:

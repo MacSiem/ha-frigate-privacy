@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+- Show the administrator-permission or unavailable status when the integration state cannot be read, instead of claiming readiness above the access/error notice. No camera control changes.
+
+## 6.0.7 (2026-09-29)
+
+- Keep persisted privacy pauses across Home Assistant restarts when a disabled Frigate camera reports `idle` with no ON_OFF feature. Treat only a genuinely re-enabled camera as a manual override; the startup scheduler must not erase the pause while Frigate remains off.
+- Control Frigate `camera.*` through its working HA turn-on/turn-off actions in the Everything scope even though the integration advertises STREAM while on and no features while off. Verify `streaming` → `idle` on pause and `idle` → `streaming` on resume, including after a restart; preserve cameras that were off before the pause.
+- Show current video entity, recording, and sound-detection states for each discovered camera. Open HA's native camera preview only after an administrator clicks Preview; screenshots remain synthetic.
+- Wait up to two seconds for Frigate switch state events after service calls before reporting a readback mismatch, including pause extensions and resume. Fetch the full integration state after a card action so the camera list and channel status stay visible.
+- Restore switches that were off before privacy when Frigate turns them on indirectly during resume; keep the pause in fail-safe state if restoration fails.
+- Keep the full card visible while refreshing integration state; bound routine polling so Home Assistant state broadcasts cannot make the card blink or change height.
+- Show the one-line support link only to administrators, with `show_support: false` and a remembered dismiss action.
+- Register one storage-mode Lovelace resource and an administrator-only sidebar panel; preserve an existing HACS resource, refresh the owned resource on upgrade and remove owned UI entries on unload. YAML mode keeps the frontend fallback.
+- Require Home Assistant 2025.2 for Lovelace resource and panel APIs.
+
 ## 6.0.0 (2026-09-01)
 
 - Security: replaced all browser-owned compatibility, token, REST-config and direct

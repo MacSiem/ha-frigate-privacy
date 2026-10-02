@@ -43,7 +43,13 @@
     camera_id: b,
     entity_id: 'camera.' + b,
     name: states['camera.' + b].attributes.friendly_name,
-    switches: [],
+    camera_state: 'idle',
+    camera_can_toggle: false,
+    switches: [
+      { entity_id: 'switch.' + b + '_detect', suffix: '_detect', state: states['switch.' + b + '_detect'].state },
+      { entity_id: 'switch.' + b + '_recordings', suffix: '_recordings', state: states['switch.' + b + '_recordings'].state },
+      { entity_id: 'switch.' + b + '_audio_detection', suffix: '_audio_detection', state: b === 'living_room' ? 'off' : 'on' },
+    ],
     available_switches: ['switch.' + b + '_detect', 'switch.' + b + '_recordings'],
     missing_switches: [],
   }));

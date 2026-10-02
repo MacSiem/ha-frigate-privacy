@@ -14,6 +14,7 @@ function createCard(initialState, mutationResult = null) {
   window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
   window.eval(source);
   const card = window.document.createElement('ha-frigate-privacy');
+  let mutated = false;
   card.setConfig({ type: 'custom:ha-frigate-privacy' });
   card.hass = {
     states: {},
@@ -21,7 +22,8 @@ function createCard(initialState, mutationResult = null) {
     language: 'en',
     user: { id: 'owner', is_admin: true },
     callWS: async (message) => {
-      if (message.type.endsWith('/get_state')) return initialState;
+      if (message.type.endsWith('/get_state')) return mutated && mutationResult?.state ? { ...initialState, ...mutationResult.state } : initialState;
+      mutated = true;
       return mutationResult || { ok: true, phase: 'paused', state: initialState };
     },
   };
@@ -34,6 +36,72 @@ const initial = {
   schedules: [],
   paused: {},
 };
+
+{
+  const status = {
+    ...initial,
+    cameras: [{
+      camera_id: 'front', entity_id: 'camera.front', name: 'Front', camera_state: 'idle',
+      switches: [
+        { suffix: '_recordings', state: 'off' },
+        { suffix: '_detect', state: 'on' },
+        { suffix: '_audio_detection', state: 'unavailable' },
+      ],
+    }],
+  };
+  const { dom, card } = createCard(status);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.match(card.shadowRoot.textContent, /Video: Idle/);
+  assert.match(card.shadowRoot.textContent, /Recording: Off/);
+  assert.match(card.shadowRoot.textContent, /Sound detection: Unavailable/);
+  let previewEntity = null;
+  card.addEventListener('hass-more-info', (event) => { previewEntity = event.detail.entityId; });
+  card.shadowRoot.querySelector('[data-preview-camera="camera.front"]').click();
+  assert.equal(previewEntity, 'camera.front');
+  dom.window.close();
+}
+
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  let polls = 0;
+  const originalCall = card._hass.callWS;
+  const hass = { ...card._hass, callWS: async (message) => { polls += 1; return originalCall(message); } };
+  const originalPanel = card.shadowRoot.querySelector('.card');
+  for (let index = 0; index < 30; index += 1) card.hass = { ...hass, states: { [`sensor.tick_${index}`]: { state: index } } };
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(polls, 0, 'unrelated HA state updates must not poll or rebuild the card');
+  assert.equal(card.shadowRoot.querySelector('.card'), originalPanel);
+  card._lastStatePollAt -= 15000;
+  card.hass = hass;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(polls, 1, 'backend state refresh remains bounded');
+  assert.equal(card.shadowRoot.querySelector('.card'), originalPanel, 'routine refresh must preserve stable card content');
+  assert.equal(card.shadowRoot.querySelector('[data-action="retry"]'), null, 'routine refresh must not show a loading gate');
+  card.hass = { ...hass, user: { id: 'owner', is_admin: false } };
+  assert.equal(card._cameras.length, 0, 'revoking admin access must clear cached camera data');
+  assert.match(card.shadowRoot.textContent, /Administrator permission required/);
+  assert.equal(card.shadowRoot.querySelector('.status-pill').textContent.trim(), 'Administrator permission required', 'a denied household read must not claim integration readiness');
+  card.hass = hass;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(card._cameras.length, 1, 'restored admin access must reload integration state');
+  dom.window.close();
+}
+
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.ok(card.shadowRoot.querySelector('.donate-section'));
+  card.setConfig({ type: 'custom:ha-frigate-privacy', show_support: false });
+  assert.equal(card.shadowRoot.querySelector('.donate-section'), null);
+  card.setConfig({ type: 'custom:ha-frigate-privacy' });
+  card.shadowRoot.querySelector('[data-action="dismiss-support"]').click();
+  assert.equal(card.shadowRoot.querySelector('.donate-section'), null);
+  assert.equal(dom.window.localStorage.getItem('ha-frigate-privacy-support-dismissed'), '1');
+  card.hass = { ...card._hass, user: { id: 'member', is_admin: false } };
+  assert.equal(card.shadowRoot.querySelector('.donate-section'), null);
+  dom.window.close();
+}
 
 {
   const switchOnly = {
@@ -60,7 +128,6 @@ const initial = {
     ok: false,
     phase: 'partial',
     state: {
-      ...initial,
       paused: { front: { camera_id: 'front', phase: 'partial', active: true } },
     },
   };
@@ -74,6 +141,7 @@ const initial = {
   assert.equal(card._error, 'partial');
   assert.equal(toasts.at(-1)?.kind, 'error');
   assert.equal(card._paused.front.phase, 'partial');
+  assert.equal(card._cameras.length, 1, 'partial mutations must keep discovered cameras visible');
   dom.window.close();
 }
 
@@ -230,3 +298,13 @@ assert.doesNotMatch(
 );
 
 console.log('truthful state, readable layout, and disconnect assertions passed');
+
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  card.hass = { ...card._hass, connection: {}, callWS: async () => { throw new Error('integration unavailable'); } };
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(card.shadowRoot.querySelector('.status-pill').textContent.trim(), 'Frigate Privacy integration is unavailable', 'a failed state read must not claim integration readiness');
+  assert.equal(card.shadowRoot.querySelector('[data-action="pause"]'), null);
+  dom.window.close();
+}
