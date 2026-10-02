@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Show the administrator-permission or unavailable status when the integration state cannot be read, instead of claiming readiness above the access/error notice. No camera control changes.
+
 ## 6.0.7 (2026-09-29)
 
 - Keep persisted privacy pauses across Home Assistant restarts when a disabled Frigate camera reports `idle` with no ON_OFF feature. Treat only a genuinely re-enabled camera as a manual override; the startup scheduler must not erase the pause while Frigate remains off.
