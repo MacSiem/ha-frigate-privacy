@@ -81,7 +81,8 @@ async def test_unload_removes_owned_resource_and_panel(hass: HomeAssistant) -> N
 
 async def test_yaml_unload_removes_only_owned_extra_module(hass: HomeAssistant) -> None:
     assert await async_setup_component(hass, "lovelace", {"lovelace": {"mode": "yaml"}})
-    assert hass.data["lovelace"].resource_mode == "yaml"
+    lovelace = hass.data["lovelace"]
+    assert getattr(lovelace, "resource_mode", getattr(lovelace, "mode", None)) == "yaml"
     assert await async_setup_component(hass, "frontend", {})
     foreign = "/local/foreign-module.js"
     frontend.add_extra_js_url(hass, foreign)

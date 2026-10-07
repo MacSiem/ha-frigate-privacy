@@ -57,9 +57,11 @@ class _ConfirmedStore(Store):
         if error := self._last_write_error:
             raise StorageWriteError("privacy state was not durably saved") from error
 
-    async def _async_write_data(self, data: dict[str, Any]) -> None:
+    async def _async_write_data(self, *args: Any, **kwargs: Any) -> None:
         try:
-            await super()._async_write_data(data)
+            # HA 2025.2 passes (path, data); newer cores pass only data.
+            # Forward the core's arguments without weakening error detection.
+            await super()._async_write_data(*args, **kwargs)
         except Exception as err:
             # Re-raise so Store retains its normal logging/handling behavior;
             # async_save above converts only its swallowed outcome to a failure.
