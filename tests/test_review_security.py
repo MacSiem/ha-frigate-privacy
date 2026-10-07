@@ -27,7 +27,7 @@ def _function(tree: ast.AST, name: str) -> ast.AsyncFunctionDef:
     )
 
 
-def test_pause_and_resume_services_require_admin() -> None:
+def test_pause_and_resume_services_use_authorization_guard() -> None:
     tree = ast.parse(INIT_PATH.read_text())
 
     for name in ("_handle_pause", "_handle_resume"):
@@ -38,13 +38,6 @@ def test_pause_and_resume_services_require_admin() -> None:
             if isinstance(call, ast.Call)
         }
         assert "_async_require_admin" in calls
-
-    guard = _function(tree, "_async_require_admin")
-    guard_source = ast.unparse(guard)
-    assert "hass.auth.async_get_user" in guard_source
-    assert "user is None or not user.is_admin" in guard_source
-    assert "raise Unauthorized()" in guard_source
-
 
 def test_startup_recovery_is_gated_before_external_mutations() -> None:
     tree = ast.parse(INIT_PATH.read_text())

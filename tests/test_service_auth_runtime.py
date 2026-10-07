@@ -176,6 +176,7 @@ def test_service_denies_non_admin_and_recovery_pending_before_side_effects():
 
         for call, expected in (
             (_call("member", camera="front"), Unauthorized),
+            (_call("missing-user", camera="front"), Unauthorized),
             (_call(None, camera="front"), Unauthorized),
             (_call("admin", camera="front"), HomeAssistantError),
         ):
