@@ -89,3 +89,23 @@ async def test_notify_entity_obeys_selected_events_and_live_preferences(hass: Ho
     await hass.async_block_till_done()
     assert len(delivered) == 2
     assert await hass.config_entries.async_unload(entry.entry_id)
+
+async def test_scheduled_notifications_are_selected_independently(hass: HomeAssistant):
+    entry = await _setup(hass)
+    delivered = []
+    async def deliver(call):
+        delivered.append(dict(call.data))
+    hass.services.async_register('notify', 'qa_phone', deliver)
+    hass.config_entries.async_update_entry(entry, options={
+        'notify_destination':'notify.qa_phone', 'notify_errors':False,
+        'notify_paused':False, 'notify_resumed':False, 'notify_scheduled':True,
+    })
+    storage = hass.data[DOMAIN]['storage']
+    for phase, source in [('paused','manual'), ('active','manual'), ('paused','schedule'), ('active','schedule')]:
+        await storage.async_set_paused('qa_camera', {'phase':phase, 'source':source, 'operation_id':source})
+        hass.bus.async_fire(EVENT_STATE_CHANGED, {'camera_id':'qa_camera'})
+        await hass.async_block_till_done()
+    assert len(delivered) == 2, 'scheduled start/end is selectable without manual on/off events'
+    assert 'scheduled' in delivered[0]['message'].lower()
+    assert 'restored' in delivered[1]['message'].lower()
+    assert await hass.config_entries.async_unload(entry.entry_id)
