@@ -70,6 +70,7 @@ _SERVICE_RESUME_SCHEMA = vol.Schema(
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Frigate Privacy from a config entry."""
     bucket = hass.data.setdefault(DOMAIN, {})
+    bucket["config_entry"] = entry
     storage = FrigatePrivacyStorage(hass)
     await storage.async_load()
     bucket[DATA_STORAGE] = storage
@@ -100,6 +101,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     scheduler.async_start()
 
+    from .notifications import FrigatePrivacyNotifications
+    notifier = FrigatePrivacyNotifications(hass, entry, storage)
+    bucket["notifications"] = notifier
+    notifier.async_start()
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     _LOGGER.debug("Frigate Privacy set up (entry_id=%s)", entry.entry_id)
@@ -112,6 +118,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not unload_ok:
         return False
     bucket = hass.data.get(DOMAIN, {})
+    if notifier := bucket.pop("notifications", None):
+        await notifier.async_stop()
+    bucket.pop("config_entry", None)
     if scheduler := bucket.pop(DATA_SCHEDULER, None):
         await scheduler.async_stop()
     bucket.pop(DATA_STORAGE, None)
@@ -172,8 +181,27 @@ async def _async_require_admin(
     """Reject service calls that cannot be attributed to an administrator."""
     user_id = call.context.user_id
     user = await hass.auth.async_get_user(user_id) if user_id else None
-    if user is None or not user.is_admin:
-        raise Unauthorized()
+    if user is not None and user.is_admin:
+        return
+    # System-triggered HA actions have no user. Only an explicitly selected,
+    # currently running registered automation/script may use this authority.
+    # State-only entities, parent contexts and client-supplied names cannot.
+    if user_id is None:
+        entry = hass.data.get(DOMAIN, {}).get("config_entry")
+        context_id = getattr(call.context, "id", None)
+        for entity_id in (entry.options.get("trusted_actions", []) if entry else []):
+            domain = entity_id.split(".", 1)[0]
+            if domain not in {"automation", "script"}:
+                continue
+            component = hass.data.get(domain)
+            entity = component.get_entity(entity_id) if component and hasattr(component, "get_entity") else None
+            current = getattr(entity, "_context", None)
+            running = bool(getattr(entity, "is_on", False))
+            if domain == "automation":
+                running = running and bool(getattr(getattr(entity, "action_script", None), "is_running", False))
+            if running and context_id and getattr(current, "id", None) == context_id:
+                return
+    raise Unauthorized()
 
 
 def _require_recovery_ready(hass: HomeAssistant) -> None:
