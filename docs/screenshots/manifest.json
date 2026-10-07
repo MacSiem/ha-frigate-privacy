@@ -4,7 +4,7 @@
   "fixture": "privacy-safe-generic-home",
   "source": {
     "path": "ha-frigate-privacy.js",
-    "sha256": "3e48ac720f47b353a3c5aec111a06f6146f3a7e427fee9ba172d8c32e429f695"
+    "sha256": "20da2365c85d0dd06b7531df7d96e0e07968680431b8b44d9bad8cb98c61f1f0"
   },
   "harness": {
     "path": "docs/screenshots/_harness.html",
@@ -36,7 +36,7 @@
     "viewport_css_width": 560,
     "viewport_css_height": 1100,
     "device_pixel_ratio": 1,
-    "source_head": "95d9d3fa92a9244756a9f0679ff6c1aae82b493f",
+    "source_head": "05c76bcda376c3041654f354f454e31a824cc488",
     "scope": "Synthetic documentation fixture only; native HA acceptance recorded separately"
   }
 }
