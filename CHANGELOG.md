@@ -1,5 +1,27 @@
 # Changelog
 
+## 6.1.0 (2026-10-07)
+
+- Add separate video, recording, snapshot, detection and sound-detection indicators, with explicit unknown/unavailable states and the limits of sound detection.
+- Add native HA options for optional notifications and their destination/events, including separate scheduled start/restoration. Use generic messages, deduplicate repeated state events, and isolate delivery failures from camera control.
+- Add reusable dashboard button, script, automation and scene-bridge examples. Explicitly selected trusted HA automations/scripts can control privacy from their real running system context; revocation applies immediately to the next action.
+
+- Show the administrator-permission or unavailable status when the integration state cannot be read, instead of claiming readiness above the access/error notice.
+- Discard private schedule drafts and pending UI state when the user, connection or permissions change. Regaining access starts a fresh read; late responses from the previous identity are ignored.
+- Preserve editing focus, text selection and draft input across background card renders; provide accessible names for schedule fields and selected weekdays.
+- Remove only the integration-owned YAML frontend module on unload and preserve the runtime if its entity platforms refuse to unload.
+- Clarify scope limits and that the existing privacy-active sensor indicates a transition record, including partial/error states, rather than proof that every camera channel is off.
+
+- Keep persisted privacy pauses across Home Assistant restarts when a disabled Frigate camera reports `idle` with no ON_OFF feature. Treat only a genuinely re-enabled camera as a manual override; the startup scheduler must not erase the pause while Frigate remains off.
+- Control Frigate `camera.*` through its working HA turn-on/turn-off actions in the Everything scope even though the integration advertises STREAM while on and no features while off. Verify `streaming` → `idle` on pause and `idle` → `streaming` on resume, including after a restart; preserve cameras that were off before the pause.
+- Show current video entity, recording, and sound-detection states for each discovered camera. Open HA's native camera preview only after an administrator clicks Preview; screenshots remain synthetic.
+- Wait up to two seconds for Frigate switch state events after service calls before reporting a readback mismatch, including pause extensions and resume. Fetch the full integration state after a card action so the camera list and channel status stay visible.
+- Restore switches that were off before privacy when Frigate turns them on indirectly during resume; keep the pause in fail-safe state if restoration fails.
+- Keep the full card visible while refreshing integration state; bound routine polling so Home Assistant state broadcasts cannot make the card blink or change height.
+- Show the one-line support link only to administrators, with `show_support: false` and a remembered dismiss action.
+- Register one storage-mode Lovelace resource and an administrator-only sidebar panel; preserve an existing HACS resource, refresh the owned resource on upgrade and remove owned UI entries on unload. YAML mode keeps the frontend fallback.
+- Require Home Assistant 2025.2 for Lovelace resource and panel APIs.
+
 ## 6.0.0 (2026-09-01)
 
 - Security: replaced all browser-owned compatibility, token, REST-config and direct

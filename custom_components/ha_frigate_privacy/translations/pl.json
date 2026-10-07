@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Frigate Privacy",
-        "description": "Rejestruje integracje Frigate Privacy. Harmonogramy i stan zapauzowanych kamer sa zapisywane po stronie serwera, a wbudowana karta Lovelace laduje sie automatycznie."
+        "description": "Rejestruje integrację Frigate Privacy. Harmonogramy i stan zapauzowanych kamer są zapisywane na serwerze, a wbudowana karta Lovelace ładuje się automatycznie."
       }
     },
     "abort": {
@@ -13,8 +13,28 @@
   "entity": {
     "binary_sensor": {
       "privacy_active": {
-        "name": "Prywatnosc aktywna"
+        "name": "Prywatność aktywna"
       }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Frigate Privacy",
+        "description": "Dodatkowe powiadomienia są opcjonalne. Wybierz odbiorcę i zdarzenia. Ufaj tylko sprawdzonym automatyzacjom i skryptom: ich działania systemowe będą mogły sterować prywatnością bez sesji użytkownika.",
+        "data": {
+          "notify_destination": "Odbiorca powiadomień",
+          "notify_errors": "Błędy i częściowa prywatność",
+          "notify_paused": "Pauza wybranego zakresu",
+          "notify_resumed": "Przywrócenie zapisanych stanów",
+          "trusted_actions": "Zaufane automatyzacje i skrypty",
+          "notify_scheduled": "Zaplanowana pauza: start i przywrócenie"
+        }
+      }
+    },
+    "error": {
+      "invalid_destination": "Wybierz dostępnego odbiorcę powiadomień.",
+      "invalid_action": "Wybierz automatyzację lub skrypt."
     }
   }
 }

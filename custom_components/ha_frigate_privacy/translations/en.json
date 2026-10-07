@@ -16,5 +16,25 @@
         "name": "Privacy active"
       }
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Frigate Privacy",
+        "description": "Additional notifications are optional. Select a destination and the events to send. Trust only automations and scripts that you have reviewed: this allows their system actions to control privacy without a user session.",
+        "data": {
+          "notify_destination": "Notification destination",
+          "notify_errors": "Errors and partial privacy",
+          "notify_paused": "Selected scope paused",
+          "notify_resumed": "Targets restored",
+          "trusted_actions": "Trusted automations and scripts",
+          "notify_scheduled": "Scheduled pause: start and restoration"
+        }
+      }
+    },
+    "error": {
+      "invalid_destination": "Choose an available notification destination.",
+      "invalid_action": "Choose an automation or script."
+    }
   }
 }

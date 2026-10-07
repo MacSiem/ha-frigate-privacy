@@ -120,18 +120,47 @@ def test_missing_started_at_still_detects_override() -> None:
     assert decision["in_grace"] is False
 
 
-def test_camera_entity_enabled_after_grace_counts_as_override() -> None:
+def test_camera_entity_streaming_after_grace_counts_as_override() -> None:
+    decision = decide_manual_override(
+        started_at=_NOW - timedelta(minutes=10),
+        now=_NOW,
+        switch_states={},
+        camera_entity_id="camera.front",
+        camera_state="streaming",
+        camera_toggled=True,
+    )
+
+    assert decision["override"] is True
+    assert decision["on_targets"] == ["camera.front"]
+
+
+def test_frigate_camera_idle_without_on_off_feature_does_not_clear_pause() -> None:
     decision = decide_manual_override(
         started_at=_NOW - timedelta(minutes=10),
         now=_NOW,
         switch_states={},
         camera_entity_id="camera.front",
         camera_state="idle",
+        camera_supported_features=0,
+        camera_toggled=True,
+    )
+
+    assert decision["override"] is False
+    assert decision["camera_reenabled"] is False
+
+
+def test_idle_camera_with_on_off_feature_counts_as_override() -> None:
+    decision = decide_manual_override(
+        started_at=_NOW - timedelta(minutes=10),
+        now=_NOW,
+        switch_states={},
+        camera_entity_id="camera.front",
+        camera_state="idle",
+        camera_supported_features=1,
         camera_toggled=True,
     )
 
     assert decision["override"] is True
-    assert decision["on_targets"] == ["camera.front"]
 
 
 def test_unavailable_camera_entity_does_not_count_as_override() -> None:

@@ -9,6 +9,8 @@ from typing import Any
 #: Seconds after pause start during which 'on' switch states are attributed to
 #: MQTT/Frigate confirmation lag rather than a manual override.
 OVERRIDE_GRACE_SECONDS = 90
+# Home Assistant CameraEntityFeature.ON_OFF. Frigate advertises 0 when off.
+CAMERA_FEATURE_ON_OFF = 1
 
 
 def _stable_list(values: Iterable[str] | None) -> list[str]:
@@ -75,6 +77,7 @@ def decide_manual_override(
     switch_states: Mapping[str, str | None],
     camera_entity_id: str | None = None,
     camera_state: str | None = None,
+    camera_supported_features: int | None = None,
     camera_toggled: bool = False,
     grace_seconds: int = OVERRIDE_GRACE_SECONDS,
 ) -> dict[str, Any]:
@@ -83,8 +86,10 @@ def decide_manual_override(
     A pause is considered manually overridden when, past a short grace period
     after it started (MQTT/Frigate confirmation lag), at least one of the
     switches it turned off reports ``on`` again, or a camera entity that it
-    explicitly turned off becomes available in an enabled state. Missing,
-    ``unavailable`` and ``unknown`` states never count as an override.
+    explicitly turned off reports an enabled state. Frigate reports ``idle``
+    with no ON_OFF feature when disabled, including after HA restarts. That
+    state must retain the pause instead of being mistaken for a manual
+    override.
     """
     on_switches = _stable_list(
         entity_id
@@ -94,7 +99,14 @@ def decide_manual_override(
     camera_reenabled = bool(
         camera_toggled
         and camera_entity_id
-        and camera_state not in {None, "off", "unavailable", "unknown"}
+        and (
+            camera_state in {"on", "streaming", "recording"}
+            or (
+                camera_state == "idle"
+                and isinstance(camera_supported_features, int)
+                and bool(camera_supported_features & CAMERA_FEATURE_ON_OFF)
+            )
+        )
     )
     on_targets = _stable_list(
         [*on_switches, *([camera_entity_id] if camera_reenabled else [])]

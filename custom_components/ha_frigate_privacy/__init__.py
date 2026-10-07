@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import logging
-import os
 
 import voluptuous as vol
 
-from homeassistant.components.frontend import add_extra_js_url
-from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -16,6 +13,7 @@ from homeassistant.exceptions import HomeAssistantError, Unauthorized
 
 from .const import (
     DATA_FRONTEND_REGISTERED,
+    DATA_PANEL_REGISTERED,
     DATA_RECOVERY_READY,
     DATA_SCHEDULER,
     DATA_SERVICES_REGISTERED,
@@ -28,6 +26,10 @@ from .const import (
     VERSION,
 )
 from .control import async_pause_cameras, async_resume_cameras
+from .frontend import (
+    async_register_card, async_register_panel, async_register_static,
+    async_unregister_card, async_unregister_panel,
+)
 from .scheduler import FrigatePrivacyScheduler
 from .storage import FrigatePrivacyStorage
 from .websocket_api import async_register_commands
@@ -35,10 +37,6 @@ from .websocket_api import async_register_commands
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.BINARY_SENSOR]
-
-_CARD_FILENAME = "ha-frigate-privacy-card.js"
-_CARD_URL_PATH = f"/{DOMAIN}/{_CARD_FILENAME}"
-_CARD_PACKAGE_DIR = "www"
 
 _CAMERA_REF = vol.All(str, vol.Length(min=1, max=255))
 _CAMERA_FIELD = vol.Any(
@@ -72,6 +70,7 @@ _SERVICE_RESUME_SCHEMA = vol.Schema(
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Frigate Privacy from a config entry."""
     bucket = hass.data.setdefault(DOMAIN, {})
+    bucket["config_entry"] = entry
     storage = FrigatePrivacyStorage(hass)
     await storage.async_load()
     bucket[DATA_STORAGE] = storage
@@ -92,10 +91,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         async_register_commands(hass)
         bucket[DATA_WS_REGISTERED] = True
 
-    await _async_register_frontend(hass)
+    if not bucket.get(DATA_FRONTEND_REGISTERED):
+        await async_register_static(hass)
+        await async_register_card(hass)
+        bucket[DATA_FRONTEND_REGISTERED] = True
+    if not bucket.get(DATA_PANEL_REGISTERED):
+        bucket[DATA_PANEL_REGISTERED] = await async_register_panel(hass)
     _async_register_services(hass)
 
     scheduler.async_start()
+
+    from .notifications import FrigatePrivacyNotifications
+    notifier = FrigatePrivacyNotifications(hass, entry, storage)
+    bucket["notifications"] = notifier
+    notifier.async_start()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -106,40 +115,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload the config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if not unload_ok:
+        return False
     bucket = hass.data.get(DOMAIN, {})
+    if notifier := bucket.pop("notifications", None):
+        await notifier.async_stop()
+    bucket.pop("config_entry", None)
     if scheduler := bucket.pop(DATA_SCHEDULER, None):
         await scheduler.async_stop()
     bucket.pop(DATA_STORAGE, None)
+    if bucket.pop(DATA_PANEL_REGISTERED, False):
+        async_unregister_panel(hass)
+    if bucket.pop(DATA_FRONTEND_REGISTERED, False):
+        await async_unregister_card(hass)
     if bucket.pop(DATA_SERVICES_REGISTERED, None):
         hass.services.async_remove(DOMAIN, SERVICE_PAUSE_CAMERA)
         hass.services.async_remove(DOMAIN, SERVICE_RESUME_CAMERA)
     _LOGGER.debug("Frigate Privacy unloaded (entry_id=%s)", entry.entry_id)
     return unload_ok
-
-
-async def _async_register_frontend(hass: HomeAssistant) -> None:
-    """Register the bundled Lovelace card under /ha_frigate_privacy/."""
-    bucket = hass.data.setdefault(DOMAIN, {})
-    if bucket.get(DATA_FRONTEND_REGISTERED):
-        return
-
-    card_path = os.path.join(
-        os.path.dirname(__file__), _CARD_PACKAGE_DIR, _CARD_FILENAME
-    )
-    if not await hass.async_add_executor_job(os.path.isfile, card_path):
-        _LOGGER.error("Bundled Frigate Privacy card missing at %s", card_path)
-        return
-
-    await hass.http.async_register_static_paths(
-        [
-            StaticPathConfig(
-                f"/{DOMAIN}", os.path.dirname(card_path), cache_headers=False
-            )
-        ]
-    )
-    add_extra_js_url(hass, f"{_CARD_URL_PATH}?v={VERSION}")
-    bucket[DATA_FRONTEND_REGISTERED] = True
-    _LOGGER.debug("Registered Frigate Privacy Lovelace card at %s", _CARD_URL_PATH)
 
 
 def _async_register_services(hass: HomeAssistant) -> None:
@@ -188,8 +181,30 @@ async def _async_require_admin(
     """Reject service calls that cannot be attributed to an administrator."""
     user_id = call.context.user_id
     user = await hass.auth.async_get_user(user_id) if user_id else None
-    if user is None or not user.is_admin:
-        raise Unauthorized()
+    if user is not None and user.is_admin:
+        return
+    # System-triggered HA actions have no user. Only an explicitly selected,
+    # currently running registered automation/script may use this authority.
+    # State-only entities, parent contexts and client-supplied names cannot.
+    if user_id is None:
+        entry = hass.data.get(DOMAIN, {}).get("config_entry")
+        context_id = getattr(call.context, "id", None)
+        for entity_id in (entry.options.get("trusted_actions", []) if entry else []):
+            domain = entity_id.split(".", 1)[0]
+            if domain not in {"automation", "script"}:
+                continue
+            component = hass.data.get(domain)
+            entity = component.get_entity(entity_id) if component and hasattr(component, "get_entity") else None
+            script = getattr(entity, "action_script" if domain == "automation" else "script", None)
+            running = bool(getattr(entity, "is_on", False)) and bool(getattr(script, "is_running", False))
+            # The entity context is only its latest trigger. Running single,
+            # queued and parallel executions retain their own HA context.
+            if running and context_id and any(
+                getattr(getattr(run, "_context", None), "id", None) == context_id
+                for run in getattr(script, "_runs", ())
+            ):
+                return
+    raise Unauthorized()
 
 
 def _require_recovery_ready(hass: HomeAssistant) -> None:

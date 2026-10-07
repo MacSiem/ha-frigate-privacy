@@ -63,6 +63,8 @@ class _State:
     def __init__(self, state: str, name: str | None = None) -> None:
         self.state = state
         self.attributes = {"friendly_name": name} if name else {}
+        if state in {"idle", "streaming", "recording"}:
+            self.attributes["supported_features"] = 1
 
 
 class _States:
@@ -98,6 +100,8 @@ class _Services:
         self.fail_on: set[tuple[str, str, str]] = set()
         self.cancel_after_apply: set[tuple[str, str, str]] = set()
         self.update_state = True
+        self.delay_state_seconds = 0
+        self.couple_detect_to_motion = False
         self.contexts = []
 
     async def async_call(self, domain, service, data, *, blocking=False, context=None, **_kwargs):
@@ -109,12 +113,25 @@ class _Services:
         if call in self.fail_on:
             raise RuntimeError("fixture service failure")
         if self.update_state and entity_id in self.states.values and service in {"turn_on", "turn_off"}:
-            if domain == "camera" and service == "turn_on":
-                # Home Assistant camera entities report idle/streaming/recording
-                # while enabled, not the generic switch state "on".
-                self.states.values[entity_id].state = "idle"
+            async def apply_state():
+                if self.delay_state_seconds:
+                    await asyncio.sleep(self.delay_state_seconds)
+                if domain == "camera" and self.states.values[entity_id].attributes.get("supported_features") in {0, 2}:
+                    # Frigate advertises STREAM only while its camera is on.
+                    self.states.values[entity_id].state = "streaming" if service == "turn_on" else "idle"
+                    self.states.values[entity_id].attributes["supported_features"] = 2 if service == "turn_on" else 0
+                elif domain == "camera" and service == "turn_on":
+                    self.states.values[entity_id].state = "idle"
+                else:
+                    self.states.values[entity_id].state = "on" if service == "turn_on" else "off"
+                    if self.couple_detect_to_motion and entity_id.endswith("_detect") and service == "turn_on":
+                        motion = entity_id.removesuffix("_detect") + "_motion"
+                        if motion in self.states.values:
+                            self.states.values[motion].state = "on"
+            if self.delay_state_seconds:
+                asyncio.create_task(apply_state())
             else:
-                self.states.values[entity_id].state = "on" if service == "turn_on" else "off"
+                await apply_state()
         if call in self.cancel_after_apply:
             self.cancel_after_apply.remove(call)
             raise asyncio.CancelledError
@@ -267,6 +284,105 @@ def test_pause_persists_intent_before_control_and_reports_verified_phase():
         "switch.front_recordings": "off",
         "camera.front": "off",
     }
+
+
+def test_camera_without_on_off_feature_uses_switches_only():
+    async def scenario():
+        hass = _Hass()
+        hass.states.values["camera.front"].state = "idle"
+        hass.states.values["camera.front"].attributes["supported_features"] = 0
+        storage = _Storage()
+        paused = await control.async_pause_camera(hass, storage, "front")
+        resumed = await control.async_resume_camera(hass, storage, "front")
+        return hass, storage, paused, resumed
+
+    hass, storage, paused, resumed = asyncio.run(scenario())
+    assert paused["phase"] == "paused"
+    assert resumed["phase"] == "active"
+    assert not any(call[0] == "camera" for call in hass.services.calls)
+    assert [hass.states.get(f"switch.front_{suffix}").state for suffix in ("detect", "recordings")] == ["on", "on"]
+    assert storage.paused["front"]["camera_toggled"] is False
+
+
+def test_frigate_camera_streaming_to_idle_is_reenabled_after_privacy():
+    async def scenario():
+        hass = _Hass()
+        hass.states.values["camera.front"].attributes["supported_features"] = 2
+        hass.services.delay_state_seconds = 0.05
+        storage = _Storage()
+        paused = await control.async_pause_camera(hass, storage, "front")
+        after_pause = (hass.states.get("camera.front").state, hass.states.get("camera.front").attributes["supported_features"])
+        resumed = await control.async_resume_camera(hass, storage, "front")
+        return hass, storage, paused, after_pause, resumed
+
+    hass, storage, paused, after_pause, resumed = asyncio.run(scenario())
+    assert paused["phase"] == "paused"
+    assert paused["camera_toggled"] is True
+    assert after_pause == ("idle", 0)
+    assert resumed["phase"] == "active"
+    assert hass.states.get("camera.front").state == "streaming"
+    assert hass.states.get("camera.front").attributes["supported_features"] == 2
+    assert ("camera", "turn_off", "camera.front") in hass.services.calls
+    assert ("camera", "turn_on", "camera.front") in hass.services.calls
+
+
+def test_frigate_switch_state_can_arrive_after_service_returns():
+    async def scenario():
+        hass = _Hass()
+        hass.states.values["camera.front"].state = "idle"
+        hass.states.values["camera.front"].attributes["supported_features"] = 0
+        hass.services.delay_state_seconds = 0.05
+        storage = _Storage()
+        paused = await control.async_pause_camera(hass, storage, "front")
+        resumed = await control.async_resume_camera(hass, storage, "front")
+        return hass, paused, resumed
+
+    hass, paused, resumed = asyncio.run(scenario())
+    assert paused["phase"] == "paused"
+    assert paused["switches"] == ["switch.front_detect", "switch.front_recordings"]
+    assert resumed["phase"] == "active"
+    assert hass.states.get("switch.front_detect").state == "on"
+    assert hass.states.get("switch.front_recordings").state == "on"
+
+
+def test_resume_restores_preexisting_off_switch_after_frigate_coupling():
+    async def scenario():
+        hass = _Hass()
+        hass.states.values["camera.front"].attributes["supported_features"] = 0
+        hass.states.values["switch.front_motion"] = _State("off")
+        hass.entity_registry.platforms["switch.front_motion"] = "frigate"
+        hass.services.couple_detect_to_motion = True
+        storage = _Storage()
+        paused = await control.async_pause_camera(hass, storage, "front")
+        resumed = await control.async_resume_camera(hass, storage, "front")
+        return hass, paused, resumed
+
+    hass, paused, resumed = asyncio.run(scenario())
+    assert paused["phase"] == "paused"
+    assert resumed["phase"] == "active"
+    assert hass.states.get("switch.front_detect").state == "on"
+    assert hass.states.get("switch.front_motion").state == "off"
+    assert ("switch", "turn_off", "switch.front_motion") in hass.services.calls
+
+
+def test_resume_retains_pause_when_coupled_switch_cannot_return_to_off():
+    async def scenario():
+        hass = _Hass()
+        hass.states.values["camera.front"].attributes["supported_features"] = 0
+        hass.states.values["switch.front_motion"] = _State("off")
+        hass.entity_registry.platforms["switch.front_motion"] = "frigate"
+        hass.services.couple_detect_to_motion = True
+        hass.services.fail_on.add(("switch", "turn_off", "switch.front_motion"))
+        storage = _Storage()
+        await control.async_pause_camera(hass, storage, "front")
+        resumed = await control.async_resume_camera(hass, storage, "front")
+        return hass, storage, resumed
+
+    hass, storage, resumed = asyncio.run(scenario())
+    assert resumed["phase"] == "error"
+    assert resumed["decision"]["clear_paused"] is False
+    assert storage.paused["front"]["phase"] == "error"
+    assert hass.states.get("switch.front_detect").state == "off"
 
 
 def test_partial_pause_is_truthful_and_retains_evidence():

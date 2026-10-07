@@ -7,7 +7,7 @@ The Home Assistant integration is the only control authority: the bundled card s
 admin-only WebSocket requests, while schedules, deadlines, state transitions, and
 restart recovery stay server-side.
 
-[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.7+-blue.svg?logo=homeassistant)](https://www.home-assistant.io/) [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![Version](https://img.shields.io/github/v/release/MacSiem/ha-frigate-privacy)](https://github.com/MacSiem/ha-frigate-privacy/releases)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2025.2+-blue.svg?logo=homeassistant)](https://www.home-assistant.io/) [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![Version](https://img.shields.io/github/v/release/MacSiem/ha-frigate-privacy)](https://github.com/MacSiem/ha-frigate-privacy/releases)
 
 ## How it works
 
@@ -22,6 +22,10 @@ created.
 2. **Pause / resume.** Pausing records its intent first, turns off only the selected
    scope, and verifies the reported state. Resume re-enables only targets that this
    integration successfully changed; pre-existing manual-off targets remain off.
+   In the **Everything** scope, Frigate's camera entity is also stopped and
+   resumed. Frigate reports an off camera as `idle` with no supported features,
+   but its HA `camera.turn_on` action still works; the integration verifies the
+   resulting `streaming` state before claiming that resume succeeded.
 3. **Privacy schedules.** Create recurring windows (e.g. weekday mornings) during
    which all currently discovered Frigate cameras pause automatically. Overlapping
    windows are treated as union coverage, so privacy remains active until the last
@@ -36,8 +40,9 @@ created.
    as evidence of a manual override—not permission to enable any other target. The
    record becomes terminal and the card stops claiming privacy is enforced.
 5. **Entities for automations.** Each camera gets
-   `binary_sensor.<camera>_privacy_active` reflecting its privacy state, so you can
-   drive lights, notifications or dashboards from it.
+   `binary_sensor.<camera>_privacy_active` indicating an active privacy transition
+   record. Check its `phase` attribute before using it as a pause indicator;
+   `on` alone does not confirm that every target is off.
 
 ### What is automatic vs. manual
 
@@ -45,12 +50,53 @@ created.
 |---|---|
 | Discovering Frigate cameras | Pressing pause / resume in the card |
 | Auto-resume after a timed pause | Creating privacy schedules |
-| Fail-safe checks before resume | Choosing stream type (`all` / `main` / `sub`) |
+| Fail-safe checks before resume | Choosing privacy scope (`all` / `main` / `sub`) |
 | Per-camera `*_privacy_active` sensor | — |
 
 > **Administrator-only:** camera topology, privacy windows, and paused-state evidence
 > can reveal household routines. All custom WebSocket commands, including reads,
 > therefore require a Home Assistant administrator account.
+
+### Privacy scopes
+
+| Scope | Targets requested off |
+|---|---|
+| Everything (`all`) | Camera, when controllable, and recognized Frigate switches |
+| Recording (`main`) | Recording and snapshot switches |
+| Detection (`sub`) | Detection, motion and audio switches |
+
+Recording and Detection leave the other channels running. A camera without
+working HA turn-on/turn-off actions can keep streaming in Everything scope;
+check the video and per-target evidence rather than assuming the live feed is off.
+
+### Channel indicators and preview
+
+The card shows video, recording, snapshots, detection, and sound detection
+separately, including unknown and unavailable states. Sound detection does not
+confirm microphone capture or listening. **Preview** opens Home Assistant's native
+camera dialog on demand; this integration never automatically fetches frames or audio.
+
+### Notifications, buttons, automations and scenes
+
+Open Settings → Devices & services → Frigate Privacy → Configure to select a
+notification destination and events: errors/partial privacy, manual selected-scope
+pause and verified restoration, plus scheduled pause start/restoration. Extra notifications default to off. Messages contain
+no camera names, addresses, images or schedule details. Notification delivery failures
+do not change camera control. Existing local fail-safe alerts remain enabled.
+
+In the card's **Buttons and automations** tab, select cameras, scope and duration,
+then copy an example for a dashboard button, script or automation action. For a
+physical button, choose its device/event trigger in HA's automation editor and use
+that action. To connect a scene, create the indicated boolean helper and the scene
+bridge automation, then set the helper on/off in your HA scenes.
+
+Administrator dashboard actions work directly. For a system-triggered automation
+or script, explicitly select its entity under **Trusted automations and scripts**
+in the integration options. Review its triggers and actions first: this delegates
+privacy control to that action. Only its real running HA context is accepted;
+a matching state name or parent context is insufficient. Revoking trust applies to
+the next action. Direct household-user calls remain denied. The card provides examples
+and opens HA editors; it does not silently create helpers or automations.
 
 ### Security and privacy boundaries
 
@@ -91,13 +137,22 @@ pause scope and duration. Dark mode follows your Home Assistant theme automatica
 
 ## Installation
 
+First install and configure the Frigate integration so its cameras and switches
+are available in Home Assistant. Frigate Privacy controls those existing entities.
+
 1. Open HACS → Custom repositories.
 2. Add `https://github.com/MacSiem/ha-frigate-privacy` as category **Integration**.
 3. Install **Frigate Privacy** and restart Home Assistant.
 4. Go to Settings → Devices & services → Add integration → **Frigate Privacy**.
+5. Administrators can open **Frigate Privacy** from the sidebar, or add the card below.
 
-The integration registers the bundled Lovelace card automatically — no manual
-resource needed.
+The integration registers one bundled Lovelace resource in storage mode; an
+existing HACS card resource is preserved. YAML mode uses Home Assistant's
+frontend fallback. No manual resource is needed.
+
+The one-line support link is visible only to administrators. Set
+`show_support: false` in the card configuration to hide it; dismissing it is
+remembered in this browser.
 
 ## Quick start
 
@@ -106,22 +161,35 @@ type: custom:ha-frigate-privacy
 ```
 
 That's it. For an administrator, the card lists discovered Frigate cameras with
-pause/resume controls, backend-confirmed state, and the schedule editor.
+pause/resume controls, backend-confirmed state, and the schedule editor. Each
+camera shows the current HA camera entity, recording switch, and sound-detection
+switch status. **Preview in HA** opens Home Assistant's native camera view only
+when selected; the card never loads a live feed on its own. An unavailable
+sound-detection switch is shown as unavailable rather than assumed to be on.
 
 ## Entities for automations
 
 | Entity | Meaning |
 |---|---|
-| `binary_sensor.<camera>_privacy_active` | `on` while the camera is privacy-paused |
+| `binary_sensor.<camera>_privacy_active` | `on` while a privacy transition record is active, including `pausing`, `paused`, `resuming`, `partial` and `error` |
 
-**Example — light up an indicator while a camera is paused:**
+The `phase` attribute distinguishes a confirmed selected-scope pause from a
+pending or failed transition. Even `paused` does not guarantee that an unsupported
+camera stopped streaming. Use the card's video status and target evidence too.
+
+**Example — indicate a confirmed selected-scope pause:**
 
 ```yaml
 alias: Privacy indicator
 trigger:
   - platform: state
     entity_id: binary_sensor.living_room_privacy_active
-    to: "on"
+    attribute: phase
+    to: "paused"
+condition:
+  - condition: state
+    entity_id: binary_sensor.living_room_privacy_active
+    state: "on"
 action:
   - service: light.turn_on
     target: { entity_id: light.privacy_indicator }
@@ -131,8 +199,9 @@ mode: single
 ## FAQ
 
 **Do I have to configure anything?**
-No. Install → add integration → add card. Cameras are discovered from Frigate's own
-switches.
+Configure Frigate in Home Assistant first. Then install → add Frigate Privacy
+integration → open its sidebar or add the card. Cameras are discovered from
+Frigate's own switches; no extra Frigate Privacy YAML is needed.
 
 **Which Frigate entities are recognized?**
 Camera discovery uses the `_detect` and `_recordings` switches. The control layer

@@ -232,6 +232,41 @@ def test_camera_entity_override_is_detected_and_notification_is_redacted():
     assert "front" not in notification["notification_id"]
 
 
+def test_frigate_idle_after_restart_keeps_persisted_pause():
+    """Frigate's off=idle/features 0 must not end an active privacy window."""
+    spec = importlib.util.spec_from_file_location(
+        "fpr_scheduler_recovery.real_failsafe", PKG / "failsafe.py"
+    )
+    real_failsafe = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    spec.loader.exec_module(real_failsafe)
+    previous = scheduler_module.decide_manual_override
+    scheduler_module.decide_manual_override = real_failsafe.decide_manual_override
+    try:
+        async def scenario():
+            now = datetime.now(timezone.utc)
+            storage = _Storage({"front": {
+                "camera_id": "front", "camera_entity_id": "camera.front",
+                "phase": "paused", "active": True, "source": "manual",
+                "switches": [], "camera_toggled": True,
+                "started_at": (now - timedelta(minutes=10)).isoformat(),
+                "ends_at": (now + timedelta(minutes=20)).isoformat(),
+            }})
+            camera = _State("idle")
+            camera.attributes = {"supported_features": 0}
+            hass = _OverrideHass({"camera.front": camera})
+            scheduler = scheduler_module.FrigatePrivacyScheduler(hass, storage)
+            await scheduler._async_handle_manual_overrides()
+            return hass, storage
+
+        hass, storage = asyncio.run(scenario())
+        assert storage.paused["front"]["active"] is True
+        assert not storage.paused["front"].get("overridden")
+        assert hass.bus.events == []
+    finally:
+        scheduler_module.decide_manual_override = previous
+
+
 def test_manual_override_never_delegates_authority_to_resume_targets():
     async def scenario():
         now = datetime.now(timezone.utc)

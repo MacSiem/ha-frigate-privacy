@@ -4,7 +4,7 @@ import { JSDOM } from 'jsdom';
 
 const source = readFileSync(new URL('../ha-frigate-privacy.js', import.meta.url), 'utf8');
 
-function createCard(initialState, mutationResult = null) {
+function createCard(initialState, mutationResult = null, clock = null) {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', {
     runScripts: 'dangerously',
     pretendToBeVisual: true,
@@ -12,8 +12,14 @@ function createCard(initialState, mutationResult = null) {
   });
   const { window } = dom;
   window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  if (clock) {
+    window.Date.now = () => clock.now;
+    window.setInterval = (callback, delay) => { const timer = { callback, delay, next: clock.now + delay }; clock.timers.add(timer); return timer; };
+    window.clearInterval = (timer) => clock.timers.delete(timer);
+  }
   window.eval(source);
   const card = window.document.createElement('ha-frigate-privacy');
+  let mutated = false;
   card.setConfig({ type: 'custom:ha-frigate-privacy' });
   card.hass = {
     states: {},
@@ -21,7 +27,8 @@ function createCard(initialState, mutationResult = null) {
     language: 'en',
     user: { id: 'owner', is_admin: true },
     callWS: async (message) => {
-      if (message.type.endsWith('/get_state')) return initialState;
+      if (message.type.endsWith('/get_state')) return mutated && mutationResult?.state ? { ...initialState, ...mutationResult.state } : initialState;
+      mutated = true;
       return mutationResult || { ok: true, phase: 'paused', state: initialState };
     },
   };
@@ -29,11 +36,121 @@ function createCard(initialState, mutationResult = null) {
   return { dom, card };
 }
 
+function createClock() {
+  return { now: 100000, timers: new Set(), async advance(ms) {
+    this.now += ms;
+    for (const timer of this.timers) if (timer.next <= this.now) { timer.next += timer.delay; timer.callback(); }
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  } };
+}
+
 const initial = {
   cameras: [{ camera_id: 'front', entity_id: 'camera.front', name: 'Front' }],
   schedules: [],
   paused: {},
 };
+
+{
+  // A quiet HA connection must not freeze indicators after an external action.
+  const clock = createClock();
+  const { dom, card } = createCard({ ...initial, cameras: [{ camera_id: 'front', entity_id: 'camera.front', name: 'Front', camera_state: 'streaming', switches: [{ suffix: '_recordings', state: 'on' }] }] }, null, clock);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  let reads = 0;
+  card._hass.callWS = async () => { reads += 1; return { ...initial, cameras: [{ camera_id: 'front', entity_id: 'camera.front', name: 'Front', camera_state: 'idle', switches: [{ suffix: '_recordings', state: 'off' }] }] }; };
+  await clock.advance(15000);
+  assert.match(card.shadowRoot.textContent, /Recording: Off/, 'external privacy actions must refresh even without another hass setter call');
+  assert.match(card.shadowRoot.textContent, /Video: Idle/);
+  const beforeRemoval = reads;
+  card.remove(); await clock.advance(15000);
+  assert.equal(reads, beforeRemoval, 'detached cards must stop background reads');
+  dom.window.close();
+}
+
+
+{
+  // Backend revocation is authoritative even while HA metadata stays cached.
+  const clock = createClock();
+  const { dom, card } = createCard(initial, null, clock);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  let reads = 0;
+  card._scheduleForm.label = 'Private draft';
+  card._hass.callWS = async () => { reads += 1; throw Object.assign(new Error('denied'), { code: 'unauthorized' }); };
+  await clock.advance(15000);
+  assert.match(card.shadowRoot.textContent, /Administrator permission required/);
+  assert.equal(card._cameras.length, 0);
+  assert.equal(card._scheduleForm.label, '');
+  const deniedReads = reads;
+  await clock.advance(15000);
+  assert.equal(reads, deniedReads, 'denied cards must not keep querying private state');
+  dom.window.close();
+}
+
+
+{
+  const status = {
+    ...initial,
+    cameras: [{
+      camera_id: 'front', entity_id: 'camera.front', name: 'Front', camera_state: 'idle',
+      switches: [
+        { suffix: '_recordings', state: 'off' },
+        { suffix: '_detect', state: 'on' },
+        { suffix: '_audio_detection', state: 'unavailable' },
+      ],
+    }],
+  };
+  const { dom, card } = createCard(status);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.match(card.shadowRoot.textContent, /Video: Idle/);
+  assert.match(card.shadowRoot.textContent, /Recording: Off/);
+  assert.match(card.shadowRoot.textContent, /Sound detection: Unavailable/);
+  let previewEntity = null;
+  card.addEventListener('hass-more-info', (event) => { previewEntity = event.detail.entityId; });
+  card.shadowRoot.querySelector('[data-preview-camera="camera.front"]').click();
+  assert.equal(previewEntity, 'camera.front');
+  dom.window.close();
+}
+
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  let polls = 0;
+  const originalCall = card._hass.callWS;
+  const hass = { ...card._hass, callWS: async (message) => { polls += 1; return originalCall(message); } };
+  const originalPanel = card.shadowRoot.querySelector('.card');
+  for (let index = 0; index < 30; index += 1) card.hass = { ...hass, states: { [`sensor.tick_${index}`]: { state: index } } };
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(polls, 0, 'unrelated HA state updates must not poll or rebuild the card');
+  assert.equal(card.shadowRoot.querySelector('.card'), originalPanel);
+  card._lastStatePollAt -= 15000;
+  card.hass = hass;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(polls, 1, 'backend state refresh remains bounded');
+  assert.equal(card.shadowRoot.querySelector('.card'), originalPanel, 'routine refresh must preserve stable card content');
+  assert.equal(card.shadowRoot.querySelector('[data-action="retry"]'), null, 'routine refresh must not show a loading gate');
+  card.hass = { ...hass, user: { id: 'owner', is_admin: false } };
+  assert.equal(card._cameras.length, 0, 'revoking admin access must clear cached camera data');
+  assert.match(card.shadowRoot.textContent, /Administrator permission required/);
+  assert.equal(card.shadowRoot.querySelector('.status-pill').textContent.trim(), 'Administrator permission required', 'a denied household read must not claim integration readiness');
+  card.hass = hass;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(card._cameras.length, 1, 'restored admin access must reload integration state');
+  dom.window.close();
+}
+
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.ok(card.shadowRoot.querySelector('.donate-section'));
+  card.setConfig({ type: 'custom:ha-frigate-privacy', show_support: false });
+  assert.equal(card.shadowRoot.querySelector('.donate-section'), null);
+  card.setConfig({ type: 'custom:ha-frigate-privacy' });
+  card.shadowRoot.querySelector('[data-action="dismiss-support"]').click();
+  assert.equal(card.shadowRoot.querySelector('.donate-section'), null);
+  assert.equal(dom.window.localStorage.getItem('ha-frigate-privacy-support-dismissed'), '1');
+  card.hass = { ...card._hass, user: { id: 'member', is_admin: false } };
+  assert.equal(card.shadowRoot.querySelector('.donate-section'), null);
+  dom.window.close();
+}
 
 {
   const switchOnly = {
@@ -60,7 +177,6 @@ const initial = {
     ok: false,
     phase: 'partial',
     state: {
-      ...initial,
       paused: { front: { camera_id: 'front', phase: 'partial', active: true } },
     },
   };
@@ -74,6 +190,7 @@ const initial = {
   assert.equal(card._error, 'partial');
   assert.equal(toasts.at(-1)?.kind, 'error');
   assert.equal(card._paused.front.phase, 'partial');
+  assert.equal(card._cameras.length, 1, 'partial mutations must keep discovered cameras visible');
   dom.window.close();
 }
 
@@ -230,3 +347,141 @@ assert.doesNotMatch(
 );
 
 console.log('truthful state, readable layout, and disconnect assertions passed');
+
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  card.hass = { ...card._hass, connection: {}, callWS: async () => { throw new Error('integration unavailable'); } };
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(card.shadowRoot.querySelector('.status-pill').textContent.trim(), 'Frigate Privacy integration is unavailable', 'a failed state read must not claim integration readiness');
+  assert.equal(card.shadowRoot.querySelector('[data-action="pause"]'), null);
+  dom.window.close();
+}
+
+// A permission change while a command is pending must release the old session's
+// busy state and discard its schedule draft; late results cannot restore it.
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const owner = card._hass;
+  let finishOld;
+  card.hass = { ...owner, callWS: (message) => message.type.endsWith('/pause_camera')
+    ? new Promise((resolve) => { finishOld = resolve; }) : owner.callWS(message) };
+  card._scheduleForm.label = 'Private owner draft';
+  card._editingScheduleIdx = 0;
+  const pending = card._pause();
+  assert.equal(card.shadowRoot.querySelector('[data-action="pause-custom"]').disabled, true);
+  card.hass = { ...owner, user: { id: 'owner', is_admin: false } };
+  assert.equal(card._scheduleForm.label, '', 'revoking access must discard the private schedule draft');
+  card.hass = owner;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.match(card.shadowRoot.textContent, /Integration ready/, 'regaining admin access must fetch fresh state despite the old pending mutation');
+  assert.equal(card.shadowRoot.querySelector('[data-action="pause-custom"]').disabled, false);
+  finishOld({ ok: true });
+  assert.equal(await pending, false, 'the old session must not accept a late mutation response');
+  assert.equal(card._scheduleForm.label, '');
+  assert.equal(card._editingScheduleIdx, null);
+  dom.window.close();
+}
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  card.hass = null;
+  assert.doesNotMatch(card.shadowRoot.textContent, /Front/, 'disconnecting the HA session must remove cached camera names');
+  assert.equal(card.shadowRoot.querySelector('[data-action="pause-custom"]'), null);
+  dom.window.close();
+}
+
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  card.setActiveTab('schedule');
+  const label = card.shadowRoot.querySelector('.input-label');
+  label.value = 'Draft window';
+  label.dispatchEvent(new dom.window.Event('input'));
+  label.focus();
+  label.setSelectionRange(3, 6);
+  card.hass = { ...card._hass, language: 'pl' };
+  const current = card.shadowRoot.querySelector('.input-label');
+  assert.equal(card.shadowRoot.activeElement, current, 'a background render must retain the field being edited');
+  assert.equal(current.value, 'Draft window');
+  assert.equal(current.selectionStart, 3);
+  assert.equal(current.selectionEnd, 6);
+  assert.equal(current.getAttribute('aria-label'), 'Etykieta');
+  dom.window.close();
+}
+
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  card._scheduleForm.label = 'Private draft';
+  const owner = card._hass;
+  card.hass = { ...owner, callWS: async () => { throw { code:'unauthorized' }; } };
+  assert.equal(await card._pause(), false);
+  assert.match(card.shadowRoot.textContent, /Administrator permission required/);
+  assert.equal(card._cameras.length, 0, 'backend authorization denial must clear cached topology');
+  assert.equal(card._scheduleForm.label, '');
+  assert.equal(card.shadowRoot.querySelector('[data-action="pause-custom"]'), null);
+  card.hass = { ...card._hass, states: { 'sensor.tick': { state:'1' } } };
+  assert.equal(card._permissionDenied, true, 'stale HA user metadata must not undo a backend denial');
+  card.hass = { ...owner, connection: {} };
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.match(card.shadowRoot.textContent, /Integration ready/);
+  dom.window.close();
+}
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  card.setActiveTab('actions');
+  assert.match(card.shadowRoot.textContent, /Buttons and automations/);
+  const examples = card.shadowRoot.querySelector('.action-example');
+  assert.ok(examples, 'the binding guide must expose a reusable HA action');
+  assert.match(examples.value, /perform_action: ha_frigate_privacy.pause_camera/);
+  assert.doesNotMatch(examples.value, /operation_id:/, 'a reusable button must not reuse a permanent idempotency key');
+  assert.match(card.shadowRoot.textContent, /trusted automation/i);
+  card.hass = { ...card._hass, user: { id: 'member', is_admin: false } };
+  assert.equal(card.shadowRoot.querySelector('.action-example'), null, 'household users must not see camera-bound action examples');
+  dom.window.close();
+}
+{
+  const { dom, card } = createCard({ ...initial, cameras: [{ ...initial.cameras[0], camera_state:'streaming', switches:[
+    { suffix:'_detect', state:'on' }, { suffix:'_recordings', state:'off' },
+    { suffix:'_snapshots', state:'unavailable' }, { suffix:'_audio_detection', state:'unknown' },
+  ]}] });
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.match(card.shadowRoot.textContent, /Detection: On/);
+  assert.match(card.shadowRoot.textContent, /Snapshots: Unavailable/);
+  assert.match(card.shadowRoot.textContent, /Sound detection: Unknown/);
+  assert.match(card.shadowRoot.textContent, /does not confirm microphone capture/i);
+  assert.equal(card.shadowRoot.querySelector('video,audio,img'), null, 'no preview media may load before a user action');
+  dom.window.close();
+}
+
+{
+  const { dom, card } = createCard({ ...initial, cameras: [{ ...initial.cameras[0], switches:[
+    { suffix:'_audio', state:'off' }, { suffix:'_audio_detection', state:'on' },
+  ]}] });
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.match(card.shadowRoot.textContent, /Sound detection: Off \/ On/, 'a legacy audio flag must not hide a different current detection state');
+  dom.window.close();
+}
+
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  card.setActiveTab('actions');
+  const kind = card.shadowRoot.querySelector('.action-kind');
+  kind.focus();
+  kind.value = 'script_pause';
+  kind.dispatchEvent(new dom.window.Event('change'));
+  assert.equal(card.shadowRoot.activeElement, card.shadowRoot.querySelector('.action-kind'), 'changing an action example must retain keyboard focus');
+  const example = card.shadowRoot.querySelector('.action-example');
+  example.focus();
+  example.setSelectionRange(2, 18);
+  card.hass = { ...card._hass, language: 'pl' };
+  const updated = card.shadowRoot.querySelector('.action-example');
+  assert.equal(card.shadowRoot.activeElement, updated, 'polling while copying a reusable action must retain text focus');
+  assert.equal(updated.selectionStart, 2);
+  assert.equal(updated.selectionEnd, 18);
+  dom.window.close();
+}
