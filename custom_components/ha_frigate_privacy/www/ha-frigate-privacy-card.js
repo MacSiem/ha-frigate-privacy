@@ -94,6 +94,13 @@
       this._editingScheduleIdx = null; this._scheduleForm = this._emptySchedule(); this._lastHtml = ''; this._toastTimer = null;
     }
 
+    connectedCallback() {
+      if (this._statePollTimer) return;
+      this._statePollTimer = setInterval(() => {
+        if (this.isConnected && this._hass?.user?.is_admin === true && !this._permissionDenied && !this._connectPromise && !this._busy && Date.now() - this._lastStatePollAt >= 15000) this._connectIntegration();
+      }, 15000);
+    }
+
     static getConfigElement() { return document.createElement('ha-frigate-privacy-editor'); }
     static getStubConfig() { return { type: 'custom:ha-frigate-privacy', title: 'Frigate Privacy' }; }
     getCardSize() { return 7; } getGridOptions() { return { columns: 12, min_rows: 4, min_columns: 6 }; }
@@ -119,7 +126,7 @@
       if (!this._connectPromise && !this._busy && (!this._integrationChecked || Date.now() - this._lastStatePollAt >= 15000)) this._connectIntegration();
       this._updateUI();
     }
-    disconnectedCallback() { this._requestEpoch += 1; this._connectPromise = null; this._lastStatePollAt = 0; this._busy = false; this._integrationChecked = false; this._integrationAvailable = false; if (this._toastTimer) clearTimeout(this._toastTimer); }
+    disconnectedCallback() { if (this._statePollTimer) clearInterval(this._statePollTimer); this._statePollTimer = null; this._requestEpoch += 1; this._connectPromise = null; this._lastStatePollAt = 0; this._busy = false; this._integrationChecked = false; this._integrationAvailable = false; if (this._toastTimer) clearTimeout(this._toastTimer); }
     _clearPrivateState() {
       this.shadowRoot.activeElement?.blur(); this._busy = false; this._error = ''; this._editingScheduleIdx = null; this._scheduleForm = this._emptySchedule();
       if (this._toastTimer) clearTimeout(this._toastTimer);
