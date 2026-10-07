@@ -407,3 +407,23 @@ console.log('truthful state, readable layout, and disconnect assertions passed')
   assert.equal(card.shadowRoot.querySelector('video,audio,img'), null, 'no preview media may load before a user action');
   dom.window.close();
 }
+
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  card.setActiveTab('actions');
+  const kind = card.shadowRoot.querySelector('.action-kind');
+  kind.focus();
+  kind.value = 'script_pause';
+  kind.dispatchEvent(new dom.window.Event('change'));
+  assert.equal(card.shadowRoot.activeElement, card.shadowRoot.querySelector('.action-kind'), 'changing an action example must retain keyboard focus');
+  const example = card.shadowRoot.querySelector('.action-example');
+  example.focus();
+  example.setSelectionRange(2, 18);
+  card.hass = { ...card._hass, language: 'pl' };
+  const updated = card.shadowRoot.querySelector('.action-example');
+  assert.equal(card.shadowRoot.activeElement, updated, 'polling while copying a reusable action must retain text focus');
+  assert.equal(updated.selectionStart, 2);
+  assert.equal(updated.selectionEnd, 18);
+  dom.window.close();
+}
