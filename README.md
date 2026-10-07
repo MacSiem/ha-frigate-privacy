@@ -79,8 +79,8 @@ camera dialog on demand; this integration never automatically fetches frames or 
 ### Notifications, buttons, automations and scenes
 
 Open Settings → Devices & services → Frigate Privacy → Configure to select a
-notification destination and events: errors/partial privacy, confirmed selected-scope
-pause, and verified restoration. Extra notifications default to off. Messages contain
+notification destination and events: errors/partial privacy, manual selected-scope
+pause and verified restoration, plus scheduled pause start/restoration. Extra notifications default to off. Messages contain
 no camera names, addresses, images or schedule details. Notification delivery failures
 do not change camera control. Existing local fail-safe alerts remain enabled.
 
