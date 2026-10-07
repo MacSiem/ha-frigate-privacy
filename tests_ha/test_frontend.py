@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from homeassistant.components import frontend
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
@@ -88,3 +90,13 @@ async def test_yaml_unload_removes_only_owned_extra_module(hass: HomeAssistant) 
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert f"{CARD_URL}?v={VERSION}" not in hass.data[frontend.DATA_EXTRA_MODULE_URL].urls, "unload must remove the owned YAML module"
     assert foreign in hass.data[frontend.DATA_EXTRA_MODULE_URL].urls, "unload must preserve unrelated frontend modules"
+
+
+async def test_failed_platform_unload_preserves_loaded_backend_and_frontend(hass: HomeAssistant) -> None:
+    entry = await _setup(hass)
+    with patch.object(hass.config_entries, "async_unload_platforms", return_value=False):
+        assert not await hass.config_entries.async_unload(entry.entry_id)
+    assert PANEL_URL_PATH in hass.data[frontend.DATA_PANELS], "a failed unload must keep its panel"
+    assert list(hass.data["lovelace"].resources.async_items()), "a failed unload must keep its resource"
+    assert "storage" in hass.data[DOMAIN], "a failed unload must retain its backend storage"
+    assert hass.services.has_service(DOMAIN, "pause_camera")
