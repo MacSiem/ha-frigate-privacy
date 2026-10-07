@@ -71,7 +71,7 @@ async def async_setup_entry(
 
 
 class FrigatePrivacyActiveSensor(BinarySensorEntity):
-    """Binary sensor indicating whether one camera is privacy-paused."""
+    """Binary sensor indicating an active per-camera privacy transition record."""
 
     _attr_translation_key = "privacy_active"
 
@@ -91,7 +91,7 @@ class FrigatePrivacyActiveSensor(BinarySensorEntity):
 
     @property
     def is_on(self) -> bool:
-        """Return true when the camera remains privacy-paused."""
+        """Return true while a privacy transition, including errors, remains active."""
         return bool(self._paused and self._paused.get("active"))
 
     @property

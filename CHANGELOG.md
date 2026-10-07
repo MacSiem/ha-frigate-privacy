@@ -1,10 +1,12 @@
 # Changelog
 
-## Unreleased
+## 6.0.7 (2026-10-07)
 
-- Show the administrator-permission or unavailable status when the integration state cannot be read, instead of claiming readiness above the access/error notice. No camera control changes.
-
-## 6.0.7 (2026-09-29)
+- Show the administrator-permission or unavailable status when the integration state cannot be read, instead of claiming readiness above the access/error notice.
+- Discard private schedule drafts and pending UI state when the user, connection or permissions change. Regaining access starts a fresh read; late responses from the previous identity are ignored.
+- Preserve editing focus, text selection and draft input across background card renders; provide accessible names for schedule fields and selected weekdays.
+- Remove only the integration-owned YAML frontend module on unload and preserve the runtime if its entity platforms refuse to unload.
+- Clarify scope limits and that the existing privacy-active sensor indicates a transition record, including partial/error states, rather than proof that every camera channel is off.
 
 - Keep persisted privacy pauses across Home Assistant restarts when a disabled Frigate camera reports `idle` with no ON_OFF feature. Treat only a genuinely re-enabled camera as a manual override; the startup scheduler must not erase the pause while Frigate remains off.
 - Control Frigate `camera.*` through its working HA turn-on/turn-off actions in the Everything scope even though the integration advertises STREAM while on and no features while off. Verify `streaming` → `idle` on pause and `idle` → `streaming` on resume, including after a restart; preserve cameras that were off before the pause.
