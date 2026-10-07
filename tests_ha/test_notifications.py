@@ -40,3 +40,52 @@ async def test_default_extra_notifications_are_off(hass: HomeAssistant, hass_ws_
     await client.send_json({'id':1,'type':'persistent_notification/get'})
     assert (await client.receive_json())['result'] == []
     assert await hass.config_entries.async_unload(entry.entry_id)
+
+async def test_notification_failure_does_not_change_privacy_and_unload_stops_delivery(hass: HomeAssistant):
+    entry = await _setup(hass)
+    delivered = []
+    async def fail_delivery(call):
+        delivered.append(call.data)
+        raise RuntimeError('test transport unavailable')
+    hass.services.async_register('notify', 'qa_phone', fail_delivery)
+    hass.config_entries.async_update_entry(entry, options={
+        'notify_destination':'notify.qa_phone', 'notify_errors':True,
+    })
+    storage = hass.data[DOMAIN]['storage']
+    await storage.async_set_paused('qa_camera', {'phase':'error', 'operation_id':'qa-first'})
+    original = await storage.async_get_record('qa_camera')
+    hass.bus.async_fire(EVENT_STATE_CHANGED, {'camera_id':'qa_camera'})
+    await hass.async_block_till_done()
+    assert len(delivered) == 1
+    assert await storage.async_get_record('qa_camera') == original
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    hass.bus.async_fire(EVENT_STATE_CHANGED, {'camera_id':'qa_other_camera'})
+    await hass.async_block_till_done()
+    assert len(delivered) == 1
+
+async def test_notify_entity_obeys_selected_events_and_live_preferences(hass: HomeAssistant):
+    entry = await _setup(hass)
+    delivered = []
+    async def deliver(call):
+        delivered.append(dict(call.data))
+    hass.services.async_register('notify', 'send_message', deliver)
+    hass.states.async_set('notify.qa_phone', 'unknown')
+    hass.config_entries.async_update_entry(entry, options={
+        'notify_destination':'entity:notify.qa_phone', 'notify_errors':False,
+        'notify_paused':True, 'notify_resumed':True,
+    })
+    storage = hass.data[DOMAIN]['storage']
+    for phase in ('error', 'paused', 'active'):
+        await storage.async_set_paused('private_name', {'phase':phase, 'operation_id':'private-operation'})
+        hass.bus.async_fire(EVENT_STATE_CHANGED, {'camera_id':'private_name'})
+        await hass.async_block_till_done()
+    assert len(delivered) == 2
+    assert all(item['entity_id'] == 'notify.qa_phone' for item in delivered)
+    assert 'paused' in delivered[0]['message'] and 'restored' in delivered[1]['message']
+    assert 'private' not in str(delivered)
+    hass.config_entries.async_update_entry(entry, options={'notify_destination':''})
+    await storage.async_set_paused('private_name', {'phase':'paused', 'operation_id':'new-operation'})
+    hass.bus.async_fire(EVENT_STATE_CHANGED, {'camera_id':'private_name'})
+    await hass.async_block_till_done()
+    assert len(delivered) == 2
+    assert await hass.config_entries.async_unload(entry.entry_id)
