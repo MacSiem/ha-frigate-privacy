@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.ha_frigate_privacy import async_unload_entry
 from custom_components.ha_frigate_privacy.const import (
     CARD_URL,
     DOMAIN,
@@ -95,7 +96,7 @@ async def test_yaml_unload_removes_only_owned_extra_module(hass: HomeAssistant) 
 async def test_failed_platform_unload_preserves_loaded_backend_and_frontend(hass: HomeAssistant) -> None:
     entry = await _setup(hass)
     with patch.object(hass.config_entries, "async_unload_platforms", return_value=False):
-        assert not await hass.config_entries.async_unload(entry.entry_id)
+        assert not await async_unload_entry(hass, entry)
     assert PANEL_URL_PATH in hass.data[frontend.DATA_PANELS], "a failed unload must keep its panel"
     assert list(hass.data["lovelace"].resources.async_items()), "a failed unload must keep its resource"
     assert "storage" in hass.data[DOMAIN], "a failed unload must retain its backend storage"
