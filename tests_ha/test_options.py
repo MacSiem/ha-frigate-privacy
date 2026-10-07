@@ -45,3 +45,28 @@ async def test_system_context_requires_a_current_registered_trusted_action(hass:
         pass
     else:
         raise AssertionError('A REST/state-only automation must not grant authority')
+
+async def test_explicit_trusted_automation_can_call_with_its_real_context(hass: HomeAssistant):
+    from homeassistant.setup import async_setup_component
+    entry = MockConfigEntry(domain=DOMAIN, data={}, unique_id=DOMAIN,
+                            options={'trusted_actions': ['automation.privacy_button']})
+    entry.add_to_hass(hass)
+    hass.data[DOMAIN] = {'config_entry': entry}
+    accepted = []
+    async def probe(call):
+        await _async_require_admin(hass, call)
+        accepted.append(call.context.user_id)
+    hass.services.async_register(DOMAIN, 'probe', probe)
+    assert await async_setup_component(hass, 'automation', {'automation': [{
+        'id': 'privacy-button-test', 'alias': 'Privacy button',
+        'trigger': [{'platform': 'event', 'event_type': 'qa_privacy_press'}],
+        'action': [{'service': DOMAIN + '.probe'}],
+    }]})
+    await hass.async_block_till_done()
+    hass.bus.async_fire('qa_privacy_press')
+    await hass.async_block_till_done()
+    assert accepted == [None], 'explicitly trusted physical-event automation must work without a user account'
+    hass.config_entries.async_update_entry(entry, options={'trusted_actions': []})
+    hass.bus.async_fire('qa_privacy_press')
+    await hass.async_block_till_done()
+    assert accepted == [None], 'revoking trust must stop the next automation action'
