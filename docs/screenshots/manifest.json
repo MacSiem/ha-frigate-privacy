@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-02",
+  "generated_at": "2026-10-07",
   "fixture": "privacy-safe-generic-home",
   "source": {
     "path": "ha-frigate-privacy.js",
-    "sha256": "b21a86b80550a61d5fbfe92054970499f4334aea7276e711b144042173ca4731"
+    "sha256": "3e48ac720f47b353a3c5aec111a06f6146f3a7e427fee9ba172d8c32e429f695"
   },
   "harness": {
     "path": "docs/screenshots/_harness.html",
@@ -14,16 +14,16 @@
     {
       "path": "docs/screenshots/card-cameras-light.png",
       "theme": "light",
-      "width": 1120,
-      "height": 2200,
-      "sha256": "7541ddce3711654a5141f1877b333aa5cb92155054ecd9707475649b7542ed61"
+      "width": 560,
+      "height": 1632,
+      "sha256": "5d4be59e7b9e20f16df76fce9bdd4ceb4a6b73b57b5031ae0b8d535d8b100889"
     },
     {
       "path": "docs/screenshots/card-cameras-dark.png",
       "theme": "dark",
-      "width": 1120,
-      "height": 2200,
-      "sha256": "62750fad22fe189b5e5706c36889f265e6794cc5ae8988c320cdacd3a48f48ae"
+      "width": 560,
+      "height": 1632,
+      "sha256": "6274f655dcb130de8337bef5e8e19d5b24a4b936cbb9498c579bac6fc4bbdd61"
     }
   ],
   "privacy": {
@@ -32,11 +32,11 @@
     "external_requests": false
   },
   "capture": {
-    "method": "native Chrome DevTools via Computer Use",
+    "method": "Codex in-app browser, PNG developer capture of synthetic harness",
     "viewport_css_width": 560,
     "viewport_css_height": 1100,
-    "device_pixel_ratio": 2,
-    "source_head": "36306b0f007cc191d690239dfc0835751ce7558e",
-    "scope": "Synthetic admin ready/control; household error status covered by separate native proof"
+    "device_pixel_ratio": 1,
+    "source_head": "95d9d3fa92a9244756a9f0679ff6c1aae82b493f",
+    "scope": "Synthetic documentation fixture only; native HA acceptance recorded separately"
   }
 }
