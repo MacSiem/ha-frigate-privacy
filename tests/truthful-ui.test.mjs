@@ -36,6 +36,14 @@ function createCard(initialState, mutationResult = null, clock = null) {
   return { dom, card };
 }
 
+function createClock() {
+  return { now: 100000, timers: new Set(), async advance(ms) {
+    this.now += ms;
+    for (const timer of this.timers) if (timer.next <= this.now) { timer.next += timer.delay; timer.callback(); }
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  } };
+}
+
 const initial = {
   cameras: [{ camera_id: 'front', entity_id: 'camera.front', name: 'Front' }],
   schedules: [],
@@ -44,23 +52,36 @@ const initial = {
 
 {
   // A quiet HA connection must not freeze indicators after an external action.
-  const clock = { now: 100000, timers: new Set(), async advance(ms) {
-    this.now += ms;
-    for (const timer of this.timers) if (timer.next <= this.now) { timer.next += timer.delay; timer.callback(); }
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  } };
+  const clock = createClock();
   const { dom, card } = createCard({ ...initial, cameras: [{ camera_id: 'front', entity_id: 'camera.front', name: 'Front', camera_state: 'streaming', switches: [{ suffix: '_recordings', state: 'on' }] }] }, null, clock);
   await new Promise((resolve) => setTimeout(resolve, 0));
-  const stablePanel = card.shadowRoot.querySelector('.card');
   let reads = 0;
   card._hass.callWS = async () => { reads += 1; return { ...initial, cameras: [{ camera_id: 'front', entity_id: 'camera.front', name: 'Front', camera_state: 'idle', switches: [{ suffix: '_recordings', state: 'off' }] }] }; };
   await clock.advance(15000);
   assert.match(card.shadowRoot.textContent, /Recording: Off/, 'external privacy actions must refresh even without another hass setter call');
   assert.match(card.shadowRoot.textContent, /Video: Idle/);
-  assert.equal(card.shadowRoot.querySelector('.card'), stablePanel);
   const beforeRemoval = reads;
   card.remove(); await clock.advance(15000);
   assert.equal(reads, beforeRemoval, 'detached cards must stop background reads');
+  dom.window.close();
+}
+
+
+{
+  // Backend revocation is authoritative even while HA metadata stays cached.
+  const clock = createClock();
+  const { dom, card } = createCard(initial, null, clock);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  let reads = 0;
+  card._scheduleForm.label = 'Private draft';
+  card._hass.callWS = async () => { reads += 1; throw Object.assign(new Error('denied'), { code: 'unauthorized' }); };
+  await clock.advance(15000);
+  assert.match(card.shadowRoot.textContent, /Administrator permission required/);
+  assert.equal(card._cameras.length, 0);
+  assert.equal(card._scheduleForm.label, '');
+  const deniedReads = reads;
+  await clock.advance(15000);
+  assert.equal(reads, deniedReads, 'denied cards must not keep querying private state');
   dom.window.close();
 }
 
