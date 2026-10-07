@@ -308,3 +308,37 @@ console.log('truthful state, readable layout, and disconnect assertions passed')
   assert.equal(card.shadowRoot.querySelector('[data-action="pause"]'), null);
   dom.window.close();
 }
+
+// A permission change while a command is pending must release the old session's
+// busy state and discard its schedule draft; late results cannot restore it.
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const owner = card._hass;
+  let finishOld;
+  card.hass = { ...owner, callWS: (message) => message.type.endsWith('/pause_camera')
+    ? new Promise((resolve) => { finishOld = resolve; }) : owner.callWS(message) };
+  card._scheduleForm.label = 'Private owner draft';
+  card._editingScheduleIdx = 0;
+  const pending = card._pause();
+  assert.equal(card.shadowRoot.querySelector('[data-action="pause-custom"]').disabled, true);
+  card.hass = { ...owner, user: { id: 'owner', is_admin: false } };
+  assert.equal(card._scheduleForm.label, '', 'revoking access must discard the private schedule draft');
+  card.hass = owner;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.match(card.shadowRoot.textContent, /Integration ready/, 'regaining admin access must fetch fresh state despite the old pending mutation');
+  assert.equal(card.shadowRoot.querySelector('[data-action="pause-custom"]').disabled, false);
+  finishOld({ ok: true });
+  assert.equal(await pending, false, 'the old session must not accept a late mutation response');
+  assert.equal(card._scheduleForm.label, '');
+  assert.equal(card._editingScheduleIdx, null);
+  dom.window.close();
+}
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  card.hass = null;
+  assert.doesNotMatch(card.shadowRoot.textContent, /Front/, 'disconnecting the HA session must remove cached camera names');
+  assert.equal(card.shadowRoot.querySelector('[data-action="pause-custom"]'), null);
+  dom.window.close();
+}
