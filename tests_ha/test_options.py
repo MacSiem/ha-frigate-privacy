@@ -91,3 +91,40 @@ async def test_explicit_trusted_script_can_run_without_a_user_session(hass: Home
     await hass.services.async_call('script', 'privacy_button', {}, blocking=True)
     await hass.async_block_till_done()
     assert accepted == [None]
+
+@pytest.mark.parametrize('mode,expected', [('single',1), ('parallel',2), ('queued',2)])
+async def test_trusted_automation_keeps_authority_for_its_active_runs(hass: HomeAssistant, mode, expected):
+    import asyncio
+    from homeassistant.setup import async_setup_component
+    entry = MockConfigEntry(domain=DOMAIN, data={}, unique_id=DOMAIN,
+                            options={'trusted_actions': ['automation.privacy_button']})
+    entry.add_to_hass(hass)
+    hass.data[DOMAIN] = {'config_entry': entry}
+    entered, release = asyncio.Event(), asyncio.Event()
+    accepted = []
+    async def probe(call):
+        entered.set()
+        await release.wait()
+        await _async_require_admin(hass, call)
+        accepted.append(call.context.id)
+    hass.services.async_register(DOMAIN, 'probe', probe)
+    assert await async_setup_component(hass, 'automation', {'automation': [{
+        'id':'privacy-button-test', 'alias':'Privacy button', 'mode':mode,
+        'trigger':[{'platform':'event', 'event_type':'qa_privacy_press'}],
+        'action':[{'service':DOMAIN + '.probe'}],
+    }]})
+    await hass.async_block_till_done()
+    hass.bus.async_fire('qa_privacy_press')
+    await asyncio.wait_for(entered.wait(), 2)
+    entity = hass.data['automation'].get_entity('automation.privacy_button')
+    first_context = entity._context.id
+    hass.bus.async_fire('qa_privacy_press')
+    for _ in range(20):
+        await asyncio.sleep(0)
+        if entity._context.id != first_context:
+            break
+    assert entity._context.id != first_context
+    release.set()
+    await hass.async_block_till_done()
+    assert len(accepted) == expected, 'a later trigger must not revoke an existing authorized run'
+    assert len(set(accepted)) == expected

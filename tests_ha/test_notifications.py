@@ -109,3 +109,30 @@ async def test_scheduled_notifications_are_selected_independently(hass: HomeAssi
     assert 'scheduled' in delivered[0]['message'].lower()
     assert 'restored' in delivered[1]['message'].lower()
     assert await hass.config_entries.async_unload(entry.entry_id)
+
+async def test_changing_notification_recipient_while_storage_waits_rechecks_preferences(hass: HomeAssistant):
+    import asyncio
+    from unittest.mock import patch
+    entry = await _setup(hass)
+    delivered = []
+    async def deliver(call):
+        delivered.append(call.service)
+    hass.services.async_register('notify','qa_old',deliver)
+    hass.services.async_register('notify','qa_new',deliver)
+    storage = hass.data[DOMAIN]['storage']
+    notifier = hass.data[DOMAIN]['notifications']
+    for replacement in ('notify.qa_new',''):
+        hass.config_entries.async_update_entry(entry, options={'notify_destination':'notify.qa_old','notify_errors':True})
+        entered, release = asyncio.Event(), asyncio.Event()
+        async def waiting_record(camera_id):
+            entered.set()
+            await release.wait()
+            return {'phase':'error','operation_id':replacement}
+        with patch.object(storage,'async_get_record',waiting_record):
+            task = hass.async_create_task(notifier._notify('qa_camera'))
+            await asyncio.wait_for(entered.wait(), 2)
+            hass.config_entries.async_update_entry(entry, options={'notify_destination':replacement,'notify_errors':True})
+            release.set()
+            await task
+    assert delivered == ['qa_new'], 'changed recipient and disable must take effect before delivery'
+    assert await hass.config_entries.async_unload(entry.entry_id)
