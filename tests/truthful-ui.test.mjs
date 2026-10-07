@@ -365,6 +365,24 @@ console.log('truthful state, readable layout, and disconnect assertions passed')
 {
   const { dom, card } = createCard(initial);
   await new Promise((resolve) => setTimeout(resolve, 30));
+  card._scheduleForm.label = 'Private draft';
+  const owner = card._hass;
+  card.hass = { ...owner, callWS: async () => { throw { code:'unauthorized' }; } };
+  assert.equal(await card._pause(), false);
+  assert.match(card.shadowRoot.textContent, /Administrator permission required/);
+  assert.equal(card._cameras.length, 0, 'backend authorization denial must clear cached topology');
+  assert.equal(card._scheduleForm.label, '');
+  assert.equal(card.shadowRoot.querySelector('[data-action="pause-custom"]'), null);
+  card.hass = { ...card._hass, states: { 'sensor.tick': { state:'1' } } };
+  assert.equal(card._permissionDenied, true, 'stale HA user metadata must not undo a backend denial');
+  card.hass = { ...owner, connection: {} };
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.match(card.shadowRoot.textContent, /Integration ready/);
+  dom.window.close();
+}
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
   card.setActiveTab('actions');
   assert.match(card.shadowRoot.textContent, /Buttons and automations/);
   const examples = card.shadowRoot.querySelector('.action-example');
