@@ -409,6 +409,15 @@ console.log('truthful state, readable layout, and disconnect assertions passed')
 }
 
 {
+  const { dom, card } = createCard({ ...initial, cameras: [{ ...initial.cameras[0], switches:[
+    { suffix:'_audio', state:'off' }, { suffix:'_audio_detection', state:'on' },
+  ]}] });
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.match(card.shadowRoot.textContent, /Sound detection: Off \/ On/, 'a legacy audio flag must not hide a different current detection state');
+  dom.window.close();
+}
+
+{
   const { dom, card } = createCard(initial);
   await new Promise((resolve) => setTimeout(resolve, 30));
   card.setActiveTab('actions');
