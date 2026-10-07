@@ -68,5 +68,6 @@ class FrigatePrivacyOptionsFlow(config_entries.OptionsFlow):
             vol.Required('notify_errors', default=options.get('notify_errors', True)): bool,
             vol.Required('notify_paused', default=options.get('notify_paused', False)): bool,
             vol.Required('notify_resumed', default=options.get('notify_resumed', False)): bool,
+            vol.Required('notify_scheduled', default=options.get('notify_scheduled', False)): bool,
             vol.Optional('trusted_actions', default=options.get('trusted_actions', [])): selector.EntitySelector(selector.EntitySelectorConfig(domain=['automation','script'], multiple=True)),
         }))

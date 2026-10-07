@@ -195,11 +195,14 @@ async def _async_require_admin(
                 continue
             component = hass.data.get(domain)
             entity = component.get_entity(entity_id) if component and hasattr(component, "get_entity") else None
-            current = getattr(entity, "_context", None)
-            running = bool(getattr(entity, "is_on", False))
-            if domain == "automation":
-                running = running and bool(getattr(getattr(entity, "action_script", None), "is_running", False))
-            if running and context_id and getattr(current, "id", None) == context_id:
+            script = getattr(entity, "action_script" if domain == "automation" else "script", None)
+            running = bool(getattr(entity, "is_on", False)) and bool(getattr(script, "is_running", False))
+            # The entity context is only its latest trigger. Running single,
+            # queued and parallel executions retain their own HA context.
+            if running and context_id and any(
+                getattr(getattr(run, "_context", None), "id", None) == context_id
+                for run in getattr(script, "_runs", ())
+            ):
                 return
     raise Unauthorized()
 

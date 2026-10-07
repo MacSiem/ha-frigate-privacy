@@ -27,7 +27,8 @@
           "notify_errors": "Errors and partial privacy",
           "notify_paused": "Selected scope paused",
           "notify_resumed": "Targets restored",
-          "trusted_actions": "Trusted automations and scripts"
+          "trusted_actions": "Trusted automations and scripts",
+          "notify_scheduled": "Scheduled pause: start and restoration"
         }
       }
     },

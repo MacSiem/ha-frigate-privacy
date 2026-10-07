@@ -27,7 +27,8 @@
           "notify_errors": "Błędy i częściowa prywatność",
           "notify_paused": "Pauza wybranego zakresu",
           "notify_resumed": "Przywrócenie zapisanych stanów",
-          "trusted_actions": "Zaufane automatyzacje i skrypty"
+          "trusted_actions": "Zaufane automatyzacje i skrypty",
+          "notify_scheduled": "Zaplanowana pauza: start i przywrócenie"
         }
       }
     },

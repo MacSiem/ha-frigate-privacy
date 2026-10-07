@@ -27,20 +27,23 @@ class FrigatePrivacyNotifications:
 
     async def _notify(self, camera_id):
         async with self._lock:
-            options = self.entry.options
-            destination = options.get('notify_destination', '')
-            if not camera_id or not destination or destination not in notification_destinations(self.hass):
+            if not camera_id:
                 return
             record = await self.storage.async_get_record(camera_id)
-            if not record:
+            # Storage can wait. Apply the user's latest recipient/event choices
+            # after that wait, immediately before reserving and sending.
+            options = self.entry.options
+            destination = options.get('notify_destination', '')
+            if not record or not destination or destination not in notification_destinations(self.hass):
                 return
             phase = record.get('phase')
+            scheduled = record.get('source') == 'schedule'
             if phase in {'partial', 'error'} and options.get('notify_errors', True):
                 message = 'Privacy is not fully confirmed. An administrator should review the target evidence in Frigate Privacy.'
-            elif phase == 'paused' and options.get('notify_paused', False):
-                message = 'The selected privacy scope is paused. Check video status for cameras without supported stop actions.'
-            elif phase == 'active' and options.get('notify_resumed', False) and record.get('reason') != 'manual_override':
-                message = 'The privacy window ended and the saved targets were restored after verification.'
+            elif phase == 'paused' and options.get('notify_scheduled' if scheduled else 'notify_paused', False):
+                message = ('Scheduled privacy scope is paused.' if scheduled else 'The selected privacy scope is paused.') + ' Check video status for cameras without supported stop actions.'
+            elif phase == 'active' and options.get('notify_scheduled' if scheduled else 'notify_resumed', False) and record.get('reason') != 'manual_override':
+                message = ('The scheduled privacy window ended' if scheduled else 'The privacy window ended') + ' and the saved targets were restored after verification.'
             else:
                 return
             signature = (destination, phase, record.get('generation'), record.get('operation_id'), record.get('resume_operation_id'))
