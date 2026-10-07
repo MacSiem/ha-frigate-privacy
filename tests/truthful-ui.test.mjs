@@ -361,3 +361,31 @@ console.log('truthful state, readable layout, and disconnect assertions passed')
   assert.equal(current.getAttribute('aria-label'), 'Etykieta');
   dom.window.close();
 }
+
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  card.setActiveTab('actions');
+  assert.match(card.shadowRoot.textContent, /Buttons and automations/);
+  const examples = card.shadowRoot.querySelector('.action-example');
+  assert.ok(examples, 'the binding guide must expose a reusable HA action');
+  assert.match(examples.value, /perform_action: ha_frigate_privacy.pause_camera/);
+  assert.doesNotMatch(examples.value, /operation_id:/, 'a reusable button must not reuse a permanent idempotency key');
+  assert.match(card.shadowRoot.textContent, /trusted automation/i);
+  card.hass = { ...card._hass, user: { id: 'member', is_admin: false } };
+  assert.equal(card.shadowRoot.querySelector('.action-example'), null, 'household users must not see camera-bound action examples');
+  dom.window.close();
+}
+{
+  const { dom, card } = createCard({ ...initial, cameras: [{ ...initial.cameras[0], camera_state:'streaming', switches:[
+    { suffix:'_detect', state:'on' }, { suffix:'_recordings', state:'off' },
+    { suffix:'_snapshots', state:'unavailable' }, { suffix:'_audio_detection', state:'unknown' },
+  ]}] });
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.match(card.shadowRoot.textContent, /Detection: On/);
+  assert.match(card.shadowRoot.textContent, /Snapshots: Unavailable/);
+  assert.match(card.shadowRoot.textContent, /Sound detection: Unknown/);
+  assert.match(card.shadowRoot.textContent, /does not confirm microphone capture/i);
+  assert.equal(card.shadowRoot.querySelector('video,audio,img'), null, 'no preview media may load before a user action');
+  dom.window.close();
+}
