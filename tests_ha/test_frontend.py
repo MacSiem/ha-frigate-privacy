@@ -74,3 +74,16 @@ async def test_unload_removes_owned_resource_and_panel(hass: HomeAssistant) -> N
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert PANEL_URL_PATH not in hass.data[frontend.DATA_PANELS]
     assert list(hass.data["lovelace"].resources.async_items()) == []
+
+
+async def test_yaml_unload_removes_only_owned_extra_module(hass: HomeAssistant) -> None:
+    assert await async_setup_component(hass, "frontend", {})
+    foreign = "/local/foreign-module.js"
+    frontend.add_extra_js_url(hass, foreign)
+    assert await async_setup_component(hass, "lovelace", {"lovelace": {"mode": "yaml"}})
+    entry = await _setup(hass)
+    urls = hass.data[frontend.DATA_EXTRA_MODULE_URL].urls
+    assert f"{CARD_URL}?v={VERSION}" in urls
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert f"{CARD_URL}?v={VERSION}" not in urls, "unload must remove the owned YAML module"
+    assert foreign in urls, "unload must preserve unrelated frontend modules"
