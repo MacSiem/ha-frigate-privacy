@@ -109,6 +109,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload the config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if not unload_ok:
+        return False
     bucket = hass.data.get(DOMAIN, {})
     if scheduler := bucket.pop(DATA_SCHEDULER, None):
         await scheduler.async_stop()
