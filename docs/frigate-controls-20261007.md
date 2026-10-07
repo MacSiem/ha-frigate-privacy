@@ -1,0 +1,13 @@
+# Frigate Privacy: kanały, powiadomienia i przypisania HA
+
+Zakres Macieja z 7 października: znaczniki i podgląd tego, co widać/słychać/nagrywa się, opcje powiadomień oraz przypisanie przycisków, automatyzacji, scen i fizycznych przycisków. Rozszerzenie jest częścią trwającego sprintu i poprzedza finalny kandydat.
+
+Karta pokaże oddzielne znaczniki obrazu, nagrywania, snapshotów, detekcji i detekcji dźwięku ze stanami potwierdzonymi przez HA. Detekcja dźwięku nie oznacza potwierdzonego mikrofonu ani odsłuchu. Podgląd pozostanie natywnym oknem HA uruchamianym na żądanie; brak automatycznego pobierania kadrów/audio.
+
+Natywne opcje integracji pozwolą wybrać odbiorcę powiadomień HA i zdarzenia: błąd/partial, potwierdzona pauza i potwierdzone wznowienie. Domyślnie dodatkowe powiadomienia są wyłączone; proponowane zdarzenia to błędy i partial. Dotychczasowe lokalne komunikaty fail-safe pozostają. Wiadomości są ogólne, bez nazw kamer, adresów, harmonogramów czy obrazów. Wybór dotyczy dostępnych usług legacy notify lub encji notify.send_message. Niepowodzenie powiadomienia nie zmienia pauzy i nie staje się jej sukcesem. Słuchacz i zadania są sprzątane na unload; ustawienia przetrwają aktualizację/restart.
+
+Administrator może jawnie wskazać zaufane istniejące automatyzacje i skrypty. Wywołanie z kontekstem systemowym jest dopuszczone tylko wtedy, gdy jego kontekst odpowiada rzeczywistej zarejestrowanej encji na tej liście. Sam parent_id, stan dopisany przez REST, nazwa z payloadu i kontekst bez autora nie wystarczą. Konto domownika nadal nie może wywołać usług bezpośrednio. Zaufanie nie omija discovery, exact-target resume ani recovery gate. Zmiana listy obowiązuje przy następnej akcji bez restartu kamer.
+
+Zakładka „Przyciski i automatyzacje” wygeneruje akcję pauzy/wznowienia z aktualnym wyborem kamer, zakresu i czasu: przycisk dashboardu, skrypt, akcja automatyzacji oraz pomocnik boolean ze sceną i automatyzacją. Fizyczny przycisk dostaje wyzwalacz wybrany w edytorze HA i tę samą akcję. Nie ma cichego tworzenia automatyzacji ani ukrytych zapisów konfiguracji z przeglądarki. UI otworzy odpowiednie natywne ustawienia i udostępni gotowy tekst do kopiowania; nazwy encji zostaną zacytowane, brak stałego operation_id blokującego późniejsze wyzwolenia.
+
+Odbiór: testy RED→GREEN ustawień, notyfikacji, deduplikacji/lifecycle i jawnego zaufania; native options flow, rzeczywista automatyzacja z wyzwalaczem event fizycznego przycisku, odrzucenie bez zaufania i po jego cofnięciu, scena pomocnika, skrypt i dashboard button na syntetycznych kamerach. Minimum/stable/beta CI oraz pełne HACS fresh/upgrade/migracja, role, układ i restart na finalnym artefakcie. Wersja kandydata 6.1.0 ze względu na nowe funkcje.
