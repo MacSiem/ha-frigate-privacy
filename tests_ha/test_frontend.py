@@ -100,3 +100,5 @@ async def test_failed_platform_unload_preserves_loaded_backend_and_frontend(hass
     assert list(hass.data["lovelace"].resources.async_items()), "a failed unload must keep its resource"
     assert "storage" in hass.data[DOMAIN], "a failed unload must retain its backend storage"
     assert hass.services.has_service(DOMAIN, "pause_camera")
+    assert await hass.config_entries.async_unload(entry.entry_id), "a later successful unload must clean up normally"
+    assert PANEL_URL_PATH not in hass.data[frontend.DATA_PANELS]
