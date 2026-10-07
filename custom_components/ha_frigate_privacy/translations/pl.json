@@ -25,7 +25,7 @@
         "data": {
           "notify_destination": "Odbiorca powiadomień",
           "notify_errors": "Błędy i częściowa prywatność",
-          "notify_paused": "Prywatność włączona",
+          "notify_paused": "Pauza wybranego zakresu",
           "notify_resumed": "Przywrócenie zapisanych stanów",
           "trusted_actions": "Zaufane automatyzacje i skrypty"
         }

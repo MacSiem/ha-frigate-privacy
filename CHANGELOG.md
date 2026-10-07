@@ -1,6 +1,10 @@
 # Changelog
 
-## 6.0.7 (2026-10-07)
+## 6.1.0 (2026-10-07)
+
+- Add separate video, recording, snapshot, detection and sound-detection indicators, with explicit unknown/unavailable states and the limits of sound detection.
+- Add native HA options for optional notifications and their destination/events. Use generic messages, deduplicate repeated state events, and isolate delivery failures from camera control.
+- Add reusable dashboard button, script, automation and scene-bridge examples. Explicitly selected trusted HA automations/scripts can control privacy from their real running system context; revocation applies immediately to the next action.
 
 - Show the administrator-permission or unavailable status when the integration state cannot be read, instead of claiming readiness above the access/error notice.
 - Discard private schedule drafts and pending UI state when the user, connection or permissions change. Regaining access starts a fresh read; late responses from the previous identity are ignored.

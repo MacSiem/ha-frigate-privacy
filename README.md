@@ -69,6 +69,35 @@ Recording and Detection leave the other channels running. A camera without
 working HA turn-on/turn-off actions can keep streaming in Everything scope;
 check the video and per-target evidence rather than assuming the live feed is off.
 
+### Channel indicators and preview
+
+The card shows video, recording, snapshots, detection, and sound detection
+separately, including unknown and unavailable states. Sound detection does not
+confirm microphone capture or listening. **Preview** opens Home Assistant's native
+camera dialog on demand; this integration never automatically fetches frames or audio.
+
+### Notifications, buttons, automations and scenes
+
+Open Settings → Devices & services → Frigate Privacy → Configure to select a
+notification destination and events: errors/partial privacy, confirmed selected-scope
+pause, and verified restoration. Extra notifications default to off. Messages contain
+no camera names, addresses, images or schedule details. Notification delivery failures
+do not change camera control. Existing local fail-safe alerts remain enabled.
+
+In the card's **Buttons and automations** tab, select cameras, scope and duration,
+then copy an example for a dashboard button, script or automation action. For a
+physical button, choose its device/event trigger in HA's automation editor and use
+that action. To connect a scene, create the indicated boolean helper and the scene
+bridge automation, then set the helper on/off in your HA scenes.
+
+Administrator dashboard actions work directly. For a system-triggered automation
+or script, explicitly select its entity under **Trusted automations and scripts**
+in the integration options. Review its triggers and actions first: this delegates
+privacy control to that action. Only its real running HA context is accepted;
+a matching state name or parent context is insufficient. Revoking trust applies to
+the next action. Direct household-user calls remain denied. The card provides examples
+and opens HA editors; it does not silently create helpers or automations.
+
 ### Security and privacy boundaries
 
 - The card never reads a Home Assistant token, calls configuration REST endpoints,

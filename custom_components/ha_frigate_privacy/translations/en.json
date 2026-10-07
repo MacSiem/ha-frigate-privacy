@@ -25,7 +25,7 @@
         "data": {
           "notify_destination": "Notification destination",
           "notify_errors": "Errors and partial privacy",
-          "notify_paused": "Privacy paused",
+          "notify_paused": "Selected scope paused",
           "notify_resumed": "Targets restored",
           "trusted_actions": "Trusted automations and scripts"
         }
