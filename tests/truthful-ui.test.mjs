@@ -4,7 +4,7 @@ import { JSDOM } from 'jsdom';
 
 const source = readFileSync(new URL('../ha-frigate-privacy.js', import.meta.url), 'utf8');
 
-function createCard(initialState, mutationResult = null) {
+function createCard(initialState, mutationResult = null, clock = null) {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', {
     runScripts: 'dangerously',
     pretendToBeVisual: true,
@@ -12,6 +12,11 @@ function createCard(initialState, mutationResult = null) {
   });
   const { window } = dom;
   window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  if (clock) {
+    window.Date.now = () => clock.now;
+    window.setInterval = (callback, delay) => { const timer = { callback, delay, next: clock.now + delay }; clock.timers.add(timer); return timer; };
+    window.clearInterval = (timer) => clock.timers.delete(timer);
+  }
   window.eval(source);
   const card = window.document.createElement('ha-frigate-privacy');
   let mutated = false;
@@ -36,6 +41,29 @@ const initial = {
   schedules: [],
   paused: {},
 };
+
+{
+  // A quiet HA connection must not freeze indicators after an external action.
+  const clock = { now: 100000, timers: new Set(), async advance(ms) {
+    this.now += ms;
+    for (const timer of this.timers) if (timer.next <= this.now) { timer.next += timer.delay; timer.callback(); }
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  } };
+  const { dom, card } = createCard({ ...initial, cameras: [{ camera_id: 'front', entity_id: 'camera.front', name: 'Front', camera_state: 'streaming', switches: [{ suffix: '_recordings', state: 'on' }] }] }, null, clock);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const stablePanel = card.shadowRoot.querySelector('.card');
+  let reads = 0;
+  card._hass.callWS = async () => { reads += 1; return { ...initial, cameras: [{ camera_id: 'front', entity_id: 'camera.front', name: 'Front', camera_state: 'idle', switches: [{ suffix: '_recordings', state: 'off' }] }] }; };
+  await clock.advance(15000);
+  assert.match(card.shadowRoot.textContent, /Recording: Off/, 'external privacy actions must refresh even without another hass setter call');
+  assert.match(card.shadowRoot.textContent, /Video: Idle/);
+  assert.equal(card.shadowRoot.querySelector('.card'), stablePanel);
+  const beforeRemoval = reads;
+  card.remove(); await clock.advance(15000);
+  assert.equal(reads, beforeRemoval, 'detached cards must stop background reads');
+  dom.window.close();
+}
+
 
 {
   const status = {
