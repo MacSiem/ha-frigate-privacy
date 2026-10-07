@@ -109,8 +109,10 @@
     setConfig(config) { this._config = { ...config }; this._updateUI(); }
     set hass(hass) {
       const identityChanged = !!this._hass && (this._connection !== (hass?.connection || null) || this._userId !== (hass?.user?.id || null) || this._permissionDenied !== (hass?.user?.is_admin !== true));
-      this._hass = hass; if (!hass) return; this._lang = String(hass.language || 'en').startsWith('pl') ? 'pl' : 'en';
-      if (identityChanged) { this._requestEpoch += 1; this._connectPromise = null; this._lastStatePollAt = 0; this._integrationChecked = false; this._integrationAvailable = false; this._cameras = []; this._schedules = []; this._paused = {}; this._lastOperations = {}; this._selectedCameras.clear(); }
+      this._hass = hass;
+      if (identityChanged || !hass) { this._busy = false; this._error = ''; this._editingScheduleIdx = null; this._scheduleForm = this._emptySchedule(); if (this._toastTimer) clearTimeout(this._toastTimer); this._requestEpoch += 1; this._connectPromise = null; this._lastStatePollAt = 0; this._integrationChecked = false; this._integrationAvailable = false; this._cameras = []; this._schedules = []; this._paused = {}; this._lastOperations = {}; this._selectedCameras.clear(); }
+      if (!hass) { this._connection = null; this._userId = null; this._permissionDenied = true; this._updateUI(); return; }
+      this._lang = String(hass.language || 'en').startsWith('pl') ? 'pl' : 'en';
       this._connection = hass.connection || null; this._userId = hass.user?.id || null;
       this.classList.toggle('bento-dark', !!hass.themes?.darkMode); this._permissionDenied = hass.user?.is_admin !== true;
       if (this._permissionDenied) { this._integrationChecked = true; this._integrationAvailable = false; this._updateUI(); return; }
