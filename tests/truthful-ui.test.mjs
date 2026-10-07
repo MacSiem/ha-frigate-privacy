@@ -342,3 +342,22 @@ console.log('truthful state, readable layout, and disconnect assertions passed')
   assert.equal(card.shadowRoot.querySelector('[data-action="pause-custom"]'), null);
   dom.window.close();
 }
+
+{
+  const { dom, card } = createCard(initial);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  card.setActiveTab('schedule');
+  const label = card.shadowRoot.querySelector('.input-label');
+  label.value = 'Draft window';
+  label.dispatchEvent(new dom.window.Event('input'));
+  label.focus();
+  label.setSelectionRange(3, 6);
+  card.hass = { ...card._hass, language: 'pl' };
+  const current = card.shadowRoot.querySelector('.input-label');
+  assert.equal(card.shadowRoot.activeElement, current, 'a background render must retain the field being edited');
+  assert.equal(current.value, 'Draft window');
+  assert.equal(current.selectionStart, 3);
+  assert.equal(current.selectionEnd, 6);
+  assert.equal(current.getAttribute('aria-label'), 'Etykieta');
+  dom.window.close();
+}
