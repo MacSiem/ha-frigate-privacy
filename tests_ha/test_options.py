@@ -1,4 +1,6 @@
 """Native options flow and explicit delegation policy."""
+import pytest
+from homeassistant.data_entry_flow import InvalidData
 from homeassistant.core import Context, HomeAssistant, ServiceCall
 from homeassistant.exceptions import Unauthorized
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -23,13 +25,13 @@ async def test_options_reject_unavailable_notification_destination(hass: HomeAss
     entry = MockConfigEntry(domain=DOMAIN, data={}, unique_id=DOMAIN)
     entry.add_to_hass(hass)
     flow = await hass.config_entries.options.async_init(entry.entry_id)
-    result = await hass.config_entries.options.async_configure(flow['flow_id'], {
-        'notify_destination': 'shell_command.execute',
-        'notify_errors': True, 'notify_paused': False, 'notify_resumed': False,
-        'trusted_actions': [],
-    })
-    assert result['type'] == 'form'
-    assert result['errors'] == {'notify_destination': 'invalid_destination'}
+    with pytest.raises(InvalidData):
+        await hass.config_entries.options.async_configure(flow['flow_id'], {
+            'notify_destination': 'shell_command.execute',
+            'notify_errors': True, 'notify_paused': False, 'notify_resumed': False,
+            'trusted_actions': [],
+        })
+    assert entry.options == {}, 'invalid destination must not be persisted'
 
 async def test_system_context_requires_a_current_registered_trusted_action(hass: HomeAssistant):
     entry = MockConfigEntry(domain=DOMAIN, data={}, unique_id=DOMAIN,
