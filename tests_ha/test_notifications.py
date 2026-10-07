@@ -1,0 +1,42 @@
+"""User-selected notifications must not change privacy control or disclose topology."""
+from homeassistant.core import HomeAssistant
+from custom_components.ha_frigate_privacy.const import DOMAIN, EVENT_STATE_CHANGED
+from tests_ha.test_frontend import _setup
+
+async def test_optional_notifications_are_generic_and_deduplicate(hass: HomeAssistant, hass_ws_client):
+    entry = await _setup(hass)
+    hass.config_entries.async_update_entry(entry, options={
+        'notify_destination':'persistent_notification.create', 'notify_errors':True,
+        'notify_paused':False, 'notify_resumed':False,
+    })
+    storage = hass.data[DOMAIN]['storage']
+    await storage.async_set_paused('private_camera_name', {'phase':'partial', 'operation_id':'private-operation', 'reason':'private-address'})
+    client = await hass_ws_client(hass)
+    async def notifications():
+        await client.send_json({'id':1,'type':'persistent_notification/get'})
+        response = await client.receive_json()
+        assert response['success']
+        return response['result']
+    hass.bus.async_fire(EVENT_STATE_CHANGED, {'camera_id':'private_camera_name'})
+    await hass.async_block_till_done()
+    first = await notifications()
+    own = [n for n in first if n['title'].startswith('Frigate Privacy')]
+    assert len(own) == 1
+    assert 'not fully confirmed' in own[0]['message']
+    assert 'private_' not in str(own) and 'private-' not in str(own)
+    hass.bus.async_fire(EVENT_STATE_CHANGED, {'camera_id':'private_camera_name'})
+    await hass.async_block_till_done()
+    # IDs must be unique per request on the same websocket.
+    await client.send_json({'id':2,'type':'persistent_notification/get'})
+    assert (await client.receive_json())['result'] == first
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+async def test_default_extra_notifications_are_off(hass: HomeAssistant, hass_ws_client):
+    entry = await _setup(hass)
+    await hass.data[DOMAIN]['storage'].async_set_paused('private_camera_name', {'phase':'error'})
+    hass.bus.async_fire(EVENT_STATE_CHANGED, {'camera_id':'private_camera_name'})
+    await hass.async_block_till_done()
+    client = await hass_ws_client(hass)
+    await client.send_json({'id':1,'type':'persistent_notification/get'})
+    assert (await client.receive_json())['result'] == []
+    assert await hass.config_entries.async_unload(entry.entry_id)
