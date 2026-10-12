@@ -88,6 +88,8 @@ def _verified_restore(record: dict[str, Any], ended: str | None) -> bool:
             return False
     if record.get('camera_toggled') and record.get('camera_entity_id') != f"camera.{record.get('camera_id')}":
         return False
+    if set(_targets(record.get('switches'))) & set(_targets(record.get('preexisting_off'))):
+        return False
     expected = {target:'on' for target in _targets(record.get('switches'))}
     expected.update({target:'off' for target in _targets(record.get('preexisting_off'))})
     camera = record.get('camera_entity_id')
@@ -137,10 +139,14 @@ def project_record(record: dict[str, Any], now: datetime) -> dict[str, Any]:
             # Scheduler observed exact switches on. Camera enabled evidence is
             # distinct from a camera's live-video or microphone state.
             actual[target] = 'on' if target.startswith('switch.') else 'unknown'
+    verified = _verified_restore(record, ended)
+    proof = record.get('period_restore_proof') if verified else {}
     evidence = []
-    for target in sorted(pause.keys() | restore.keys() | set(_targets(record.get('overridden_switches')))):
+    for target in sorted(pause.keys() | restore.keys() | set(_targets(record.get('overridden_switches'))) | set(proof)):
         pause_outcome = pause.get(target, 'unknown')
         restore_outcome = restore.get(target, 'unknown')
+        if verified and target in proof:
+            restore_outcome = 'preexisting_off' if proof[target] == 'off' else 'active'
         if target in _targets(record.get('preexisting_off')) and restore_outcome == 'active':
             restore_outcome = 'preexisting_off'
         state = actual.get(target)
@@ -157,10 +163,30 @@ def project_record(record: dict[str, Any], now: datetime) -> dict[str, Any]:
         'phase':record.get('phase') if _is(record.get('phase'), PHASES) else 'error',
         'source':record.get('source') if _is(record.get('source'), SOURCES) else 'unknown',
         'reason':_reason(record.get('reason')), 'end_reason':_reason(record.get('period_end_reason')) if ended else None,
-        'verified_restore':_verified_restore(record, ended), 'duration_seconds':duration,
+        'verified_restore':verified, 'duration_seconds':duration,
         'channels':[item for item in evidence if item['channel'] != 'unknown'],
         'unknown_channels':[item for item in evidence if item['channel'] == 'unknown'],
         'evidence_scope':'transition_intent'}
+
+
+
+def _restore_channels_consistent(row: dict[str, Any]) -> bool:
+    items = row['channels'] + row['unknown_channels']
+    if not items or len({item['target'] for item in items}) != len(items):
+        return False
+    for item in items:
+        target = item['target']
+        if item['channel'] != _channel(target):
+            return False
+        if target.startswith('switch.'):
+            if not target.startswith(f"switch.{row['camera_id']}_"):
+                return False
+            expected = 'off' if item['restore_outcome'] == 'preexisting_off' else 'on'
+            if item['restore_outcome'] not in {'active','preexisting_off'} or item['observed_state'] != expected:
+                return False
+        elif target != f"camera.{row['camera_id']}" or item['restore_outcome'] != 'active' or item['observed_state'] not in {'on','idle','streaming','recording'}:
+            return False
+    return True
 
 
 def _valid_row(row: Any) -> bool:
@@ -199,6 +225,8 @@ def _valid_row(row: Any) -> bool:
             seen = item.get('outcomes_seen', [])
             if not isinstance(seen, list) or len(seen) > len(OUTCOMES) or any(not _is(value, OUTCOMES) for value in seen):
                 return False
+    if row['verified_restore'] and not _restore_channels_consistent(row):
+        return False
     # Unknown row fields are not echoed to clients; only generated schema fields.
     return True
 

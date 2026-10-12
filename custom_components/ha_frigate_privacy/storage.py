@@ -554,6 +554,7 @@ class FrigatePrivacyStorage:
                         if old and old.get("started_at") == record.get("started_at")
                         else utc(record.get("started_at"), datetime.now(timezone.utc))
                     )
+            capture_succeeded = False
             if data.get("paused") != previous.get("paused"):
                 try:
                     candidate = capture(data.get("privacy_periods"),
@@ -565,8 +566,9 @@ class FrigatePrivacyStorage:
                     self._period_durability = "capture_failed"
                 else:
                     data["privacy_periods"] = candidate
+                    capture_succeeded = True
             await self._store.async_save(data)
-            if self._period_durability != "capture_failed":
+            if capture_succeeded or self._period_durability != "capture_failed":
                 self._period_durability = "confirmed"
         except asyncio.CancelledError:
             self._data = previous

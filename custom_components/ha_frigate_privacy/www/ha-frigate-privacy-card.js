@@ -119,7 +119,7 @@ function createUiV3({ language = 'en' } = {}) {
     .toast { position: fixed; left: 50%; bottom: 24px; z-index: 10; max-width: min(90vw, 520px); transform: translate(-50%, 90px); opacity: 0; pointer-events: none; padding: 12px 17px; border-radius: 11px; background: #101828; color: #fff; transition: .22s; font-size: 14px; line-height: 1.45; } .toast.show { transform: translate(-50%, 0); opacity: 1; } .toast.error { background: var(--fp-danger); }
     .empty { padding: 24px; text-align: center; color: var(--fp-muted); font-size: 14px; line-height: 1.55; }
 
-    .history-panel { min-width:0; } .period-toolbar { display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:16px 0; }
+    .history-panel { min-width:0;container-type:inline-size; } .period-toolbar { display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:16px 0; }
     .period-toolbar label { color:var(--fp-muted);font-size:13px; } .period-toolbar select { display:block;min-height:44px;min-width:100px;margin-top:5px; }
     .period-timeline { list-style:none;padding:0;margin:18px 0;display:grid;gap:10px; }
     .period-timeline li { display:grid;grid-template-columns:minmax(90px,.6fr) minmax(0,1.6fr) auto;gap:12px;align-items:start;border:1px solid var(--fp-border);border-left:3px solid var(--fp-primary);padding:14px;border-radius:12px;background:var(--fp-bg); }
@@ -137,6 +137,14 @@ function createUiV3({ language = 'en' } = {}) {
     .history-panel button,.history-panel select { min-height:44px; } .history-panel button:focus-visible,.history-panel select:focus-visible { outline:3px solid var(--fp-primary);outline-offset:3px; }
     @media (max-width:620px) { .period-timeline li { grid-template-columns:1fr; } .period-detail dl { grid-template-columns:1fr;gap:3px; } .period-detail dd { margin-bottom:9px; } .period-toolbar > button { flex:1; } .period-table th,.period-table td { min-width:110px; } }
 
+    @container (max-width:499px) {
+      .period-table,.period-table tbody { display:block; }
+      .period-table thead { position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%); }
+      .period-table tr { display:grid;gap:8px;border:1px solid var(--fp-border);border-radius:12px;margin:12px 0;padding:12px; }
+      .period-table td { display:block;min-width:0;border:0;padding:0; }
+      .period-table td::before { content:attr(data-label);display:block;color:var(--fp-muted);font-size:12px;margin-bottom:4px; }
+      .period-table-wrap { overflow:visible; }
+    }
     @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
     @media (max-width: 620px) { .header, .body { padding-left: 16px; padding-right: 16px; } .header { align-items: flex-start; flex-wrap: wrap; } .brand { width: 100%; } .status-pill { max-width: 100%; margin-left: 57px; } .tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; } .camera-grid, .form-grid, .state-row, .schedule-item { grid-template-columns: 1fr; } .phase { justify-self: start; } .field-wide { grid-column: auto; } .days { grid-template-columns: repeat(4, minmax(0, 1fr)); } .donate-section { flex-direction: row; align-items: center; } .donate-buttons { flex-direction: column; } .duration-row { grid-template-columns: 1fr; } }
   `;
@@ -292,6 +300,7 @@ function createUiV3({ language = 'en' } = {}) {
       const user = hass?.user || {};
       const groups = Array.isArray(user.groups) ? user.groups.map(group => String(group?.id || '')).sort() : [];
       return JSON.stringify([user.id || null, user.is_admin === true, user.is_active !== false, groups,
+        Array.isArray(user.group_ids) ? user.group_ids.map(String).sort() : [],
         hass?.language || 'en', hass?.config?.time_zone || 'UTC', hass?.connection?.connected !== false, this._periodDays, this._config]);
     }
     _invalidatePeriods(state = 'discarded') {
@@ -383,11 +392,24 @@ function createUiV3({ language = 'en' } = {}) {
               restore_outcome:item.restore_outcome, observed_state:item.observed_state, outcomes_seen:Object.freeze([...seen]) });
           }));
         };
+        const projectedChannels = channels('channels'); const projectedUnknown = channels('unknown_channels');
+        if (row.verified_restore) {
+          const all = [...projectedChannels,...projectedUnknown];
+          if (!all.length || new Set(all.map(item => item.target)).size !== all.length) fail();
+          const category = target => target.startsWith('camera.') ? 'camera_control' :
+            Object.entries({'_audio_detection':'sound_detection','_audio':'sound_detection','_recordings':'recording','_snapshots':'snapshots','_detect':'detection','_motion':'motion','_enabled':'camera_control'}).find(([suffix])=>target.endsWith(suffix))?.[1] || 'unknown';
+          for (const item of all) {
+            if (item.channel !== category(item.target)) fail();
+            if (item.target.startsWith('switch.')) {
+              if (!item.target.startsWith(`switch.${row.camera_id}_`) || !['active','preexisting_off'].includes(item.restore_outcome) || item.observed_state !== (item.restore_outcome==='preexisting_off'?'off':'on')) fail();
+            } else if (item.target !== `camera.${row.camera_id}` || item.restore_outcome !== 'active' || !['on','idle','streaming','recording'].includes(item.observed_state)) fail();
+          }
+        }
         return Object.freeze({ id:row.id,camera_id:row.camera_id,generation:row.generation,started_at:row.started_at,
           ended_at:row.ended_at,planned_ends_at:row.planned_ends_at,observed_at:row.observed_at,
           duration_seconds:row.duration_seconds,phase:row.phase,source:row.source,reason:row.reason,
-          end_reason:row.end_reason,verified_restore:row.verified_restore,channels:channels('channels'),
-          unknown_channels:channels('unknown_channels'),evidence_scope:row.evidence_scope });
+          end_reason:row.end_reason,verified_restore:row.verified_restore,channels:projectedChannels,
+          unknown_channels:projectedUnknown,evidence_scope:row.evidence_scope });
       });
       const durability = ['confirmed','loaded','not_written','not_loaded','save_failed','capture_failed'].includes(payload.durability) ? payload.durability : 'not_loaded';
       if (['corrupt','unsupported','unavailable'].includes(payload.status) && rows.length) fail();
@@ -445,7 +467,7 @@ function createUiV3({ language = 'en' } = {}) {
       const end = row => row.ended_at ? this._periodTime(row.ended_at) : t.open;
       const selection = row => `<button type="button" class="period-select ${this._periodSelected===row.id?'selected':''}" data-period-select="${_esc(row.id)}" aria-pressed="${this._periodSelected===row.id}">${_esc(row.camera_id)}</button>`;
       const timeline = `<ol class="period-timeline">${rows.map(row => `<li>${selection(row)}<div class="period-event"><span>${_esc(t.start)}</span><time datetime="${_esc(row.started_at||'')}">${_esc(this._periodTime(row.started_at))}</time><span>${_esc(t.end)}</span><span>${_esc(end(row))}</span></div>${ui.statusHtml(this._periodResult(row))}</li>`).join('')}</ol>`;
-      const data = `<div class="period-table-wrap"><table class="period-table"><caption>${_esc(t.data)} · ${_esc(zone)} · UTC</caption><thead><tr><th>${_esc(this._t.cameras)}</th><th>${_esc(t.start)}</th><th>${_esc(t.end)}</th><th>${_esc(t.duration)}</th><th>${_esc(t.reason)}</th></tr></thead><tbody>${rows.map(row => `<tr><td>${selection(row)}</td><td>${_esc(this._periodTime(row.started_at))}</td><td>${_esc(end(row))}</td><td>${_esc(row.duration_seconds ?? t.unknown)}</td><td>${_esc(row.end_reason||t.unknown)} ${ui.statusHtml(this._periodResult(row))}</td></tr>`).join('')}</tbody></table></div>`;
+      const data = `<div class="period-table-wrap"><table class="period-table"><caption>${_esc(t.data)} · ${_esc(zone)} · UTC</caption><thead><tr><th>${_esc(this._t.cameras)}</th><th>${_esc(t.start)}</th><th>${_esc(t.end)}</th><th>${_esc(t.duration)}</th><th>${_esc(t.reason)}</th></tr></thead><tbody>${rows.map(row => `<tr><td data-label="${_esc(this._t.cameras)}">${selection(row)}</td><td data-label="${_esc(t.start)}">${_esc(this._periodTime(row.started_at))}</td><td data-label="${_esc(t.end)}">${_esc(end(row))}</td><td data-label="${_esc(t.duration)}">${_esc(row.duration_seconds ?? t.unknown)}</td><td data-label="${_esc(t.reason)}">${_esc(row.end_reason||t.unknown)} ${ui.statusHtml(this._periodResult(row))}</td></tr>`).join('')}</tbody></table></div>`;
       const selected = this._periods.find(row => row.id === this._periodSelected);
       const evidence = (items,heading) => items.length ? `<div class="period-evidence"><h4>${_esc(heading)}</h4>${items.map(item => `<div><strong>${_esc(t[item.channel]||t.unknown)}</strong><code>${_esc(item.target)}</code><dl><dt>${_esc(t.pause)}</dt><dd>${_esc(item.pause_outcome)}</dd><dt>${_esc(t.resume)}</dt><dd>${_esc(item.restore_outcome)}</dd><dt>${_esc(t.observed)}</dt><dd>${_esc(item.observed_state)}</dd><dt>${_esc(t.seen)}</dt><dd>${_esc(item.outcomes_seen.join(', ')||t.unknown)}</dd></dl></div>`).join('')}</div>` : '';
       const detail = selected ? `<section class="period-detail" aria-label="${_esc(t.selected)}"><h3>${_esc(t.selected)} · ${_esc(selected.camera_id)}</h3>${ui.statusHtml(this._periodResult(selected))}<p>${_esc(selected.verified_restore?t.restore:t.noRestore)}</p><dl>${[[t.start,this._periodTime(selected.started_at)],[t.end,end(selected)],[t.planned,this._periodTime(selected.planned_ends_at)],[t.duration,selected.duration_seconds??t.unknown],[t.reason,selected.end_reason||t.unknown],[this._t.reason,selected.reason||t.unknown],[t.source,selected.source],[t.generation,selected.generation??t.unknown]].map(([key,value])=>`<dt>${_esc(key)}</dt><dd>${_esc(value)}</dd>`).join('')}</dl><p class="helper">UTC: ${_esc(selected.started_at||t.unknown)} → ${_esc(selected.ended_at||t.unknown)}</p>${evidence(selected.channels,t.channels)}${evidence(selected.unknown_channels,t.unknownChannels)}</section>` : '';
@@ -486,7 +508,10 @@ function createUiV3({ language = 'en' } = {}) {
       this._lastHtml = html; this.shadowRoot.innerHTML = html; this._attachEvents();
       if (!active) return;
       const next = [...this.shadowRoot.querySelectorAll('button,input,select,textarea,[tabindex]')].find((element) => element.tagName === active.tagName && (active.id ? element.id === active.id : keys.length ? keys.every((attr) => element.getAttribute(attr.name) === attr.value) : element.className === active.className));
-      if (!next || next.disabled) return;
+      if (!next || next.disabled) {
+        if (active.hasAttribute('data-period-page')) this.shadowRoot.querySelector('[data-period-select]')?.focus({preventScroll:true});
+        return;
+      }
       if (selection?.value != null) next.value = selection.value;
       next.focus({ preventScroll:true });
       if (selection?.start != null) next.setSelectionRange(selection.start, selection.end);
