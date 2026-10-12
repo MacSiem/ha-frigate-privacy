@@ -8,11 +8,17 @@ import json
 import uuid
 from copy import deepcopy
 from typing import Any
+from datetime import datetime, timezone
 
 from homeassistant.core import HomeAssistant
+try:
+    from homeassistant.core import CoreState
+except ImportError:  # lightweight synthetic fixtures; HA provides the real enum
+    CoreState = None
 from homeassistant.helpers.storage import Store
 
 from .const import STORAGE_KEY, STORAGE_VERSION
+from .periods import capture, read_history, utc
 from .replay import (
     ReplayFilterError,
     normalize_replay_filter,
@@ -51,17 +57,29 @@ class _ConfirmedStore(Store):
 
     _last_write_error: Exception | None
 
+    def __init__(self, hass: HomeAssistant, *args: Any, **kwargs: Any) -> None:
+        self._privacy_hass = hass
+        super().__init__(hass, *args, **kwargs)
+
     async def async_save(self, data: dict[str, Any]) -> None:
+        # HA may silently defer/skip a write during shutdown. Durable state
+        # requires actual lower-level completion, not just async_save returning.
+        if getattr(self._privacy_hass, "state", None) == (CoreState.stopping if CoreState else "stopping"):
+            raise StorageWriteError("privacy state write skipped during shutdown")
         self._last_write_error = None
+        self._write_confirmed = False
         await super().async_save(data)
         if error := self._last_write_error:
             raise StorageWriteError("privacy state was not durably saved") from error
+        if not self._write_confirmed:
+            raise StorageWriteError("privacy state write was not confirmed")
 
     async def _async_write_data(self, *args: Any, **kwargs: Any) -> None:
         try:
             # HA 2025.2 passes (path, data); newer cores pass only data.
             # Forward the core's arguments without weakening error detection.
             await super()._async_write_data(*args, **kwargs)
+            self._write_confirmed = True
         except Exception as err:
             # Re-raise so Store retains its normal logging/handling behavior;
             # async_save above converts only its swallowed outcome to a failure.
@@ -84,6 +102,7 @@ class FrigatePrivacyStorage:
         )
         self._lock = asyncio.Lock()
         self._data: dict[str, Any] | None = None
+        self._period_durability = "not_written"
 
     async def async_load(self) -> dict[str, Any]:
         """Load persisted state, creating defaults when absent."""
@@ -109,6 +128,20 @@ class FrigatePrivacyStorage:
             "paused": active,
             "last_operations": terminal,
         }
+
+    async def async_get_periods(self, *, days: int = 30) -> dict[str, Any]:
+        """Project already loaded state without save, load, probe or migration."""
+        if days not in {7, 30}:
+            raise ValueError("invalid history range")
+        async with self._lock:
+            if self._data is None:
+                return {"schema": 1, "status": "unavailable", "periods": [],
+                        "durability": "not_loaded", "days": days}
+            result = read_history(self._data.get("privacy_periods"),
+                                  self._data.get("paused", {}),
+                                  datetime.now(timezone.utc), days)
+            result["durability"] = self._period_durability
+            return result
 
     async def async_get_schedules(self) -> list[dict[str, Any]]:
         """Return persisted privacy schedules."""
@@ -395,6 +428,9 @@ class FrigatePrivacyStorage:
             paused["phase"] = "active"
             paused["active"] = False
             paused["desired_state"] = "active"
+            # Only this observed terminal transition may record an actual end.
+            paused["period_ended_at"] = updates.get("observed_at")
+            paused["period_end_reason"] = paused.get("resume_reason") or "unknown"
             await self._save_locked(data, previous)
             return deepcopy(paused)
 
@@ -455,6 +491,11 @@ class FrigatePrivacyStorage:
             paused["active"] = False
             paused["desired_state"] = "active"
             paused["reason"] = "manual_override"
+            observed = datetime.now(timezone.utc).isoformat()
+            paused["observed_at"] = observed
+            paused["period_ended_at"] = observed
+            paused["period_end_reason"] = "manual_override"
+            paused["period_restore_proof"] = {}
             await self._save_locked(data, previous)
             return deepcopy(paused)
 
@@ -498,12 +539,42 @@ class FrigatePrivacyStorage:
     ) -> None:
         """Save while preserving the last durable in-memory snapshot on failure."""
         try:
+            # Preserve pause identity when resume advances the control generation.
+            for camera, record in data.get("paused", {}).items():
+                old = previous.get("paused", {}).get(camera, {})
+                if record != old and "period_generation" not in record:
+                    record["period_generation"] = (
+                        old.get("period_generation")
+                        if old and old.get("started_at") == record.get("started_at")
+                        else record.get("generation")
+                    )
+                if record != old and "period_started_at" not in record:
+                    record["period_started_at"] = (
+                        old.get("period_started_at", utc(old.get("started_at"), datetime.now(timezone.utc)))
+                        if old and old.get("started_at") == record.get("started_at")
+                        else utc(record.get("started_at"), datetime.now(timezone.utc))
+                    )
+            if data.get("paused") != previous.get("paused"):
+                try:
+                    candidate = capture(data.get("privacy_periods"),
+                                        previous.get("paused", {}), data.get("paused", {}),
+                                        datetime.now(timezone.utc))
+                except (ValueError, TypeError, OverflowError):
+                    # Never weaken control/recovery because a projection cannot
+                    # be captured. Keep prior history intact and expose failure.
+                    self._period_durability = "capture_failed"
+                else:
+                    data["privacy_periods"] = candidate
             await self._store.async_save(data)
+            if self._period_durability != "capture_failed":
+                self._period_durability = "confirmed"
         except asyncio.CancelledError:
             self._data = previous
+            self._period_durability = "save_failed"
             raise
         except Exception:
             self._data = previous
+            self._period_durability = "save_failed"
             raise
 
     async def _ensure_loaded_locked(self) -> dict[str, Any]:
@@ -513,6 +584,7 @@ class FrigatePrivacyStorage:
             if not isinstance(loaded, dict):
                 loaded = {}
             loaded = deepcopy(loaded)
+            self._period_durability = "loaded"
             if not isinstance(loaded.get("schedules"), list):
                 loaded["schedules"] = []
             if not isinstance(loaded.get("schedule_operations"), list):

@@ -2,6 +2,45 @@
 (function () {
   'use strict';
 
+// BEGIN canonical W4 closure SHA256 029c06206e55abad9aa09dfcf65bb13027ec24ce6a0bfacc45a938891b27254e
+// HA Tools v3: vendored inside each consumer's own closure, never a window API.
+function createUiV3({ language = 'en' } = {}) {
+  const pl = String(language).startsWith('pl');
+  const states = {
+    success: ['Success', 'Sukces', '✓'],
+    partial: ['Partial', 'Częściowo', '½'],
+    unconfirmed: ['Unconfirmed', 'Niepotwierdzony', '?'],
+    error: ['Error', 'Błąd', '✕'],
+    not_checked: ['Not checked', 'Nie sprawdzono', '–'],
+    no_data: ['No data', 'Brak danych', '∅'],
+  };
+  const status = (value) => {
+    const code = typeof value === 'string' && Object.hasOwn(states, value) ? value : 'not_checked';
+    const row = states[code];
+    return { code, label: row[pl ? 1 : 0], icon: row[2], countsAsSuccess: code === 'success' };
+  };
+  const statusHtml = (value) => {
+    const result = status(value);
+    return `<span class="ht-result-state ht-result-state--${result.code}" data-result-state="${result.code}"><span aria-hidden="true">${result.icon}</span> ${result.label}</span>`;
+  };
+  const css = `
+.ht-result-state { display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid currentColor;border-radius:6px;font-size:12px;line-height:1.4;white-space:normal; }
+.ht-result-state--success { color:#237b3d;background:rgba(35,123,61,.10); }
+.ht-result-state--partial { color:#966400;background:rgba(150,100,0,.10); }
+.ht-result-state--unconfirmed { color:#ad5200;background:rgba(173,82,0,.10); }
+.ht-result-state--error { color:#c32b2b;background:rgba(195,43,43,.10); }
+.ht-result-state--not_checked,.ht-result-state--no_data { color:var(--secondary-text-color,#666);background:transparent; }
+.ht-result-state--no_data { border-style:dashed; }
+:host(.bento-dark) .ht-result-state--success { color:#81cf99; }
+:host(.bento-dark) .ht-result-state--partial { color:#efd080; }
+:host(.bento-dark) .ht-result-state--unconfirmed { color:#ffb97b; }
+:host(.bento-dark) .ht-result-state--error { color:#ff9999; }
+`;
+  return { status, statusHtml, css };
+}
+// END canonical W4 closure
+
+
   const sharedEsc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
   const _esc = (s) => sharedEsc(String(s == null ? '' : s));
   const haToolsPersistence = {
@@ -79,6 +118,25 @@
     .donate-buttons { display: flex; gap: 9px; } .donate-btn { display: inline-flex; align-items: center; gap: 7px; min-height: 42px; padding: 9px 12px; border: 1px solid var(--fp-border); border-radius: 11px; background: var(--fp-card); color: var(--fp-text); text-decoration: none; font-size: 13px; line-height: 1.35; font-weight: 750; } .donate-btn ha-icon { --mdc-icon-size: 18px; color: var(--fp-primary); }
     .toast { position: fixed; left: 50%; bottom: 24px; z-index: 10; max-width: min(90vw, 520px); transform: translate(-50%, 90px); opacity: 0; pointer-events: none; padding: 12px 17px; border-radius: 11px; background: #101828; color: #fff; transition: .22s; font-size: 14px; line-height: 1.45; } .toast.show { transform: translate(-50%, 0); opacity: 1; } .toast.error { background: var(--fp-danger); }
     .empty { padding: 24px; text-align: center; color: var(--fp-muted); font-size: 14px; line-height: 1.55; }
+
+    .history-panel { min-width:0; } .period-toolbar { display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:16px 0; }
+    .period-toolbar label { color:var(--fp-muted);font-size:13px; } .period-toolbar select { display:block;min-height:44px;min-width:100px;margin-top:5px; }
+    .period-timeline { list-style:none;padding:0;margin:18px 0;display:grid;gap:10px; }
+    .period-timeline li { display:grid;grid-template-columns:minmax(90px,.6fr) minmax(0,1.6fr) auto;gap:12px;align-items:start;border:1px solid var(--fp-border);border-left:3px solid var(--fp-primary);padding:14px;border-radius:12px;background:var(--fp-bg); }
+    .period-select { min-height:44px;min-width:44px;max-width:100%;padding:9px 12px;border:1px solid var(--fp-border);border-radius:10px;background:var(--fp-card);color:var(--fp-text);overflow-wrap:anywhere;text-align:start;cursor:pointer; }
+    .period-select.selected { border-color:var(--fp-primary);background:var(--fp-soft);box-shadow:inset 0 0 0 1px var(--fp-primary); }
+    .period-event { display:grid;gap:2px;font-size:14px;overflow-wrap:anywhere; } .period-event > span:nth-child(odd) { color:var(--fp-muted);font-size:12px; }
+    .period-pagination { display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin:16px 0;font-size:13px; }
+    .period-detail { padding:18px;margin-top:16px;border:1px solid var(--fp-border);border-radius:14px;overflow-wrap:anywhere; }
+    .period-detail h3 { margin-bottom:12px; } .period-detail p { margin:10px 0; }
+    .period-detail dl { display:grid;grid-template-columns:minmax(120px,.8fr) minmax(0,1.2fr);gap:6px 12px;margin:12px 0; }
+    .period-detail dt { color:var(--fp-muted);font-size:13px; } .period-detail dd { margin:0;font-size:14px; }
+    .period-evidence { margin-top:18px; } .period-evidence h4 { margin:0 0 10px; } .period-evidence > div { border-top:1px solid var(--fp-border);padding:12px 0; } .period-evidence code { display:block;font-size:12px;overflow-wrap:anywhere; }
+    .period-table-wrap { max-width:100%;overflow:auto;overscroll-behavior:contain; } .period-table { width:100%;border-collapse:collapse;font-size:13px; } .period-table caption { text-align:start;color:var(--fp-muted);padding:10px 0; }
+    .period-table th,.period-table td { text-align:start;vertical-align:top;border-bottom:1px solid var(--fp-border);padding:10px;overflow-wrap:anywhere; } .period-table th { font-weight:700;color:var(--fp-muted); }
+    .history-panel button,.history-panel select { min-height:44px; } .history-panel button:focus-visible,.history-panel select:focus-visible { outline:3px solid var(--fp-primary);outline-offset:3px; }
+    @media (max-width:620px) { .period-timeline li { grid-template-columns:1fr; } .period-detail dl { grid-template-columns:1fr;gap:3px; } .period-detail dd { margin-bottom:9px; } .period-toolbar > button { flex:1; } .period-table th,.period-table td { min-width:110px; } }
+
     @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
     @media (max-width: 620px) { .header, .body { padding-left: 16px; padding-right: 16px; } .header { align-items: flex-start; flex-wrap: wrap; } .brand { width: 100%; } .status-pill { max-width: 100%; margin-left: 57px; } .tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; } .camera-grid, .form-grid, .state-row, .schedule-item { grid-template-columns: 1fr; } .phase { justify-self: start; } .field-wide { grid-column: auto; } .days { grid-template-columns: repeat(4, minmax(0, 1fr)); } .donate-section { flex-direction: row; align-items: center; } .donate-buttons { flex-direction: column; } .duration-row { grid-template-columns: 1fr; } }
   `;
@@ -91,13 +149,26 @@
       this._requestEpoch = 0; this._connectPromise = null; this._lastStatePollAt = 0; this._connection = null; this._userId = null; this._cameras = []; this._schedules = []; this._paused = {}; this._lastOperations = {}; this._selectedCameras = new Set();
       this._customMinutes = Number(haToolsPersistence.loadSync('ha-frigate-privacy-pause-minutes')) || 30;
       const storedScope = haToolsPersistence.loadSync('ha-frigate-privacy-pause-stream-type'); this._pauseStreamType = ['all','main','sub'].includes(storedScope) ? storedScope : 'all';
+      this._periodEpoch = 0; this._periods = []; this._periodInfo = null; this._periodState = 'idle';
+      this._periodDays = 30; this._periodPage = 0; this._periodView = 'timeline'; this._periodSelected = null;
+      this._periodWire = null; this._periodDeadline = null; this._periodContextKey = null; this._periodProducerKey = null;
+      this._periodCallWS = null; this._periodContextConnection = null; this._periodBoundConnection = null;
+      this._periodConnectionOffline = false; this._historyBrowserOnline = navigator.onLine !== false;
+      this._periodDisconnected = () => { this._periodConnectionOffline = true; this._clearPrivateState(); this._invalidatePeriods('offline'); this._updateUI(); };
+      this._periodReady = () => { this._periodConnectionOffline = false; this._invalidatePeriods('discarded'); this._updateUI(); };
+      this._periodOffline = () => { this._historyBrowserOnline = false; this._clearPrivateState(); this._invalidatePeriods('offline'); this._updateUI(); };
+      this._periodOnline = () => { this._historyBrowserOnline = true; this._invalidatePeriods('discarded'); this._updateUI(); };
       this._editingScheduleIdx = null; this._scheduleForm = this._emptySchedule(); this._lastHtml = ''; this._toastTimer = null;
     }
 
     connectedCallback() {
+      this._bindPeriodConnection();
+      window.addEventListener('offline', this._periodOffline);
+      window.addEventListener('online', this._periodOnline);
+      this._invalidatePeriods('idle'); this._updateUI();
       if (this._statePollTimer) return;
       this._statePollTimer = setInterval(() => {
-        if (this.isConnected && this._hass?.user?.is_admin === true && !this._permissionDenied && !this._connectPromise && !this._busy && Date.now() - this._lastStatePollAt >= 15000) this._connectIntegration();
+        if (this.isConnected && this._hass?.user?.is_admin === true && this._hass.user.is_active !== false && this._historyBrowserOnline && !this._periodConnectionOffline && !this._permissionDenied && !this._connectPromise && !this._busy && Date.now() - this._lastStatePollAt >= 15000) this._connectIntegration();
       }, 15000);
     }
 
@@ -113,41 +184,60 @@
       }; return strings[this._lang] || strings.en;
     }
 
-    setConfig(config) { this._config = { ...config }; this._updateUI(); }
+    setConfig(config) { this._config = { ...config }; this._invalidatePeriods('discarded'); this._periodContextKey = this._periodContext(this._hass); this._updateUI(); }
     set hass(hass) {
       const identityChanged = !!this._hass && (this._connection !== (hass?.connection || null) || this._userId !== (hass?.user?.id || null) || this._declaredAdmin !== (hass?.user?.is_admin === true));
+      const context = this._periodContext(hass);
+      const changed = context !== this._periodContextKey || this._periodCallWS !== hass?.callWS || this._periodContextConnection !== hass?.connection;
+      const authorityChanged = this._hass && (this._hass.user?.is_active !== false) !== (hass?.user?.is_active !== false);
       this._hass = hass;
-      if (identityChanged || !hass) this._clearPrivateState();
+      if (changed) this._invalidatePeriods('discarded');
+      this._periodContextKey = context; this._periodCallWS = hass?.callWS; this._periodContextConnection = hass?.connection;
+      if (identityChanged || authorityChanged || !hass) this._clearPrivateState();
+      if (this._connection !== (hass?.connection || null)) this._periodConnectionOffline = hass?.connection?.connected === false;
+      this._bindPeriodConnection();
       if (!hass) { this._connection = null; this._userId = null; this._permissionDenied = true; this._updateUI(); return; }
       this._lang = String(hass.language || 'en').startsWith('pl') ? 'pl' : 'en';
       this._connection = hass.connection || null; this._userId = hass.user?.id || null;
-      this.classList.toggle('bento-dark', !!hass.themes?.darkMode); this._declaredAdmin = hass.user?.is_admin === true; if (identityChanged || !this._integrationChecked) this._permissionDenied = !this._declaredAdmin;
+      this.classList.toggle('bento-dark', !!hass.themes?.darkMode); this._declaredAdmin = hass.user?.is_admin === true; if (identityChanged || authorityChanged || !this._integrationChecked) this._permissionDenied = !this._declaredAdmin || hass.user?.is_active === false;
       if (this._permissionDenied) { this._integrationChecked = true; this._integrationAvailable = false; this._updateUI(); return; }
-      if (!this._connectPromise && !this._busy && (!this._integrationChecked || Date.now() - this._lastStatePollAt >= 15000)) this._connectIntegration();
+      if (this._historyBrowserOnline && !this._periodConnectionOffline && !this._connectPromise && !this._busy && (!this._integrationChecked || Date.now() - this._lastStatePollAt >= 15000)) this._connectIntegration();
       this._updateUI();
     }
-    disconnectedCallback() { if (this._statePollTimer) clearInterval(this._statePollTimer); this._statePollTimer = null; this._requestEpoch += 1; this._connectPromise = null; this._lastStatePollAt = 0; this._busy = false; this._integrationChecked = false; this._integrationAvailable = false; if (this._toastTimer) clearTimeout(this._toastTimer); }
+    disconnectedCallback() {
+      window.removeEventListener('offline', this._periodOffline); window.removeEventListener('online', this._periodOnline);
+      if (this._periodBoundConnection?.removeEventListener) {
+        this._periodBoundConnection.removeEventListener('disconnected', this._periodDisconnected);
+        this._periodBoundConnection.removeEventListener('ready', this._periodReady);
+      }
+      this._periodBoundConnection = null;
+      this._clearPrivateState(); this._invalidatePeriods('discarded'); this._updateUI();
+      if (this._statePollTimer) clearInterval(this._statePollTimer); this._statePollTimer = null; this._requestEpoch += 1; this._connectPromise = null; this._lastStatePollAt = 0; this._busy = false; this._integrationChecked = false; this._integrationAvailable = false; if (this._toastTimer) clearTimeout(this._toastTimer); }
     _clearPrivateState() {
+      this._invalidatePeriods('discarded');
       this.shadowRoot.activeElement?.blur(); this._busy = false; this._error = ''; this._editingScheduleIdx = null; this._scheduleForm = this._emptySchedule();
       if (this._toastTimer) clearTimeout(this._toastTimer);
       this._requestEpoch += 1; this._connectPromise = null; this._lastStatePollAt = 0; this._integrationChecked = false; this._integrationAvailable = false;
-      this._cameras = []; this._schedules = []; this._paused = {}; this._lastOperations = {}; this._selectedCameras.clear();
+      this._cameras = []; this._schedules = []; this._paused = {}; this._lastOperations = {}; this._selectedCameras.clear(); this._periodProducerKey = null;
     }
     _denyAccess() { this._clearPrivateState(); this._permissionDenied = true; this._integrationChecked = true; this._updateUI(); }
     _emptySchedule() { return { enabled:true,days:[1,2,3,4,5],startHour:18,startMin:0,endHour:20,endMin:0,repeat:true,label:'' }; }
     async _callIntegration(command, payload = {}) {
-      if (!this._hass || this._hass.user?.is_admin !== true) throw Object.assign(new Error('admin_required'), { code: 'unauthorized' });
+      if (!this._hass || (this._hass.user?.is_admin !== true || this._hass.user?.is_active === false)) throw Object.assign(new Error('admin_required'), { code: 'unauthorized' });
       return this._hass.callWS({ type: `ha_frigate_privacy/${command}`, ...payload });
     }
     async _connectIntegration() {
       const epoch = ++this._requestEpoch; const refresh = this._integrationChecked && this._integrationAvailable; this._lastStatePollAt = Date.now(); if (!refresh) this._integrationChecked = false; this._error = '';
       this._connectPromise = this._callIntegration('get_state').then((state) => { if (epoch !== this._requestEpoch) return; this._permissionDenied = false; this._integrationAvailable = true; this._integrationChecked = true; this._applyState(state); })
-        .catch((error) => { if (epoch !== this._requestEpoch) return; if (error?.code === 'unauthorized') { this._denyAccess(); return; } this._integrationAvailable = false; this._integrationChecked = true; this._error = this._safeError(error); })
+        .catch((error) => { if (epoch !== this._requestEpoch) return; if (error?.code === 'unauthorized') { this._denyAccess(); return; } this._integrationAvailable = false; this._integrationChecked = true; this._invalidatePeriods('discarded'); this._error = this._safeError(error); })
         .finally(() => { if (epoch === this._requestEpoch) { this._connectPromise = null; this._updateUI(); } });
       this._updateUI(); return this._connectPromise;
     }
     _applyState(state) {
       const safe = state && typeof state === 'object' && !Array.isArray(state) ? state : {};
+      const producerKey = JSON.stringify([safe.paused || {}, safe.last_operations || {}]);
+      if (producerKey !== this._periodProducerKey && (this._periodInfo || this._periodWire)) this._invalidatePeriods('discarded');
+      this._periodProducerKey = producerKey;
       this._recoveryReady = safe.recovery_ready !== false; this._cameras = Array.isArray(safe.cameras) ? safe.cameras : []; this._schedules = Array.isArray(safe.schedules) ? safe.schedules : []; const records = safe.paused && typeof safe.paused === 'object' && !Array.isArray(safe.paused) ? safe.paused : {}; const terminal = safe.last_operations && typeof safe.last_operations === 'object' && !Array.isArray(safe.last_operations) ? safe.last_operations : {}; this._paused = Object.fromEntries(Object.entries(records).filter(([,record]) => record && record.active !== false && record.phase !== 'active')); this._lastOperations = Object.fromEntries(Object.entries(terminal).filter(([,record]) => record && record.active === false && record.phase === 'active'));
       const valid = new Set(this._cameras.map((camera) => camera.camera_id)); this._selectedCameras = new Set([...this._selectedCameras].filter((id) => valid.has(id))); this._updateUI();
     }
@@ -193,6 +283,184 @@
       return `<div class="section"><div class="section-head"><h3>${_esc(t.schedules)}</h3><span class="helper">${this._schedules.length}</span></div><div class="schedule-list">${list||`<div class="empty">${_esc(t.noSchedules)}</div>`}</div></div><div class="section"><div class="section-head"><h3>${_esc(this._editingScheduleIdx==null?t.add:t.edit)}</h3></div><div class="form-grid"><div class="field field-wide"><label>${_esc(t.label)}</label><input class="input-label" aria-label="${_esc(t.label)}" maxlength="120" value="${_esc(form.label)}"></div><div class="field"><label>${_esc(t.start)}</label><input class="input-start" aria-label="${_esc(t.start)}" type="time" value="${_esc(`${String(form.startHour).padStart(2,'0')}:${String(form.startMin).padStart(2,'0')}`)}"></div><div class="field"><label>${_esc(t.end)}</label><input class="input-end" aria-label="${_esc(t.end)}" type="time" value="${_esc(`${String(form.endHour).padStart(2,'0')}:${String(form.endMin).padStart(2,'0')}`)}"></div><div class="field field-wide"><label>${_esc(t.schedule)}</label><div class="days">${t.days.map((label,index)=>`<button class="day-btn ${form.days.includes(index+1)?'selected':''}" data-day="${index+1}" aria-pressed="${form.days.includes(index+1)}" type="button">${_esc(label)}</button>`).join('')}</div></div></div><div class="form-actions"><button class="btn btn-primary" data-action="save-schedule" ${this._busy||!form.days.length?'disabled':''}>${_esc(t.save)}</button>${this._editingScheduleIdx==null?'':`<button class="btn btn-secondary" data-action="cancel-edit">${_esc(t.cancel)}</button>`}</div></div>`;
     }
     _buildStateTab() { const t=this._t; const render=(records,terminal=false)=>Object.entries(records||{}).map(([cameraId,state])=>{const outcomes=state.target_outcomes&&typeof state.target_outcomes==='object'?Object.entries(state.target_outcomes):[];const resumeOutcomes=state.resume_target_outcomes&&typeof state.resume_target_outcomes==='object'?Object.entries(state.resume_target_outcomes):[];const actual=state.last_verified_actual_state&&typeof state.last_verified_actual_state==='object'?Object.entries(state.last_verified_actual_state):[];const evidence=[...outcomes.map(([target,value])=>`${target}: ${value}`),...resumeOutcomes.map(([target,value])=>`${target}: ${value}`),...actual.map(([target,value])=>`${target}: actual=${value??'missing'}`)];const retry=!terminal&&(['error','partial'].includes(state.phase)||state.resume_blocked);return `<div class="state-row"><div><div class="state-name">${_esc(state.name||cameraId)}</div><div class="state-meta">${_esc(t.source)}: ${_esc(state.source||'unknown')} · ${_esc(t.deadline)}: ${_esc(state.ends_at||'—')}<br>${_esc(t.operation)}: ${_esc(state.resume_operation_id||state.operation_id||'—')}<br>${_esc(t.observed)}: ${_esc(state.observed_at||'—')} · ${_esc(t.attempts)}: ${_esc(state.resume_attempt_count||0)}${state.reason?`<br>${_esc(t.reason)}: ${_esc(state.reason)}`:''}</div></div><span class="phase ${_esc(state.phase||'paused')}">${_esc(state.phase||'paused')}</span>${evidence.length?`<details class="evidence"><summary>${_esc(t.evidence)}</summary><div class="evidence-list">${evidence.map((item)=>`<div>${_esc(item)}</div>`).join('')}</div></details>`:''}${retry?`<div class="state-actions"><button class="btn btn-secondary" data-retry-camera="${_esc(cameraId)}" ${this._busy?'disabled':''}>${_esc(t.retryResume)}</button></div>`:''}</div>`;}).join('');const activeRows=render(this._paused);const terminalRows=render(this._lastOperations,true);return `<div class="section"><div class="section-head"><h3>${_esc(t.currentState)}</h3></div><div class="state-grid">${activeRows||`<div class="empty">${_esc(t.noActive)}</div>`}</div></div><div class="section"><div class="section-head"><h3>${_esc(t.lastVerified)}</h3></div><div class="state-grid">${terminalRows||`<div class="empty">${_esc(t.noHistory)}</div>`}</div></div>`; }
+    _periodAuthority() {
+      return this.isConnected && this._hass?.user?.is_admin === true && this._hass.user.is_active !== false &&
+        !this._permissionDenied && this._historyBrowserOnline && !this._periodConnectionOffline &&
+        this._hass.connection?.connected !== false && typeof this._hass.callWS === 'function';
+    }
+    _periodContext(hass) {
+      const user = hass?.user || {};
+      const groups = Array.isArray(user.groups) ? user.groups.map(group => String(group?.id || '')).sort() : [];
+      return JSON.stringify([user.id || null, user.is_admin === true, user.is_active !== false, groups,
+        hass?.language || 'en', hass?.config?.time_zone || 'UTC', hass?.connection?.connected !== false, this._periodDays, this._config]);
+    }
+    _invalidatePeriods(state = 'discarded') {
+      this._periodEpoch += 1;
+      if (this._periodDeadline) clearTimeout(this._periodDeadline);
+      this._periodDeadline = null; this._periods = []; this._periodInfo = null;
+      this._periodSelected = null; this._periodPage = 0; this._periodState = state;
+      // Never release an occupied HA callWS wire before its actual settlement.
+      const panel = this.shadowRoot.querySelector('.history-panel');
+      if (panel) { panel.replaceChildren(); this._lastHtml = ''; }
+    }
+    _bindPeriodConnection() {
+      const next = this._hass?.connection || null;
+      if (this._periodBoundConnection === next) return;
+      if (this._periodBoundConnection?.removeEventListener) {
+        this._periodBoundConnection.removeEventListener('disconnected', this._periodDisconnected);
+        this._periodBoundConnection.removeEventListener('ready', this._periodReady);
+      }
+      this._periodBoundConnection = next;
+      if (this.isConnected && next?.addEventListener) {
+        next.addEventListener('disconnected', this._periodDisconnected);
+        next.addEventListener('ready', this._periodReady);
+      } else this._periodBoundConnection = null;
+    }
+    _periodDeadlineExpired() {
+      this._invalidatePeriods('timeout'); this._updateUI();
+    }
+    _setPeriodRange(value) {
+      const days = Number(value);
+      if (![7, 30].includes(days) || days === this._periodDays) return;
+      this._periodDays = days; this._invalidatePeriods('discarded');
+      this._periodContextKey = this._periodContext(this._hass); this._updateUI();
+    }
+    async _refreshPeriods() {
+      if (this._periodWire || !this._periodAuthority()) return false;
+      this._invalidatePeriods('loading');
+      const epoch = this._periodEpoch; const hass = this._hass;
+      const context = this._periodContext(hass); const connection = hass.connection;
+      const callWS = hass.callWS; const wire = {};
+      this._periodWire = wire;
+      this._periodDeadline = setTimeout(() => this._periodDeadlineExpired(), 15000);
+      this._updateUI();
+      const current = () => epoch === this._periodEpoch && this._periodAuthority() &&
+        this._hass?.connection === connection && this._hass?.callWS === callWS && this._periodContext(this._hass) === context;
+      try {
+        const payload = await callWS.call(hass, { type:'ha_frigate_privacy/get_periods', days:this._periodDays });
+        if (!current()) return false;
+        const projection = this._validatePeriods(payload);
+        this._periods = projection.rows; this._periodInfo = projection.info;
+        this._periodSelected = this._periods[0]?.id || null; this._periodState = 'ready';
+        return true;
+      } catch (error) {
+        if (!current()) return false;
+        if (error?.code === 'unauthorized') { this._denyAccess(); return false; }
+        this._invalidatePeriods('error'); return false;
+      } finally {
+        if (this._periodWire === wire) this._periodWire = null;
+        if (epoch === this._periodEpoch && this._periodDeadline) clearTimeout(this._periodDeadline);
+        if (epoch === this._periodEpoch) this._periodDeadline = null;
+        this._updateUI();
+      }
+    }
+    _validatePeriods(payload) {
+      const phases = ['pausing','paused','resuming','partial','error','active'];
+      const reasons = ['pause_incomplete','manual_override','admin_request','schedule_window_ended','manual_deadline_elapsed','restart_recovery','restart_during_pause','recovery_targets_missing','switch_unavailable','resume_failed','resume_cancelled','state_persistence_failed','invalid_persisted_targets','invalid_persisted_state','recovery_pending','unknown'];
+      const outcomes = ['pending','missing','unavailable','preexisting_off','paused','active','service_failed','readback_failed','failed','repaused','re_pause_readback_failed','re_pause_cancelled','re_pause_service_failed','unknown'];
+      const states = ['on','off','idle','streaming','recording','unavailable','unknown'];
+      const knownChannels = ['detection','recording','snapshots','sound_detection','motion','camera_control'];
+      const date = value => value === null || (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0,19) === value.slice(0,19));
+      const fail = () => { throw new Error('invalid_history'); };
+      if (!payload || payload.schema !== 1 || !['ready','legacy_latest','corrupt','unsupported','unavailable'].includes(payload.status) || !Array.isArray(payload.periods) || payload.periods.length > 200) fail();
+      const ids = new Set();
+      const rows = payload.periods.map(row => {
+        if (!row || typeof row.id !== 'string' || !/^[a-f0-9]{64}$/.test(row.id) || ids.has(row.id) || typeof row.camera_id !== 'string' || !/^[a-z0-9_]{1,255}$/.test(row.camera_id)) fail();
+        ids.add(row.id);
+        if (row.generation !== null && (!Number.isSafeInteger(row.generation) || row.generation < 0)) fail();
+        for (const field of ['started_at','ended_at','planned_ends_at','observed_at']) if (!date(row[field])) fail();
+        if (!phases.includes(row.phase) || !['manual','schedule','unknown'].includes(row.source) || typeof row.verified_restore !== 'boolean' || row.evidence_scope !== 'transition_intent') fail();
+        for (const field of ['reason','end_reason']) if (row[field] !== null && !reasons.includes(row[field])) fail();
+        const elapsed = row.started_at && row.ended_at ? (Date.parse(row.ended_at)-Date.parse(row.started_at))/1000 : null;
+        if ((elapsed !== null && elapsed < 0) || (elapsed === null ? row.duration_seconds !== null : typeof row.duration_seconds !== 'number' || !Number.isFinite(row.duration_seconds) || Math.abs(row.duration_seconds-elapsed) > .001) || (row.verified_restore && (!row.ended_at || row.phase !== 'active' || row.end_reason === 'manual_override'))) fail();
+        const channels = field => {
+          if (!Array.isArray(row[field]) || row[field].length > 256) fail();
+          return Object.freeze(row[field].map(item => {
+            if (!item || typeof item.target !== 'string' || !/^(switch|camera)\.[a-z0-9_]{1,255}$/.test(item.target) || !(field === 'channels' ? knownChannels : ['unknown']).includes(item.channel) || !outcomes.includes(item.pause_outcome) || !outcomes.includes(item.restore_outcome) || !states.includes(item.observed_state)) fail();
+            const seen = item.outcomes_seen || [];
+            if (!Array.isArray(seen) || seen.length > outcomes.length || seen.some(value => !outcomes.includes(value))) fail();
+            return Object.freeze({ channel:item.channel, target:item.target, pause_outcome:item.pause_outcome,
+              restore_outcome:item.restore_outcome, observed_state:item.observed_state, outcomes_seen:Object.freeze([...seen]) });
+          }));
+        };
+        return Object.freeze({ id:row.id,camera_id:row.camera_id,generation:row.generation,started_at:row.started_at,
+          ended_at:row.ended_at,planned_ends_at:row.planned_ends_at,observed_at:row.observed_at,
+          duration_seconds:row.duration_seconds,phase:row.phase,source:row.source,reason:row.reason,
+          end_reason:row.end_reason,verified_restore:row.verified_restore,channels:channels('channels'),
+          unknown_channels:channels('unknown_channels'),evidence_scope:row.evidence_scope });
+      });
+      const durability = ['confirmed','loaded','not_written','not_loaded','save_failed','capture_failed'].includes(payload.durability) ? payload.durability : 'not_loaded';
+      if (['corrupt','unsupported','unavailable'].includes(payload.status) && rows.length) fail();
+      return { rows:Object.freeze(rows), info:Object.freeze({status:payload.status,durability}) };
+    }
+    _periodStrings() {
+      return this._lang === 'pl' ? {
+        title:'Historia okresów', timeline:'Oś zdarzeń', data:'Dane', refresh:'Odczytaj historię', cancel:'Odrzuć odczyt',
+        hint:'Zapisane przejścia integracji. Początek to intencja pauzy, nie dowód ciągłej ochrony fizycznej. Termin planowany nie jest końcem.',
+        limitation:'Sterowanie kamerą nie dowodzi wyłączenia obrazu na żywo. Detekcja dźwięku nie dowodzi wyłączenia mikrofonu.',
+        idle:'Historia wymaga jawnego odczytu.',loading:'Odczyt historii…',discarded:'Poprzedni wynik odrzucono. Odczytaj ponownie.',
+        timeout:'Przekroczono termin odczytu. Odpowiedź będzie odrzucona; nowy odczyt po zakończeniu poprzedniego.',
+        error:'Nie można potwierdzić historii. Spróbuj ponownie.',offline:'Połączenie jest niedostępne.',unknown:'Nieznany',open:'Brak zaobserwowanego końca',
+        start:'Intencja rozpoczęcia',end:'Zaobserwowany koniec',planned:'Planowany termin',duration:'Czas między zdarzeniami (s)',
+        reason:'Powód zakończenia',source:'Źródło',generation:'Generacja pauzy',restore:'Przywrócenie potwierdzone odczytem celów',
+        noRestore:'Brak dowodu przywrócenia',previous:'Poprzednie',next:'Następne',page:'Strona',rows:'okresów',empty:'Brak zapisanych okresów w zakresie.',
+        selected:'Szczegóły wybranego okresu',channels:'Wyniki kanałów',unknownChannels:'Nierozpoznane kanały',pause:'Pauza',resume:'Wznowienie',observed:'Odczyt celu',seen:'Zachowane wyniki',
+        retained:'Do 200 okresów / 30 dni / 1 MiB; odczyt filtruje retencję bez zapisu.',zone:'Strefa HA',legacy:'Dane legacy: tylko ostatni rekord każdej kamery. Daty i pełna historia mogą być nieznane.',
+        storage:'Trwałość zapisu',status:'Stan historii',ready:'Dostępna',corrupt:'Uszkodzony format — dane zachowano',unsupported:'Nieobsługiwana wersja — dane zachowano',unavailable:'Niedostępna',
+        confirmed:'Potwierdzony zapis',loaded:'Odczytano ze Store',not_written:'Brak potwierdzonego zapisu',not_loaded:'Nie załadowano',save_failed:'Zapis nie powiódł się; pokazano ostatni trwały stan',capture_failed:'Nie udało się utrwalić projekcji historii',
+        detection:'Detekcja',recording:'Nagrywanie',snapshots:'Zdjęcia',sound_detection:'Detekcja dźwięku',motion:'Ruch',camera_control:'Sterowanie kamerą',
+      } : {
+        title:'Period history',timeline:'Event timeline',data:'Data',refresh:'Read history',cancel:'Discard read',
+        hint:'Recorded integration transitions. Start is pause intent, not proof of continuous physical protection. Planned deadline is not the end.',
+        limitation:'Camera control does not prove live video is disabled. Sound detection does not prove the microphone is disabled.',
+        idle:'History requires an explicit read.',loading:'Reading history…',discarded:'Previous result discarded. Read again.',
+        timeout:'Read deadline exceeded. Its response will be discarded; a new read becomes available after settlement.',error:'History could not be confirmed. Try again.',offline:'Connection unavailable.',
+        unknown:'Unknown',open:'No observed end',start:'Pause intent',end:'Observed end',planned:'Planned deadline',duration:'Time between events (s)',
+        reason:'End reason',source:'Source',generation:'Pause generation',restore:'Restore verified by target readback',noRestore:'No verified restore',
+        previous:'Previous',next:'Next',page:'Page',rows:'periods',empty:'No recorded periods in this range.',selected:'Selected period details',
+        channels:'Channel outcomes',unknownChannels:'Unrecognized channels',pause:'Pause',resume:'Resume',observed:'Target readback',seen:'Retained outcomes',
+        retained:'Up to 200 periods / 30 days / 1 MiB; reads filter retention without writes.',zone:'HA time zone',legacy:'Legacy data: only the latest record per camera. Dates and complete history may be unknown.',
+        storage:'Storage durability',status:'History status',ready:'Available',corrupt:'Corrupt format — data preserved',unsupported:'Unsupported version — data preserved',unavailable:'Unavailable',
+        confirmed:'Write confirmed',loaded:'Loaded from Store',not_written:'No confirmed write',not_loaded:'Not loaded',save_failed:'Save failed; last durable state shown',capture_failed:'History projection could not be saved',
+        detection:'Detection',recording:'Recording',snapshots:'Snapshots',sound_detection:'Sound detection',motion:'Motion',camera_control:'Camera control',
+      };
+    }
+    _periodTime(value) {
+      const t = this._periodStrings(); if (!value) return t.unknown;
+      const zone = this._hass?.config?.time_zone || 'UTC';
+      try { return new Intl.DateTimeFormat(this._lang === 'pl' ? 'pl-PL' : 'en-GB', {timeZone:zone,dateStyle:'medium',timeStyle:'medium'}).format(new Date(value)); }
+      catch (_) { return value; }
+    }
+    _periodResult(row) {
+      return row.verified_restore ? 'success' : row.end_reason === 'manual_override' ? 'unconfirmed' :
+        row.phase === 'error' ? 'error' : row.phase === 'partial' ? 'partial' : row.ended_at ? 'unconfirmed' : 'not_checked';
+    }
+    _buildHistoryTab() {
+      const t = this._periodStrings(); const ui = createUiV3({language:this._lang});
+      const count = this._periods.length; const pages = Math.max(1,Math.ceil(count/50));
+      this._periodPage = Math.min(this._periodPage,pages-1);
+      const rows = this._periods.slice(this._periodPage*50,this._periodPage*50+50);
+      const unavailable = !this._periodAuthority();
+      const info = this._periodInfo; const zone = this._hass?.config?.time_zone || 'UTC';
+      const end = row => row.ended_at ? this._periodTime(row.ended_at) : t.open;
+      const selection = row => `<button type="button" class="period-select ${this._periodSelected===row.id?'selected':''}" data-period-select="${_esc(row.id)}" aria-pressed="${this._periodSelected===row.id}">${_esc(row.camera_id)}</button>`;
+      const timeline = `<ol class="period-timeline">${rows.map(row => `<li>${selection(row)}<div class="period-event"><span>${_esc(t.start)}</span><time datetime="${_esc(row.started_at||'')}">${_esc(this._periodTime(row.started_at))}</time><span>${_esc(t.end)}</span><span>${_esc(end(row))}</span></div>${ui.statusHtml(this._periodResult(row))}</li>`).join('')}</ol>`;
+      const data = `<div class="period-table-wrap"><table class="period-table"><caption>${_esc(t.data)} · ${_esc(zone)} · UTC</caption><thead><tr><th>${_esc(this._t.cameras)}</th><th>${_esc(t.start)}</th><th>${_esc(t.end)}</th><th>${_esc(t.duration)}</th><th>${_esc(t.reason)}</th></tr></thead><tbody>${rows.map(row => `<tr><td>${selection(row)}</td><td>${_esc(this._periodTime(row.started_at))}</td><td>${_esc(end(row))}</td><td>${_esc(row.duration_seconds ?? t.unknown)}</td><td>${_esc(row.end_reason||t.unknown)} ${ui.statusHtml(this._periodResult(row))}</td></tr>`).join('')}</tbody></table></div>`;
+      const selected = this._periods.find(row => row.id === this._periodSelected);
+      const evidence = (items,heading) => items.length ? `<div class="period-evidence"><h4>${_esc(heading)}</h4>${items.map(item => `<div><strong>${_esc(t[item.channel]||t.unknown)}</strong><code>${_esc(item.target)}</code><dl><dt>${_esc(t.pause)}</dt><dd>${_esc(item.pause_outcome)}</dd><dt>${_esc(t.resume)}</dt><dd>${_esc(item.restore_outcome)}</dd><dt>${_esc(t.observed)}</dt><dd>${_esc(item.observed_state)}</dd><dt>${_esc(t.seen)}</dt><dd>${_esc(item.outcomes_seen.join(', ')||t.unknown)}</dd></dl></div>`).join('')}</div>` : '';
+      const detail = selected ? `<section class="period-detail" aria-label="${_esc(t.selected)}"><h3>${_esc(t.selected)} · ${_esc(selected.camera_id)}</h3>${ui.statusHtml(this._periodResult(selected))}<p>${_esc(selected.verified_restore?t.restore:t.noRestore)}</p><dl>${[[t.start,this._periodTime(selected.started_at)],[t.end,end(selected)],[t.planned,this._periodTime(selected.planned_ends_at)],[t.duration,selected.duration_seconds??t.unknown],[t.reason,selected.end_reason||t.unknown],[this._t.reason,selected.reason||t.unknown],[t.source,selected.source],[t.generation,selected.generation??t.unknown]].map(([key,value])=>`<dt>${_esc(key)}</dt><dd>${_esc(value)}</dd>`).join('')}</dl><p class="helper">UTC: ${_esc(selected.started_at||t.unknown)} → ${_esc(selected.ended_at||t.unknown)}</p>${evidence(selected.channels,t.channels)}${evidence(selected.unknown_channels,t.unknownChannels)}</section>` : '';
+      return `<section class="history-panel section"><style>${ui.css}</style><div class="section-head"><h3>${_esc(t.title)}</h3></div><p class="helper">${_esc(t.hint)}</p><div class="period-toolbar"><label>${_esc(this._lang==='pl'?'Zakres czasu':'Time range')}<select data-period-range aria-label="${_esc(t.title)}"><option value="7" ${this._periodDays===7?'selected':''}>7 ${this._lang==='pl'?'dni':'days'}</option><option value="30" ${this._periodDays===30?'selected':''}>30 ${this._lang==='pl'?'dni':'days'}</option></select></label><button type="button" class="btn btn-primary" data-period-refresh ${unavailable||this._periodWire?'disabled':''}>${_esc(t.refresh)}</button>${this._periodWire?`<button type="button" class="btn btn-secondary" data-period-cancel>${_esc(t.cancel)}</button>`:''}</div><p class="helper" role="status">${_esc(unavailable?t.offline:this._periodState==='ready'?'':t[this._periodState]||t.idle)}</p>${info?`<p class="helper">${_esc(t.status)}: ${_esc(t[info.status]||info.status)} · ${_esc(t.storage)}: ${_esc(t[info.durability])}</p>${info.status==='legacy_latest'?`<p class="helper">${_esc(t.legacy)}</p>`:''}`:''}<p class="helper">${_esc(t.retained)} ${_esc(t.zone)}: ${_esc(zone)}. UTC.</p>${count?`<div class="period-toolbar" role="group" aria-label="${_esc(t.title)}">${[['timeline',t.timeline],['data',t.data]].map(([value,label])=>`<button type="button" class="btn btn-secondary" data-period-view="${value}" aria-pressed="${this._periodView===value}">${_esc(label)}</button>`).join('')}</div>${this._periodView==='data'?data:timeline}<nav class="period-pagination" aria-label="${_esc(t.page)}"><button type="button" class="btn btn-secondary" data-period-page="previous" ${this._periodPage===0?'disabled':''}>${_esc(t.previous)}</button><span>${_esc(t.page)} ${this._periodPage+1}/${pages} · ${count} ${_esc(t.rows)}</span><button type="button" class="btn btn-secondary" data-period-page="next" ${this._periodPage>=pages-1?'disabled':''}>${_esc(t.next)}</button></nav>${detail}`:info&&['ready','legacy_latest'].includes(info.status)?`<div class="empty">${_esc(t.empty)}</div>`:''}<p class="helper">${_esc(t.limitation)}</p></section>`;
+    }
+    _attachPeriodEvents() {
+      const root = this.shadowRoot;
+      root.querySelector('[data-period-refresh]')?.addEventListener('click',()=>this._refreshPeriods());
+      root.querySelector('[data-period-cancel]')?.addEventListener('click',()=>{this._invalidatePeriods('discarded');this._updateUI();});
+      root.querySelector('[data-period-range]')?.addEventListener('change',event=>this._setPeriodRange(event.target.value));
+      root.querySelectorAll('[data-period-view]').forEach(button=>button.addEventListener('click',()=>{this._periodView=button.dataset.periodView;this._updateUI();}));
+      root.querySelectorAll('[data-period-select]').forEach(button=>button.addEventListener('click',()=>{this._periodSelected=button.dataset.periodSelect;this._updateUI();}));
+      root.querySelectorAll('[data-period-page]').forEach(button=>button.addEventListener('click',()=>{this._periodPage+=button.dataset.periodPage==='next'?1:-1;this._updateUI();}));
+    }
+
     _buildInfoTab() { const t=this._t; return `<div class="section"><div class="section-head"><h3>${_esc(t.architecture)}</h3></div><p class="helper">${_esc(t.architectureText)}</p></div>`; }
     _actionExample() {
       const kind = this._actionKind || 'button_pause'; const resume = kind.includes('resume');
@@ -209,7 +477,7 @@
       const t = this._t; const kind = this._actionKind || 'button_pause';
       return `<div class="section"><div class="section-head"><h3>${_esc(t.actions)}</h3></div><p>${_esc(t.actionHint)}</p><p class="helper" style="margin-top:12px">${_esc(t.trustHint)}</p><div class="action-links"><a href="/config/integrations/integration/ha_frigate_privacy">${_esc(t.notificationSettings)}</a></div></div><div class="section"><label for="action-kind">${_esc(t.example)}</label><select id="action-kind" class="action-kind">${[['button_pause',t.buttonPause],['button_resume',t.buttonResume],['script_pause',t.scriptPause],['script_resume',t.scriptResume],['automation_pause',t.automationPause],['scene',t.sceneHelper]].map(([value,label])=>`<option value="${value}" ${kind===value?'selected':''}>${_esc(label)}</option>`).join('')}</select>${kind==='scene'?`<p class="helper">${_esc(t.sceneHint)}</p>`:''}<textarea class="action-example" aria-label="${_esc(t.example)}" readonly>${_esc(this._actionExample())}</textarea><button class="btn btn-secondary" data-action="copy-example">${_esc(t.copy)}</button><div class="action-links"><a href="/config/automation/dashboard">${_esc(t.automationPause)}</a><a href="/config/script/dashboard">${_esc(t.scriptPause)}</a><a href="/config/scene/dashboard">${_esc(t.sceneHelper)}</a></div></div>`;
     }
-    _buildHTML() { const t=this._t;const gate=this._buildGate();const summary=this._phaseSummary();const title=this._config.title||'Frigate Privacy';const main=gate||`<div class="tabs" role="tablist">${[['control',t.control],['schedule',t.schedule],['state',t.state],['actions',t.actions],['info',t.info]].map(([id,label])=>`<button class="tab-btn ${this._activeTab===id?'active':''}" data-tab="${id}" role="tab" aria-selected="${this._activeTab===id}">${_esc(label)}</button>`).join('')}</div>${this._activeTab==='control'?this._buildControlTab():this._activeTab==='schedule'?this._buildScheduleTab():this._activeTab==='state'?this._buildStateTab():this._activeTab==='actions'?this._buildActionsTab():this._buildInfoTab()}`;return `<style>${CSS}</style><div class="card"><div class="header"><div class="brand"><div class="brand-mark"><ha-icon icon="mdi:shield-lock-outline"></ha-icon></div><div><h2>${_esc(title)}</h2><p class="subtitle">${_esc(t.subtitle)}</p></div></div><div class="status-pill ${_esc(summary.phase)}"><span class="status-dot"></span>${_esc(this._integrationChecked?summary.label:t.connecting)}</div></div><div class="body">${this._buildIntroBanner()}${this._error?`<div class="notice error" style="margin-bottom:16px"><ha-icon icon="mdi:alert-circle-outline"></ha-icon><div><h3>${_esc(t.failed)}</h3><p>${_esc(this._error)}</p></div></div>`:''}${main}${this._buildDonateFooter()}</div><div class="toast"></div></div>`; }
+    _buildHTML() { const t=this._t;const gate=this._buildGate();const summary=this._phaseSummary();const title=this._config.title||'Frigate Privacy';const main=gate||`<div class="tabs" role="tablist">${[['control',t.control],['schedule',t.schedule],['state',t.state],['history',this._periodStrings().title],['actions',t.actions],['info',t.info]].map(([id,label])=>`<button class="tab-btn ${this._activeTab===id?'active':''}" data-tab="${id}" role="tab" aria-selected="${this._activeTab===id}">${_esc(label)}</button>`).join('')}</div>${this._activeTab==='control'?this._buildControlTab():this._activeTab==='schedule'?this._buildScheduleTab():this._activeTab==='state'?this._buildStateTab():this._activeTab==='history'?this._buildHistoryTab():this._activeTab==='actions'?this._buildActionsTab():this._buildInfoTab()}`;return `<style>${CSS}</style><div class="card"><div class="header"><div class="brand"><div class="brand-mark"><ha-icon icon="mdi:shield-lock-outline"></ha-icon></div><div><h2>${_esc(title)}</h2><p class="subtitle">${_esc(t.subtitle)}</p></div></div><div class="status-pill ${_esc(summary.phase)}"><span class="status-dot"></span>${_esc(this._integrationChecked?summary.label:t.connecting)}</div></div><div class="body">${this._buildIntroBanner()}${this._error?`<div class="notice error" style="margin-bottom:16px"><ha-icon icon="mdi:alert-circle-outline"></ha-icon><div><h3>${_esc(t.failed)}</h3><p>${_esc(this._error)}</p></div></div>`:''}${main}${this._buildDonateFooter()}</div><div class="toast"></div></div>`; }
     _updateUI() {
       const html = this._buildHTML(); if (html === this._lastHtml) return;
       const active = this.shadowRoot.activeElement;
@@ -224,6 +492,7 @@
       if (selection?.start != null) next.setSelectionRange(selection.start, selection.end);
     }
     _attachEvents() {
+      this._attachPeriodEvents();
       const root=this.shadowRoot;root.querySelector('[data-action="dismiss-intro"]')?.addEventListener('click',()=>this._dismissIntro());root.querySelector('[data-action="dismiss-support"]')?.addEventListener('click',()=>this._dismissSupport());root.querySelector('[data-action="retry"]')?.addEventListener('click',()=>this._connectIntegration());
       root.querySelector('.action-kind')?.addEventListener('change',(event)=>{this._actionKind=event.target.value;this._updateUI();});
       root.querySelector('[data-action="copy-example"]')?.addEventListener('click',async()=>{const field=root.querySelector('.action-example');try{await navigator.clipboard.writeText(field.value);this._showToast(this._t.copied,'success');}catch(_){field.focus();field.select();}});
@@ -239,7 +508,7 @@
       root.querySelectorAll('[data-day]').forEach((button)=>button.addEventListener('click',()=>{const day=Number(button.dataset.day);const days=this._scheduleForm.days;this._scheduleForm.days=days.includes(day)?days.filter((item)=>item!==day):[...days,day].sort();this._updateUI();}));root.querySelector('[data-action="save-schedule"]')?.addEventListener('click',()=>this._saveScheduleFromForm());root.querySelector('[data-action="cancel-edit"]')?.addEventListener('click',()=>{this._editingScheduleIdx=null;this._scheduleForm=this._emptySchedule();this._updateUI();});
     }
     _showToast(message,kind) { const toast=this.shadowRoot.querySelector('.toast');if(!toast)return;toast.textContent=String(message||'');toast.className=`toast show ${kind==='error'?'error':''}`;if(this._toastTimer)clearTimeout(this._toastTimer);this._toastTimer=setTimeout(()=>{if(toast.isConnected)toast.className='toast';},2600); }
-    setActiveTab(tabId) { if(['control','schedule','state','actions','info'].includes(tabId)){this._activeTab=tabId;this._updateUI();} }
+    setActiveTab(tabId) { if(['control','schedule','state','history','actions','info'].includes(tabId)){this._activeTab=tabId;this._updateUI();} }
   }
 
   if (!customElements.get('ha-frigate-privacy')) customElements.define('ha-frigate-privacy', HaFrigatePrivacy);

@@ -312,6 +312,45 @@ async def _ws_get_state(
     connection.send_result(msg["id"], state)
 
 
+def _period_read_authorized(connection: websocket_api.ActiveConnection) -> bool:
+    user = getattr(connection, "user", None)
+    return bool(user and user.is_admin and getattr(user, "is_active", True))
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/get_periods",
+    vol.Optional("days", default=30): vol.In([7, 30]),
+})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def _ws_get_periods(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Admin-only memory read. No retention save, discovery or control."""
+    if not _period_read_authorized(connection):
+        connection.send_error(msg["id"], "unauthorized", "Administrator required")
+        return
+    storage = hass.data.get(DOMAIN, {}).get(DATA_STORAGE)
+    if storage is None:
+        connection.send_error(msg["id"], "history_unavailable", "History unavailable")
+        return
+    user_id = getattr(connection.user, "id", None)
+    try:
+        result = await storage.async_get_periods(days=msg.get("days", 30))
+    except Exception:  # fixed safe code; never send arbitrary exception text
+        connection.send_error(msg["id"], "history_unavailable", "History unavailable")
+        return
+    if not _period_read_authorized(connection) or getattr(connection.user, "id", None) != user_id:
+        connection.send_error(msg["id"], "unauthorized", "Administrator required")
+        return
+    if hass.data.get(DOMAIN, {}).get(DATA_STORAGE) is not storage:
+        connection.send_error(msg["id"], "history_unavailable", "History unavailable")
+        return
+    connection.send_result(msg["id"], result)
+
+
 def async_register_commands(hass: HomeAssistant) -> None:
     """Register all websocket commands."""
     for handler in (
@@ -321,6 +360,7 @@ def async_register_commands(hass: HomeAssistant) -> None:
         _ws_pause_camera,
         _ws_resume_camera,
         _ws_get_state,
+        _ws_get_periods,
     ):
         websocket_api.async_register_command(hass, handler)
 

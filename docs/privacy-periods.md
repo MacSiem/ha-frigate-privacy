@@ -1,0 +1,19 @@
+# Privacy period history
+
+Administrators can explicitly read retained privacy-transition periods in the History tab. Opening the tab does not read history automatically. Timeline and Data use the same validated rows, up to 50 per page, with selectable per-channel detail. Current state, last operation, controls, schedules, action examples and information remain available.
+
+Stored UTC start means the integration persisted its pause intent before control. It does not establish a continuously protected physical interval. A planned deadline remains separate from an observed terminal end. Open/unavailable/undated legacy records have no invented end or duration. Restore success requires existing actual per-target readback, including the preexisting-off baseline; a camera service ACK or detection status cannot prove live video or microphone privacy. Manual intervention ends the transition with an explicit reason and no verified restore claim.
+
+The private atomic integration Store retains at most 200 periods, 30 days and 1 MiB of history. Producer writes enforce those bounds; history reads filter without cleanup writes or probes. Known and unknown channel categories remain separate. Partial/failure outcomes remain visible across retries. New camera pause generations preserve completed earlier periods. Replay and recovery use the existing state and filters.
+
+Before this version, only each camera's latest record existed. Such fallback data is labeled latest-only legacy, with unknown dates kept unknown. Unsupported or corrupt history remains persisted and is reported; the integration never silently replaces it with an empty successful history. A failed storage write rolls back both history and control state. Stopping, skipped writes and swallowed Store errors are not treated as durable saves. History projection errors do not add camera control or bypass existing fail-safe behavior.
+
+Dates display in Home Assistant's configured time zone; the selected period also shows UTC source dates. The UI clears private history on identity, authority, range/config, connection, mount or offline changes and ignores late responses. An expired/cancelled request keeps its wire occupied until real settlement; refresh is explicit and has no automatic retry.
+
+## Card maintenance
+
+`ha-frigate-privacy.js` is the maintained source; `custom_components/ha_frigate_privacy/www/ha-frigate-privacy-card.js` is its byte-identical served copy. Edit the source and copy the full file to the served path in the same change. Compare both files before review. Do not create a third runtime copy.
+
+The local W4 `createUiV3` closure between its BEGIN/END markers is the exact factory body from HA Config Auditor `shared/ha-tools-ui.js`, full source SHA256 `029c06206e55abad9aa09dfcf65bb13027ec24ce6a0bfacc45a938891b27254e`. Its documented CommonJS test export is excluded. A W4 update requires checking the canonical source, replacing that one closure in the maintained source, updating provenance and copying the resulting card. It is never installed as a window API. Success is used only for a verified terminal restore.
+
+Run the new pure/storage/WebSocket and JSDOM tests together with existing control, recovery, authorization and truthful UI regressions through the authorized host receipt queue. Run the native HA fixture with an explicit SSD `--basetemp` path; it otherwise skips. That fixture reloads a new wrapper from the actual HA Store file, but does not replace a whole-HA restart test on the candidate. Native compatibility, physical control, visual PL/EN light/dark at 320/390/500/900 and release acceptance remain owner work.

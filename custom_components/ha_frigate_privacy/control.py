@@ -730,6 +730,7 @@ async def _async_pause_camera_locked(
             "desired_state": "paused",
             "operation_id": operation_id,
             "generation": generation,
+            "period_generation": generation,
             "operation_history": operation_history,
             "request_user_id": getattr(context, "user_id", None),
             "stream_type": stream_type,
@@ -746,6 +747,7 @@ async def _async_pause_camera_locked(
             "camera_failed": False,
             "target_outcomes": target_outcomes,
             "started_at": now.isoformat(),
+            "period_started_at": now.isoformat(),
             "updated_at": now.isoformat(),
             "ends_at": ends_at.isoformat() if ends_at else None,
             "resume_blocked": False,
@@ -1462,6 +1464,15 @@ async def _async_resume_camera_locked(
                 resume_completed=list(resume_completed),
                 resume_target_outcomes={
                     entity_id: "active" for entity_id in targets
+                },
+                # Existing per-target readback is the sole terminal proof.
+                # Camera control evidence does not prove microphone/live feed.
+                period_camera_restore_confirmed=camera_reenabled,
+                period_restore_proof={
+                    **{target: "on" for target in expected},
+                    **{target: "off" for target in paused.get("preexisting_off") or []},
+                    **({cam_entity: actual.get(cam_entity)}
+                       if paused.get("camera_toggled") and cam_entity else {}),
                 },
                 last_verified_actual_state=actual,
                 observed_at=observed_at,
