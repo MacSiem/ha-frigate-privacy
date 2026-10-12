@@ -187,3 +187,14 @@ def test_fail_safe_repause_keeps_original_failure_evidence():
     row = periods.project_record(state,NOW)
     assert row['channels'][0]['restore_outcome'] == 'repaused'
     assert 'failed' in row['channels'][0]['outcomes_seen']
+
+
+def test_persisted_positive_flag_requires_consistent_exact_channel_evidence():
+    valid = periods.project_record(record(), NOW)
+    positive = {**valid,'phase':'active','ended_at':'2026-10-12T19:00:00Z',
+                'duration_seconds':3600,'end_reason':'admin_request','verified_restore':True}
+    for evidence in ([], positive['channels'], [{**positive['channels'][0],
+                      'restore_outcome':'active','observed_state':'off'}]):
+        forged = {**positive,'channels':evidence}
+        result = periods.read_history({'schema':1,'periods':[forged]}, {}, NOW)
+        assert result['status'] == 'corrupt' and result['periods'] == []

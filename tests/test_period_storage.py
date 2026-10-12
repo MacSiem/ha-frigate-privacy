@@ -127,3 +127,20 @@ def test_legacy_unknown_start_and_generation_remain_unknown_after_terminal_trans
         assert row['duration_seconds'] is None and row['verified_restore'] is False
         assert row['end_reason'] == 'manual_override'
     asyncio.run(scenario())
+
+
+def test_successful_capture_after_a_projection_error_recovers_durability(storage_module, monkeypatch):
+    async def scenario():
+        storage = storage_module.FrigatePrivacyStorage(types.SimpleNamespace(state='running'))
+        await storage.async_load()
+        original = storage_module.capture
+        def fail(*args):
+            raise ValueError('synthetic capture failure')
+        monkeypatch.setattr(storage_module, 'capture', fail)
+        await storage.async_set_paused('front',start())
+        assert (await storage.async_get_periods())['durability'] == 'capture_failed'
+        monkeypatch.setattr(storage_module, 'capture', original)
+        await storage.async_transition_paused('front','partial',failed=['switch.front_detect'])
+        assert (await storage.async_get_periods())['durability'] == 'confirmed'
+        assert (await storage.async_get_periods())['periods']
+    asyncio.run(scenario())

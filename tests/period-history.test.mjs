@@ -143,3 +143,22 @@ for (const change of ['role','groups','config','range','offline','connected_flag
   assert.equal(f.calls.filter(c=>c.type.endsWith('/get_periods')).length,1,'producer changes do not query history automatically');
   f.dom.window.close();
 }
+
+{
+ const f=fixture();await settle();f.card.setActiveTab('history');const job=f.card._refreshPeriods();f.resolve(response());await job;
+ f.card.hass={...f.hass,user:{...f.hass.user,group_ids:['changed-group']}};
+ assert.equal(f.card._periods.length,0,'actual group_ids revokes cached history');
+ f.dom.window.close();
+}
+{
+ const f=fixture();await settle();f.card.setActiveTab('history');const job=f.card._refreshPeriods();f.resolve(response(51));await job;
+ const next=f.card.shadowRoot.querySelector('[data-period-page="next"]');next.focus();next.click();
+ assert.ok(f.card.shadowRoot.activeElement && !f.card.shadowRoot.activeElement.disabled,'last page retains a usable keyboard focus');
+ f.dom.window.close();
+}
+{
+ const f=fixture();await settle();f.card.setActiveTab('history');const job=f.card._refreshPeriods();
+ f.resolve({...response(),periods:[{...row(),phase:'active',ended_at:'2026-10-12T19:00:00Z',duration_seconds:3600,end_reason:'admin_request',verified_restore:true,channels:[]}]});await job;
+ assert.equal(f.card._periods.length,0,'a positive flag without any target proof is invalid');
+ f.dom.window.close();
+}
