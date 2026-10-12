@@ -141,6 +141,9 @@ def project_record(record: dict[str, Any], now: datetime) -> dict[str, Any]:
             actual[target] = 'on' if target.startswith('switch.') else 'unknown'
     verified = _verified_restore(record, ended)
     proof = record.get('period_restore_proof') if verified else {}
+    managed = set(_targets(record.get('switches'))) | set(_targets(record.get('preexisting_off')))
+    if record.get('camera_toggled') and isinstance(record.get('camera_entity_id'), str):
+        managed.add(record['camera_entity_id'])
     evidence = []
     for target in sorted(pause.keys() | restore.keys() | set(_targets(record.get('overridden_switches'))) | set(proof)):
         pause_outcome = pause.get(target, 'unknown')
@@ -152,6 +155,7 @@ def project_record(record: dict[str, Any], now: datetime) -> dict[str, Any]:
         state = actual.get(target)
         evidence.append({'channel':_channel(target), 'target':target,
             'pause_outcome':pause_outcome, 'restore_outcome':restore_outcome,
+            'restore_expected':target in managed,
             'observed_state':state if isinstance(state, str) and state in STATES else 'unknown',
             'outcomes_seen':sorted(({pause_outcome, restore_outcome}
                 | ({'failed'} if target in _targets(record.get('failed')) + _targets(record.get('resume_failed')) else set())
@@ -172,12 +176,14 @@ def project_record(record: dict[str, Any], now: datetime) -> dict[str, Any]:
 
 def _restore_channels_consistent(row: dict[str, Any]) -> bool:
     items = row['channels'] + row['unknown_channels']
-    if not items or len({item['target'] for item in items}) != len(items):
+    if not items or not any(item.get('restore_expected') is True for item in items) or len({item['target'] for item in items}) != len(items):
         return False
     for item in items:
         target = item['target']
         if item['channel'] != _channel(target):
             return False
+        if item.get('restore_expected') is not True:
+            continue
         if target.startswith('switch.'):
             if not target.startswith(f"switch.{row['camera_id']}_"):
                 return False
@@ -221,6 +227,8 @@ def _valid_row(row: Any) -> bool:
             if not isinstance(item,dict) or not isinstance(item.get('target'),str) or not TARGET.fullmatch(item['target']) or not _is(item.get('channel'), (CHANNELS if field == 'channels' else {'unknown'})):
                 return False
             if not _is(item.get('pause_outcome'), OUTCOMES) or not _is(item.get('restore_outcome'), OUTCOMES) or not _is(item.get('observed_state'), STATES):
+                return False
+            if 'restore_expected' in item and type(item['restore_expected']) is not bool:
                 return False
             seen = item.get('outcomes_seen', [])
             if not isinstance(seen, list) or len(seen) > len(OUTCOMES) or any(not _is(value, OUTCOMES) for value in seen):
@@ -320,7 +328,7 @@ def read_history(payload: Any, current: dict[str, Any], now: datetime, days: int
     for row in retain(rows, now, days):
         safe = {key:deepcopy(row[key]) for key in ('id','camera_id','generation','started_at','ended_at','planned_ends_at','observed_at','phase','source','reason','end_reason','verified_restore','duration_seconds','evidence_scope')}
         for field in ('channels','unknown_channels'):
-            safe[field] = [{key:deepcopy(item.get(key, [] if key == 'outcomes_seen' else 'unknown')) for key in ('channel','target','pause_outcome','restore_outcome','observed_state','outcomes_seen')} for item in row[field]]
+            safe[field] = [{key:deepcopy(item.get(key, [] if key == 'outcomes_seen' else False if key == 'restore_expected' else 'unknown')) for key in ('channel','target','pause_outcome','restore_outcome','observed_state','outcomes_seen','restore_expected')} for item in row[field]]
         safe_rows.append(safe)
     return {'schema':SCHEMA, 'status':status, 'periods':safe_rows,
             'retention':{'max_periods':MAX_PERIODS,'max_days':MAX_DAYS,'max_bytes':MAX_BYTES,'read_filtered':True},

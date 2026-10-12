@@ -386,20 +386,22 @@ function createUiV3({ language = 'en' } = {}) {
           if (!Array.isArray(row[field]) || row[field].length > 256) fail();
           return Object.freeze(row[field].map(item => {
             if (!item || typeof item.target !== 'string' || !/^(switch|camera)\.[a-z0-9_]{1,255}$/.test(item.target) || !(field === 'channels' ? knownChannels : ['unknown']).includes(item.channel) || !outcomes.includes(item.pause_outcome) || !outcomes.includes(item.restore_outcome) || !states.includes(item.observed_state)) fail();
+            if (item.restore_expected !== undefined && typeof item.restore_expected !== 'boolean') fail();
             const seen = item.outcomes_seen || [];
             if (!Array.isArray(seen) || seen.length > outcomes.length || seen.some(value => !outcomes.includes(value))) fail();
             return Object.freeze({ channel:item.channel, target:item.target, pause_outcome:item.pause_outcome,
-              restore_outcome:item.restore_outcome, observed_state:item.observed_state, outcomes_seen:Object.freeze([...seen]) });
+              restore_outcome:item.restore_outcome, observed_state:item.observed_state, restore_expected:item.restore_expected === true, outcomes_seen:Object.freeze([...seen]) });
           }));
         };
         const projectedChannels = channels('channels'); const projectedUnknown = channels('unknown_channels');
         if (row.verified_restore) {
           const all = [...projectedChannels,...projectedUnknown];
-          if (!all.length || new Set(all.map(item => item.target)).size !== all.length) fail();
+          if (!all.length || !all.some(item=>item.restore_expected) || new Set(all.map(item => item.target)).size !== all.length) fail();
           const category = target => target.startsWith('camera.') ? 'camera_control' :
             Object.entries({'_audio_detection':'sound_detection','_audio':'sound_detection','_recordings':'recording','_snapshots':'snapshots','_detect':'detection','_motion':'motion','_enabled':'camera_control'}).find(([suffix])=>target.endsWith(suffix))?.[1] || 'unknown';
           for (const item of all) {
             if (item.channel !== category(item.target)) fail();
+            if (!item.restore_expected) continue;
             if (item.target.startsWith('switch.')) {
               if (!item.target.startsWith(`switch.${row.camera_id}_`) || !['active','preexisting_off'].includes(item.restore_outcome) || item.observed_state !== (item.restore_outcome==='preexisting_off'?'off':'on')) fail();
             } else if (item.target !== `camera.${row.camera_id}` || item.restore_outcome !== 'active' || !['on','idle','streaming','recording'].includes(item.observed_state)) fail();
@@ -417,7 +419,7 @@ function createUiV3({ language = 'en' } = {}) {
     }
     _periodStrings() {
       return this._lang === 'pl' ? {
-        title:'Historia okresów', timeline:'Oś zdarzeń', data:'Dane', refresh:'Odczytaj historię', cancel:'Odrzuć odczyt',
+        expected:'Cel przywrócenia', yes:'Tak', no:'Nie', title:'Historia okresów', timeline:'Oś zdarzeń', data:'Dane', refresh:'Odczytaj historię', cancel:'Odrzuć odczyt',
         hint:'Zapisane przejścia integracji. Początek to intencja pauzy, nie dowód ciągłej ochrony fizycznej. Termin planowany nie jest końcem.',
         limitation:'Sterowanie kamerą nie dowodzi wyłączenia obrazu na żywo. Detekcja dźwięku nie dowodzi wyłączenia mikrofonu.',
         idle:'Historia wymaga jawnego odczytu.',loading:'Odczyt historii…',discarded:'Poprzedni wynik odrzucono. Odczytaj ponownie.',
@@ -432,7 +434,7 @@ function createUiV3({ language = 'en' } = {}) {
         confirmed:'Potwierdzony zapis',loaded:'Odczytano ze Store',not_written:'Brak potwierdzonego zapisu',not_loaded:'Nie załadowano',save_failed:'Zapis nie powiódł się; pokazano ostatni trwały stan',capture_failed:'Nie udało się utrwalić projekcji historii',
         detection:'Detekcja',recording:'Nagrywanie',snapshots:'Zdjęcia',sound_detection:'Detekcja dźwięku',motion:'Ruch',camera_control:'Sterowanie kamerą',
       } : {
-        title:'Period history',timeline:'Event timeline',data:'Data',refresh:'Read history',cancel:'Discard read',
+        expected:'Restore target', yes:'Yes', no:'No', title:'Period history',timeline:'Event timeline',data:'Data',refresh:'Read history',cancel:'Discard read',
         hint:'Recorded integration transitions. Start is pause intent, not proof of continuous physical protection. Planned deadline is not the end.',
         limitation:'Camera control does not prove live video is disabled. Sound detection does not prove the microphone is disabled.',
         idle:'History requires an explicit read.',loading:'Reading history…',discarded:'Previous result discarded. Read again.',
@@ -469,7 +471,7 @@ function createUiV3({ language = 'en' } = {}) {
       const timeline = `<ol class="period-timeline">${rows.map(row => `<li>${selection(row)}<div class="period-event"><span>${_esc(t.start)}</span><time datetime="${_esc(row.started_at||'')}">${_esc(this._periodTime(row.started_at))}</time><span>${_esc(t.end)}</span><span>${_esc(end(row))}</span></div>${ui.statusHtml(this._periodResult(row))}</li>`).join('')}</ol>`;
       const data = `<div class="period-table-wrap"><table class="period-table"><caption>${_esc(t.data)} · ${_esc(zone)} · UTC</caption><thead><tr><th>${_esc(this._t.cameras)}</th><th>${_esc(t.start)}</th><th>${_esc(t.end)}</th><th>${_esc(t.duration)}</th><th>${_esc(t.reason)}</th></tr></thead><tbody>${rows.map(row => `<tr><td data-label="${_esc(this._t.cameras)}">${selection(row)}</td><td data-label="${_esc(t.start)}">${_esc(this._periodTime(row.started_at))}</td><td data-label="${_esc(t.end)}">${_esc(end(row))}</td><td data-label="${_esc(t.duration)}">${_esc(row.duration_seconds ?? t.unknown)}</td><td data-label="${_esc(t.reason)}">${_esc(row.end_reason||t.unknown)} ${ui.statusHtml(this._periodResult(row))}</td></tr>`).join('')}</tbody></table></div>`;
       const selected = this._periods.find(row => row.id === this._periodSelected);
-      const evidence = (items,heading) => items.length ? `<div class="period-evidence"><h4>${_esc(heading)}</h4>${items.map(item => `<div><strong>${_esc(t[item.channel]||t.unknown)}</strong><code>${_esc(item.target)}</code><dl><dt>${_esc(t.pause)}</dt><dd>${_esc(item.pause_outcome)}</dd><dt>${_esc(t.resume)}</dt><dd>${_esc(item.restore_outcome)}</dd><dt>${_esc(t.observed)}</dt><dd>${_esc(item.observed_state)}</dd><dt>${_esc(t.seen)}</dt><dd>${_esc(item.outcomes_seen.join(', ')||t.unknown)}</dd></dl></div>`).join('')}</div>` : '';
+      const evidence = (items,heading) => items.length ? `<div class="period-evidence"><h4>${_esc(heading)}</h4>${items.map(item => `<div><strong>${_esc(t[item.channel]||t.unknown)}</strong><code>${_esc(item.target)}</code><dl><dt>${_esc(t.expected)}</dt><dd>${_esc(item.restore_expected?t.yes:t.no)}</dd><dt>${_esc(t.pause)}</dt><dd>${_esc(item.pause_outcome)}</dd><dt>${_esc(t.resume)}</dt><dd>${_esc(item.restore_outcome)}</dd><dt>${_esc(t.observed)}</dt><dd>${_esc(item.observed_state)}</dd><dt>${_esc(t.seen)}</dt><dd>${_esc(item.outcomes_seen.join(', ')||t.unknown)}</dd></dl></div>`).join('')}</div>` : '';
       const detail = selected ? `<section class="period-detail" aria-label="${_esc(t.selected)}"><h3>${_esc(t.selected)} · ${_esc(selected.camera_id)}</h3>${ui.statusHtml(this._periodResult(selected))}<p>${_esc(selected.verified_restore?t.restore:t.noRestore)}</p><dl>${[[t.start,this._periodTime(selected.started_at)],[t.end,end(selected)],[t.planned,this._periodTime(selected.planned_ends_at)],[t.duration,selected.duration_seconds??t.unknown],[t.reason,selected.end_reason||t.unknown],[this._t.reason,selected.reason||t.unknown],[t.source,selected.source],[t.generation,selected.generation??t.unknown]].map(([key,value])=>`<dt>${_esc(key)}</dt><dd>${_esc(value)}</dd>`).join('')}</dl><p class="helper">UTC: ${_esc(selected.started_at||t.unknown)} → ${_esc(selected.ended_at||t.unknown)}</p>${evidence(selected.channels,t.channels)}${evidence(selected.unknown_channels,t.unknownChannels)}</section>` : '';
       return `<section class="history-panel section"><style>${ui.css}</style><div class="section-head"><h3>${_esc(t.title)}</h3></div><p class="helper">${_esc(t.hint)}</p><div class="period-toolbar"><label>${_esc(this._lang==='pl'?'Zakres czasu':'Time range')}<select data-period-range aria-label="${_esc(t.title)}"><option value="7" ${this._periodDays===7?'selected':''}>7 ${this._lang==='pl'?'dni':'days'}</option><option value="30" ${this._periodDays===30?'selected':''}>30 ${this._lang==='pl'?'dni':'days'}</option></select></label><button type="button" class="btn btn-primary" data-period-refresh ${unavailable||this._periodWire?'disabled':''}>${_esc(t.refresh)}</button>${this._periodWire?`<button type="button" class="btn btn-secondary" data-period-cancel>${_esc(t.cancel)}</button>`:''}</div><p class="helper" role="status">${_esc(unavailable?t.offline:this._periodState==='ready'?'':t[this._periodState]||t.idle)}</p>${info?`<p class="helper">${_esc(t.status)}: ${_esc(t[info.status]||info.status)} · ${_esc(t.storage)}: ${_esc(t[info.durability])}</p>${info.status==='legacy_latest'?`<p class="helper">${_esc(t.legacy)}</p>`:''}`:''}<p class="helper">${_esc(t.retained)} ${_esc(t.zone)}: ${_esc(zone)}. UTC.</p>${count?`<div class="period-toolbar" role="group" aria-label="${_esc(t.title)}">${[['timeline',t.timeline],['data',t.data]].map(([value,label])=>`<button type="button" class="btn btn-secondary" data-period-view="${value}" aria-pressed="${this._periodView===value}">${_esc(label)}</button>`).join('')}</div>${this._periodView==='data'?data:timeline}<nav class="period-pagination" aria-label="${_esc(t.page)}"><button type="button" class="btn btn-secondary" data-period-page="previous" ${this._periodPage===0?'disabled':''}>${_esc(t.previous)}</button><span>${_esc(t.page)} ${this._periodPage+1}/${pages} · ${count} ${_esc(t.rows)}</span><button type="button" class="btn btn-secondary" data-period-page="next" ${this._periodPage>=pages-1?'disabled':''}>${_esc(t.next)}</button></nav>${detail}`:info&&['ready','legacy_latest'].includes(info.status)?`<div class="empty">${_esc(t.empty)}</div>`:''}<p class="helper">${_esc(t.limitation)}</p></section>`;
     }
