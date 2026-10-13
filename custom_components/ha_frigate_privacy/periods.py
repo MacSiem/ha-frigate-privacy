@@ -292,6 +292,12 @@ def capture(payload: Any, before: dict[str, Any], after: dict[str, Any], now: da
     if status in {'corrupt','unsupported'}:
         return deepcopy(payload)
     by_id = {row['id']:row for row in rows}
+    if status == 'legacy_latest':
+        # First producer write must retain every available legacy latest record,
+        # including cameras not touched by this operation. Preserve unknowns.
+        for camera,record in before.items():
+            row = project_record({**record,'camera_id':camera}, now)
+            by_id[row['id']] = row
     for camera,record in after.items():
         if record == before.get(camera):
             continue

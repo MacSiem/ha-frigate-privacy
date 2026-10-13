@@ -1,7 +1,8 @@
-"""Native HA Store fixture: owner must provide an SSD --basetemp directory."""
+"""Native HA Store fixture: macOS owner provides SSD --basetemp; Linux CI uses runner temp."""
 from datetime import datetime, timezone
 from pathlib import Path
 import json
+import sys
 import pytest
 from unittest.mock import patch
 from custom_components.ha_frigate_privacy.storage import FrigatePrivacyStorage, StorageWriteError
@@ -32,8 +33,8 @@ def hass_storage():
             yield data
 
 async def test_ssd_native_atomic_period_store_reloads_from_file(hass, tmp_path):
-    if not tmp_path.resolve().is_relative_to(Path('/Volumes/Samsung_SSD')):
-        pytest.skip('Native storage fixture requires explicit SSD --basetemp')
+    if sys.platform == 'darwin' and not tmp_path.resolve().is_relative_to(Path('/Volumes/Samsung_SSD')):
+        pytest.fail('macOS native storage fixture requires explicit SSD --basetemp')
     hass.config.config_dir = str(tmp_path)
     storage = FrigatePrivacyStorage(hass)
     await storage.async_load()
@@ -61,8 +62,8 @@ async def test_ssd_native_atomic_period_store_reloads_from_file(hass, tmp_path):
 
 
 async def test_native_failed_io_rolls_back_periods_and_control(hass, tmp_path):
-    if not tmp_path.resolve().is_relative_to(Path('/Volumes/Samsung_SSD')):
-        pytest.skip('Native storage fixture requires explicit SSD --basetemp')
+    if sys.platform == 'darwin' and not tmp_path.resolve().is_relative_to(Path('/Volumes/Samsung_SSD')):
+        pytest.fail('macOS native storage fixture requires explicit SSD --basetemp')
     from homeassistant.util.file import WriteError
     hass.config.config_dir = str(tmp_path)
     storage = FrigatePrivacyStorage(hass)
