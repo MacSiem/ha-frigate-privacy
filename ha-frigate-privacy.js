@@ -54,14 +54,17 @@ function createUiV3({ language = 'en' } = {}) {
       --fp-card: var(--card-background-color, #ffffff); --fp-bg: var(--primary-background-color, #f6f7fb);
       --fp-soft: color-mix(in srgb, var(--fp-primary) 9%, var(--fp-card));
       --fp-border: var(--divider-color, #e4e7ec); --fp-text: var(--primary-text-color, #101828);
-      --fp-muted: var(--secondary-text-color, #667085); --fp-success: #059669; --fp-warning: #d97706; --fp-danger: #dc2626;
+      --fp-muted: var(--secondary-text-color, #667085); --fp-success: #18763b; --fp-warning: #795100; --fp-danger: #b42318;
       display: block; color: var(--fp-text); font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased;
     }
     :host(.bento-dark) {
       --fp-card: var(--card-background-color, #151821); --fp-bg: var(--primary-background-color, #0e1117);
       --fp-border: var(--divider-color, #2b3140); --fp-text: var(--primary-text-color, #f4f6fb);
+      --fp-success:#81cf99; --fp-warning:#efd080; --fp-danger:#ff9999;
       --fp-muted: var(--secondary-text-color, #aab2c0); --fp-soft: color-mix(in srgb, var(--fp-primary) 15%, var(--fp-card)); color-scheme: dark;
     }
+    :host .ht-result-state { background:transparent; }
+    :host(:not(.bento-dark)) .ht-result-state--partial { color:#795100; }
     * { box-sizing: border-box; } button, input, select, textarea { font: inherit; } .channel-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border:1px solid var(--fp-border);border-radius:8px;background:var(--fp-soft)} .channel-badge ha-icon{--mdc-icon-size:17px} .channel-hint{margin-top:12px} .action-example{width:100%;min-height:240px;resize:vertical;padding:12px;background:var(--fp-bg);color:var(--fp-text);border:1px solid var(--fp-border);border-radius:12px;font:13px/1.6 ui-monospace,monospace;white-space:pre} .action-kind{max-width:100%;min-height:44px;margin-bottom:12px;background:var(--fp-card);color:var(--fp-text);border:1px solid var(--fp-border);border-radius:10px;padding:8px} .action-links{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px}
     button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, var(--fp-primary) 35%, transparent); outline-offset: 2px; }
     .card { overflow: hidden; background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: 24px; box-shadow: 0 18px 50px rgba(16, 24, 40, .10); }
