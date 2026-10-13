@@ -187,8 +187,9 @@ const initial = {
   card.shadowRoot.querySelector('[data-action="pause-custom"]')?.click();
   await new Promise((resolve) => setTimeout(resolve, 30));
 
-  assert.equal(card._error, 'partial');
-  assert.equal(toasts.at(-1)?.kind, 'error');
+  assert.match(card._error, /Only part of the operation was confirmed/);
+  assert.equal(card._mutationOutcome.code, 'partial');
+  assert.equal(toasts.at(-1)?.kind, 'partial');
   assert.equal(card._paused.front.phase, 'partial');
   assert.equal(card._cameras.length, 1, 'partial mutations must keep discovered cameras visible');
   dom.window.close();
@@ -359,7 +360,7 @@ console.log('truthful state, readable layout, and disconnect assertions passed')
 }
 
 // A permission change while a command is pending must release the old session's
-// busy state and discard its schedule draft; late results cannot restore it.
+// visible busy state and discard its schedule draft; the wire still blocks new writes; late results cannot restore it.
 {
   const { dom, card } = createCard(initial);
   await new Promise((resolve) => setTimeout(resolve, 30));
@@ -376,7 +377,8 @@ console.log('truthful state, readable layout, and disconnect assertions passed')
   card.hass = owner;
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.match(card.shadowRoot.textContent, /Integration ready/, 'regaining admin access must fetch fresh state despite the old pending mutation');
-  assert.equal(card.shadowRoot.querySelector('[data-action="pause-custom"]').disabled, false);
+  assert.equal(card.shadowRoot.querySelector('[data-action="pause-custom"]').disabled, true);
+  assert.equal(await card._pause(), false, 'a pending raw mutation must block another write');
   finishOld({ ok: true });
   assert.equal(await pending, false, 'the old session must not accept a late mutation response');
   assert.equal(card._scheduleForm.label, '');

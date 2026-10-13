@@ -21,15 +21,15 @@ for(const sourcePath of ['ha-frigate-privacy.js','custom_components/ha_frigate_p
  }finally{f.close();}});
  for(const outcome of ['success','error','partial'])test(sourcePath+': pause restores keyboard origin after '+outcome,async()=>{const f=await fixture();try{
   const b=f.r.querySelector('[data-action="pause-custom"]');b.focus();b.click();assert.equal(f.r.querySelector('[data-action="pause-custom"]').disabled,true);
-  if(outcome==='error')f.reject();else f.resolve({ok:outcome==='success',phase:outcome});await tick();assert.equal(f.r.activeElement?.dataset.action,'pause-custom');assert.equal(f.calls.filter(m=>m.type.endsWith('/pause_camera')).length,1);
+  if(outcome==='error')f.reject();else { if(outcome==='success')f.state.paused={front:{phase:'paused',active:true}}; f.resolve(outcome==='success'?{ok:true,phase:'paused',results:[{camera_id:'front',paused:true,phase:'paused'}]}:{ok:false,phase:outcome}); } await tick();assert.equal(f.r.activeElement?.dataset.action,'pause-custom');assert.equal(f.calls.filter(m=>m.type.endsWith('/pause_camera')).length,1);
  }finally{f.close();}});
  test(sourcePath+': pending action never steals outside focus or crosses identity',async()=>{const f=await fixture();try{
   let b=f.r.querySelector('[data-action="pause-custom"]');b.focus();b.click();const outside=f.w.document.createElement('input');f.w.document.body.append(outside);outside.focus();f.resolve();await tick();assert.equal(f.w.document.activeElement,outside);
   b=f.r.querySelector('[data-action="pause-custom"]');b.focus();b.click();f.c.hass={...f.hass,user:{id:'other',is_admin:false}};f.resolve();await tick();assert.equal(f.r.querySelector('[data-action="pause-custom"]'),null);assert.equal(f.r.activeElement,null);
  }finally{f.close();}});
  test(sourcePath+': schedule save restores origin; deleted schedule falls back without focusing shifted row',async()=>{const f=await fixture();try{
-  f.c.setActiveTab('schedule');let b=f.r.querySelector('[data-action="save-schedule"]');b.focus();b.click();f.resolve();await tick();assert.equal(f.r.activeElement?.dataset.action,'save-schedule');
-  b=f.r.querySelector('[data-schedule-delete="0"]');b.focus();b.click();f.state.schedules=[{...f.state.schedules[0],id:'stable-b'}];f.resolve();await tick();assert.ok(f.r.activeElement?.matches('[data-tab="schedule"],[data-tab-picker]'));assert.notEqual(f.r.activeElement?.dataset.scheduleDelete,'0');
+  f.c.setActiveTab('schedule');let b=f.r.querySelector('[data-action="save-schedule"]');b.focus();b.click();const saved={...f.c._scheduleForm,id:'new-schedule'};f.state.schedules.push(saved);f.resolve({schedule:saved});await tick();assert.equal(f.r.activeElement?.dataset.action,'save-schedule');
+  b=f.r.querySelector('[data-schedule-delete="0"]');b.focus();b.click();f.state.schedules=[{...f.state.schedules[0],id:'stable-b'}];f.resolve({deleted:true});await tick();assert.ok(f.r.activeElement?.matches('[data-tab="schedule"],[data-tab-picker]'));assert.notEqual(f.r.activeElement?.dataset.scheduleDelete,'0');
  }finally{f.close();}});
  test(sourcePath+': switching tabs while pending preserves the new focus',async()=>{const f=await fixture();try{f.r.querySelector('[data-action="pause-custom"]').focus();f.r.querySelector('[data-action="pause-custom"]').click();const tab=f.r.querySelector('[data-tab="info"]');tab.focus();tab.click();f.resolve();await tick();assert.equal(f.r.activeElement?.dataset.tab,'info');}finally{f.close();}});
  test(sourcePath+': editor echo, hass, empty title and reconnect keep node and backward selection',async()=>{const f=await fixture();try{
