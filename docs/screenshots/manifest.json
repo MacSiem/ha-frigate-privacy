@@ -1,29 +1,36 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-07",
+  "generated_at": "2026-10-13",
   "fixture": "privacy-safe-generic-home",
   "source": {
     "path": "ha-frigate-privacy.js",
-    "sha256": "20da2365c85d0dd06b7531df7d96e0e07968680431b8b44d9bad8cb98c61f1f0"
+    "sha256": "2250640b81e84646edd24beb830e9bee486ce52debc01453b00a8d4a7c184e5e"
   },
   "harness": {
     "path": "docs/screenshots/_harness.html",
-    "sha256": "a9312b37763f58aa69b7113340eae23a569f830926a087ce742dd3d4a858210f"
+    "sha256": "7a12a2e1e5c8801381451b72abfdc0bfc7d6858b2510eb36cd3202e6d04c5a32"
   },
   "images": [
     {
       "path": "docs/screenshots/card-cameras-light.png",
       "theme": "light",
-      "width": 560,
-      "height": 1632,
-      "sha256": "5d4be59e7b9e20f16df76fce9bdd4ceb4a6b73b57b5031ae0b8d535d8b100889"
+      "width": 1920,
+      "height": 961,
+      "sha256": "52d3c20210ccba53422ab2c23246ba47fadc78e2e057f2be51232f8ae0e56997"
     },
     {
       "path": "docs/screenshots/card-cameras-dark.png",
       "theme": "dark",
-      "width": 560,
-      "height": 1632,
-      "sha256": "6274f655dcb130de8337bef5e8e19d5b24a4b936cbb9498c579bac6fc4bbdd61"
+      "width": 1920,
+      "height": 961,
+      "sha256": "3d0d5f5f9b85f07345e9ab6619f002f9df3cc7eabcb9c8eea3e8bd5eab28909a"
+    },
+    {
+      "path": "docs/screenshots/card-history-light.png",
+      "theme": "light",
+      "width": 1920,
+      "height": 1825,
+      "sha256": "c836a27def3a40b21db3d52ec48176d94ffe0859ea55b0538638e2c229803f9d"
     }
   ],
   "privacy": {
@@ -32,11 +39,12 @@
     "external_requests": false
   },
   "capture": {
-    "method": "Codex in-app browser, PNG developer capture of synthetic harness",
-    "viewport_css_width": 560,
-    "viewport_css_height": 1100,
+    "method": "Chrome full-page native screenshot, JPEG decoded to PNG without resizing or content changes",
+    "viewport_css_width": 1920,
+    "viewport_css_height": 783,
     "device_pixel_ratio": 1,
-    "source_head": "05c76bcda376c3041654f354f454e31a824cc488",
-    "scope": "Synthetic documentation fixture only; native HA acceptance recorded separately"
+    "source_head": "e0e5f4e08b7ecfdde40d9683e1d6fe0d805204c1",
+    "scope": "Synthetic documentation only; actual periods.py projection and offline MDI renderer. Native HA acceptance recorded separately.",
+    "review": "Visual and local Tesseract text review: generic names only; no household data, addresses, credentials or camera images."
   }
 }
