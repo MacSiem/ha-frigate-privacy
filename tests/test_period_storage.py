@@ -144,3 +144,27 @@ def test_successful_capture_after_a_projection_error_recovers_durability(storage
         assert (await storage.async_get_periods())['durability'] == 'confirmed'
         assert (await storage.async_get_periods())['periods']
     asyncio.run(scenario())
+
+
+def test_first_capture_keeps_unchanged_legacy_camera_and_unknowns(storage_module):
+    async def scenario():
+        storage = storage_module.FrigatePrivacyStorage(types.SimpleNamespace(state='running'))
+        storage._store.saved = {'paused':{
+            'front':{'phase':'paused','generation':7},
+            'garden':{'phase':'paused','generation':3},
+        }}
+        await storage.async_load()
+        before = (await storage.async_get_periods())['periods']
+        garden_before = next(row for row in before if row['camera_id'] == 'garden')
+        await storage.async_mark_overridden('front',on_switches=['switch.front_detect'])
+        rows = (await storage.async_get_periods())['periods']
+        assert {row['camera_id'] for row in rows} == {'front','garden'}
+        garden = next(row for row in rows if row['camera_id'] == 'garden')
+        assert garden == garden_before
+        assert garden['started_at'] is None and garden['ended_at'] is None
+        assert garden['generation'] is None and not garden['verified_restore']
+        restarted = storage_module.FrigatePrivacyStorage(types.SimpleNamespace(state='running'))
+        restarted._store.saved = deepcopy(storage._store.saved)
+        await restarted.async_load()
+        assert (await restarted.async_get_periods())['periods'] == rows
+    asyncio.run(scenario())
