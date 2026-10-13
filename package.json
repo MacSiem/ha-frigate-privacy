@@ -5,7 +5,8 @@
   "scripts": {
     "test:smoke": "node .github/smoke.cjs",
     "test:security": "node tests/forbidden-legacy.test.mjs && node tests/hard-stop-streaming.test.mjs && node tests/truthful-ui.test.mjs",
-    "test:periods": "node tests/period-history.test.mjs"
+    "test:periods": "node tests/period-history.test.mjs",
+    "test:controls": "node --test tests/controls-focus.test.mjs"
   },
   "devDependencies": {
     "jsdom": "24.1.3"

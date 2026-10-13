@@ -146,6 +146,16 @@ function createUiV3({ language = 'en' } = {}) {
       .period-table td::before { content:attr(data-label);display:block;color:var(--fp-muted);font-size:12px;margin-bottom:4px; }
       .period-table-wrap { overflow:visible; }
     }
+
+    :host{container-type:inline-size}
+    button,input,select,textarea,a,[role="button"],summary{min-height:44px;min-width:44px;max-width:100%;box-sizing:border-box}
+    button,select,summary,a{white-space:normal;overflow-wrap:anywhere}
+    .icon-btn{width:44px;height:44px}.camera-tile .camera-card,.preview-btn,.seg-item,.day-btn{min-height:44px}
+    .tabs{display:flex;flex-wrap:wrap}.tab-btn{flex:1 1 auto}.seg,.schedule-actions,.form-actions,.days{display:flex;flex-wrap:wrap}.seg-item{flex:1 1 90px}.day-btn{flex:0 0 44px}
+    .tab-picker{margin-bottom:18px}.brand>div:last-child{min-width:0}.brand-mark{flex:0 0 44px}.brand h2{overflow-wrap:anywhere}
+    .action-links a,summary{display:flex;align-items:center}button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,[role="button"]:focus-visible,summary:focus-visible{outline:3px solid var(--fp-primary);outline-offset:2px}
+    [hidden]{display:none!important}
+    @container(max-width:620px){.header,.body{padding-left:16px;padding-right:16px}.header{align-items:flex-start;flex-wrap:wrap}.brand{width:100%}.status-pill{max-width:100%;margin-left:0}.camera-grid,.form-grid,.state-row,.schedule-item,.duration-row{grid-template-columns:minmax(0,1fr)}.field-wide{grid-column:auto}.section{padding:14px}.period-timeline li{grid-template-columns:minmax(0,1fr)}.period-detail dl{grid-template-columns:minmax(0,1fr)}.phase{justify-self:start}.donate-section{flex-wrap:wrap}}
     @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
     @media (max-width: 620px) { .header, .body { padding-left: 16px; padding-right: 16px; } .header { align-items: flex-start; flex-wrap: wrap; } .brand { width: 100%; } .status-pill { max-width: 100%; margin-left: 57px; } .tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; } .camera-grid, .form-grid, .state-row, .schedule-item { grid-template-columns: 1fr; } .phase { justify-self: start; } .field-wide { grid-column: auto; } .days { grid-template-columns: repeat(4, minmax(0, 1fr)); } .donate-section { flex-direction: row; align-items: center; } .donate-buttons { flex-direction: column; } .duration-row { grid-template-columns: 1fr; } }
   `;
@@ -214,6 +224,7 @@ function createUiV3({ language = 'en' } = {}) {
       this._updateUI();
     }
     disconnectedCallback() {
+      this._navigationObserver?.disconnect(); this._navigationObserver = null; this._pendingControlFocus = null;
       window.removeEventListener('offline', this._periodOffline); window.removeEventListener('online', this._periodOnline);
       if (this._periodBoundConnection?.removeEventListener) {
         this._periodBoundConnection.removeEventListener('disconnected', this._periodDisconnected);
@@ -223,6 +234,7 @@ function createUiV3({ language = 'en' } = {}) {
       this._clearPrivateState(); this._invalidatePeriods('discarded'); this._updateUI();
       if (this._statePollTimer) clearInterval(this._statePollTimer); this._statePollTimer = null; this._requestEpoch += 1; this._connectPromise = null; this._lastStatePollAt = 0; this._busy = false; this._integrationChecked = false; this._integrationAvailable = false; if (this._toastTimer) clearTimeout(this._toastTimer); }
     _clearPrivateState() {
+      this._pendingControlFocus = null;
       this._invalidatePeriods('discarded');
       this.shadowRoot.activeElement?.blur(); this._busy = false; this._error = ''; this._editingScheduleIdx = null; this._scheduleForm = this._emptySchedule();
       if (this._toastTimer) clearTimeout(this._toastTimer);
@@ -288,7 +300,7 @@ function createUiV3({ language = 'en' } = {}) {
       <div class="section"><div class="section-head"><h3>${_esc(t.scope)}</h3></div><div class="seg" role="radiogroup">${[['all',t.allScope],['main',t.main],['sub',t.sub]].map(([value,label])=>`<button class="seg-item ${this._pauseStreamType===value?'selected':''}" data-scope="${value}" role="radio" aria-checked="${this._pauseStreamType===value}">${_esc(label)}</button>`).join('')}</div><div class="duration-row"><input class="input-minutes" type="number" min="1" max="1440" value="${_esc(this._customMinutes)}" aria-label="${_esc(t.duration)}"><button class="btn btn-primary" data-action="pause-custom" ${this._busy||!this._cameras.length?'disabled':''}>${_esc(t.pause)}</button></div>${phases.length?`<button class="btn btn-danger btn-full" data-action="resume" ${this._busy?'disabled':''}>${_esc(t.resume)}</button>`:''}</div>`;
     }
     _buildScheduleTab() {
-      const t=this._t; const list=this._schedules.map((schedule,index)=>{const days=[...(schedule.days||[])].sort().map((day)=>t.days[day-1]).filter(Boolean).join(', ');const time=`${String(schedule.startHour).padStart(2,'0')}:${String(schedule.startMin).padStart(2,'0')} – ${String(schedule.endHour).padStart(2,'0')}:${String(schedule.endMin).padStart(2,'0')}`;return `<div class="schedule-item"><div><div class="schedule-title">${_esc(schedule.label||t.schedule)}</div><div class="schedule-meta">${_esc(days)} · ${_esc(time)} · ${_esc(schedule.enabled?t.enabled:t.cancel)}</div></div><div class="schedule-actions"><button class="icon-btn" data-schedule-toggle="${index}" aria-label="${_esc(t.enabled)}"><ha-icon icon="mdi:${schedule.enabled?'toggle-switch':'toggle-switch-off-outline'}"></ha-icon></button><button class="icon-btn" data-schedule-edit="${index}" aria-label="${_esc(t.edit)}"><ha-icon icon="mdi:pencil-outline"></ha-icon></button><button class="icon-btn" data-schedule-delete="${index}" aria-label="${_esc(t.remove)}"><ha-icon icon="mdi:delete-outline"></ha-icon></button></div></div>`;}).join(''); const form=this._scheduleForm;
+      const t=this._t; const list=this._schedules.map((schedule,index)=>{const days=[...(schedule.days||[])].sort().map((day)=>t.days[day-1]).filter(Boolean).join(', ');const time=`${String(schedule.startHour).padStart(2,'0')}:${String(schedule.startMin).padStart(2,'0')} – ${String(schedule.endHour).padStart(2,'0')}:${String(schedule.endMin).padStart(2,'0')}`;return `<div class="schedule-item"><div><div class="schedule-title">${_esc(schedule.label||t.schedule)}</div><div class="schedule-meta">${_esc(days)} · ${_esc(time)} · ${_esc(schedule.enabled?t.enabled:t.cancel)}</div></div><div class="schedule-actions"><button class="icon-btn" data-schedule-toggle="${index}" data-schedule-id="${_esc(schedule.id)}" aria-label="${_esc(t.enabled)}"><ha-icon icon="mdi:${schedule.enabled?'toggle-switch':'toggle-switch-off-outline'}"></ha-icon></button><button class="icon-btn" data-schedule-edit="${index}" data-schedule-id="${_esc(schedule.id)}" aria-label="${_esc(t.edit)}"><ha-icon icon="mdi:pencil-outline"></ha-icon></button><button class="icon-btn" data-schedule-delete="${index}" data-schedule-id="${_esc(schedule.id)}" aria-label="${_esc(t.remove)}"><ha-icon icon="mdi:delete-outline"></ha-icon></button></div></div>`;}).join(''); const form=this._scheduleForm;
       return `<div class="section"><div class="section-head"><h3>${_esc(t.schedules)}</h3><span class="helper">${this._schedules.length}</span></div><div class="schedule-list">${list||`<div class="empty">${_esc(t.noSchedules)}</div>`}</div></div><div class="section"><div class="section-head"><h3>${_esc(this._editingScheduleIdx==null?t.add:t.edit)}</h3></div><div class="form-grid"><div class="field field-wide"><label>${_esc(t.label)}</label><input class="input-label" aria-label="${_esc(t.label)}" maxlength="120" value="${_esc(form.label)}"></div><div class="field"><label>${_esc(t.start)}</label><input class="input-start" aria-label="${_esc(t.start)}" type="time" value="${_esc(`${String(form.startHour).padStart(2,'0')}:${String(form.startMin).padStart(2,'0')}`)}"></div><div class="field"><label>${_esc(t.end)}</label><input class="input-end" aria-label="${_esc(t.end)}" type="time" value="${_esc(`${String(form.endHour).padStart(2,'0')}:${String(form.endMin).padStart(2,'0')}`)}"></div><div class="field field-wide"><label>${_esc(t.schedule)}</label><div class="days">${t.days.map((label,index)=>`<button class="day-btn ${form.days.includes(index+1)?'selected':''}" data-day="${index+1}" aria-pressed="${form.days.includes(index+1)}" type="button">${_esc(label)}</button>`).join('')}</div></div></div><div class="form-actions"><button class="btn btn-primary" data-action="save-schedule" ${this._busy||!form.days.length?'disabled':''}>${_esc(t.save)}</button>${this._editingScheduleIdx==null?'':`<button class="btn btn-secondary" data-action="cancel-edit">${_esc(t.cancel)}</button>`}</div></div>`;
     }
     _buildStateTab() { const t=this._t; const render=(records,terminal=false)=>Object.entries(records||{}).map(([cameraId,state])=>{const outcomes=state.target_outcomes&&typeof state.target_outcomes==='object'?Object.entries(state.target_outcomes):[];const resumeOutcomes=state.resume_target_outcomes&&typeof state.resume_target_outcomes==='object'?Object.entries(state.resume_target_outcomes):[];const actual=state.last_verified_actual_state&&typeof state.last_verified_actual_state==='object'?Object.entries(state.last_verified_actual_state):[];const evidence=[...outcomes.map(([target,value])=>`${target}: ${value}`),...resumeOutcomes.map(([target,value])=>`${target}: ${value}`),...actual.map(([target,value])=>`${target}: actual=${value??'missing'}`)];const retry=!terminal&&(['error','partial'].includes(state.phase)||state.resume_blocked);return `<div class="state-row"><div><div class="state-name">${_esc(state.name||cameraId)}</div><div class="state-meta">${_esc(t.source)}: ${_esc(state.source||'unknown')} · ${_esc(t.deadline)}: ${_esc(state.ends_at||'—')}<br>${_esc(t.operation)}: ${_esc(state.resume_operation_id||state.operation_id||'—')}<br>${_esc(t.observed)}: ${_esc(state.observed_at||'—')} · ${_esc(t.attempts)}: ${_esc(state.resume_attempt_count||0)}${state.reason?`<br>${_esc(t.reason)}: ${_esc(state.reason)}`:''}</div></div><span class="phase ${_esc(state.phase||'paused')}">${_esc(state.phase||'paused')}</span>${evidence.length?`<details class="evidence"><summary>${_esc(t.evidence)}</summary><div class="evidence-list">${evidence.map((item)=>`<div>${_esc(item)}</div>`).join('')}</div></details>`:''}${retry?`<div class="state-actions"><button class="btn btn-secondary" data-retry-camera="${_esc(cameraId)}" ${this._busy?'disabled':''}>${_esc(t.retryResume)}</button></div>`:''}</div>`;}).join('');const activeRows=render(this._paused);const terminalRows=render(this._lastOperations,true);return `<div class="section"><div class="section-head"><h3>${_esc(t.currentState)}</h3></div><div class="state-grid">${activeRows||`<div class="empty">${_esc(t.noActive)}</div>`}</div></div><div class="section"><div class="section-head"><h3>${_esc(t.lastVerified)}</h3></div><div class="state-grid">${terminalRows||`<div class="empty">${_esc(t.noHistory)}</div>`}</div></div>`; }
@@ -525,29 +537,64 @@ function createUiV3({ language = 'en' } = {}) {
       const t = this._t; const kind = this._actionKind || 'button_pause';
       return `<div class="section"><div class="section-head"><h3>${_esc(t.actions)}</h3></div><p>${_esc(t.actionHint)}</p><p class="helper" style="margin-top:12px">${_esc(t.trustHint)}</p><div class="action-links"><a href="/config/integrations/integration/ha_frigate_privacy">${_esc(t.notificationSettings)}</a></div></div><div class="section"><label for="action-kind">${_esc(t.example)}</label><select id="action-kind" class="action-kind">${[['button_pause',t.buttonPause],['button_resume',t.buttonResume],['script_pause',t.scriptPause],['script_resume',t.scriptResume],['automation_pause',t.automationPause],['scene',t.sceneHelper]].map(([value,label])=>`<option value="${value}" ${kind===value?'selected':''}>${_esc(label)}</option>`).join('')}</select>${kind==='scene'?`<p class="helper">${_esc(t.sceneHint)}</p>`:''}<textarea class="action-example" aria-label="${_esc(t.example)}" readonly>${_esc(this._actionExample())}</textarea><button class="btn btn-secondary" data-action="copy-example">${_esc(t.copy)}</button><div class="action-links"><a href="/config/automation/dashboard">${_esc(t.automationPause)}</a><a href="/config/script/dashboard">${_esc(t.scriptPause)}</a><a href="/config/scene/dashboard">${_esc(t.sceneHelper)}</a></div></div>`;
     }
-    _buildHTML() { const t=this._t;const gate=this._buildGate();const summary=this._phaseSummary();const title=this._config.title||'Frigate Privacy';const main=gate||`<div class="tabs" role="tablist">${[['control',t.control],['schedule',t.schedule],['state',t.state],['history',this._periodStrings().title],['actions',t.actions],['info',t.info]].map(([id,label])=>`<button class="tab-btn ${this._activeTab===id?'active':''}" data-tab="${id}" role="tab" aria-selected="${this._activeTab===id}">${_esc(label)}</button>`).join('')}</div>${this._activeTab==='control'?this._buildControlTab():this._activeTab==='schedule'?this._buildScheduleTab():this._activeTab==='state'?this._buildStateTab():this._activeTab==='history'?this._buildHistoryTab():this._activeTab==='actions'?this._buildActionsTab():this._buildInfoTab()}`;return `<style>${CSS}</style><div class="card"><div class="header"><div class="brand"><div class="brand-mark"><ha-icon icon="mdi:shield-lock-outline"></ha-icon></div><div><h2>${_esc(title)}</h2><p class="subtitle">${_esc(t.subtitle)}</p></div></div><div class="status-pill ${_esc(summary.phase)}"><span class="status-dot"></span>${_esc(this._integrationChecked?summary.label:t.connecting)}</div></div><div class="body">${this._buildIntroBanner()}${this._error?`<div class="notice error" style="margin-bottom:16px"><ha-icon icon="mdi:alert-circle-outline"></ha-icon><div><h3>${_esc(t.failed)}</h3><p>${_esc(this._error)}</p></div></div>`:''}${main}${this._buildDonateFooter()}</div><div class="toast"></div></div>`; }
+    _buildHTML() { const t=this._t;const gate=this._buildGate();const summary=this._phaseSummary();const title=this._config.title||'Frigate Privacy';const main=gate||`<select class="tab-picker" data-tab-picker aria-label="${_esc(this._lang==='pl'?'Sekcje karty':'Card sections')}" hidden>${[['control',t.control],['schedule',t.schedule],['state',t.state],['history',this._periodStrings().title],['actions',t.actions],['info',t.info]].map(([id,label])=>`<option value="${id}" ${this._activeTab===id?'selected':''}>${_esc(label)}</option>`).join('')}</select><div class="tabs" role="tablist" aria-label="${_esc(this._lang==='pl'?'Sekcje karty':'Card sections')}">${[['control',t.control],['schedule',t.schedule],['state',t.state],['history',this._periodStrings().title],['actions',t.actions],['info',t.info]].map(([id,label])=>`<button class="tab-btn ${this._activeTab===id?'active':''}" data-tab="${id}" role="tab" aria-selected="${this._activeTab===id}">${_esc(label)}</button>`).join('')}</div>${this._activeTab==='control'?this._buildControlTab():this._activeTab==='schedule'?this._buildScheduleTab():this._activeTab==='state'?this._buildStateTab():this._activeTab==='history'?this._buildHistoryTab():this._activeTab==='actions'?this._buildActionsTab():this._buildInfoTab()}`;return `<style>${CSS}</style><div class="card"><div class="header"><div class="brand"><div class="brand-mark"><ha-icon icon="mdi:shield-lock-outline"></ha-icon></div><div><h2>${_esc(title)}</h2><p class="subtitle">${_esc(t.subtitle)}</p></div></div><div class="status-pill ${_esc(summary.phase)}"><span class="status-dot"></span>${_esc(this._integrationChecked?summary.label:t.connecting)}</div></div><div class="body">${this._buildIntroBanner()}${this._error?`<div class="notice error" style="margin-bottom:16px"><ha-icon icon="mdi:alert-circle-outline"></ha-icon><div><h3>${_esc(t.failed)}</h3><p>${_esc(this._error)}</p></div></div>`:''}${main}${this._buildDonateFooter()}</div><div class="toast"></div></div>`; }
+    _syncNavigation() {
+      if (!this._navigationObserver && this.isConnected && typeof ResizeObserver === 'function') {
+        this._navigationObserver = new ResizeObserver(() => this._syncNavigation()); this._navigationObserver.observe(this);
+      }
+      const root = this.shadowRoot, group = root.querySelector('.tabs'), picker = root.querySelector('[data-tab-picker]');
+      if (!group || !picker) return;
+      const width = this.getBoundingClientRect().width, compact = width > 0 && width < 280;
+      const active = root.activeElement;
+      picker.value = this._activeTab;
+      if (compact) {
+        picker.hidden = false;
+        if (group.contains(active)) picker.focus({preventScroll:true});
+        group.hidden = true;
+      } else {
+        group.hidden = false;
+        if (active === picker) group.querySelector('[aria-selected="true"]')?.focus({preventScroll:true});
+        picker.hidden = true;
+      }
+      if (this._pendingControlFocus?.anchor === active && root.activeElement !== active) this._pendingControlFocus.anchor = root.activeElement;
+    }
+    _focusControl(element) {
+      if (element?.matches('[data-tab]') && element.closest('.tabs')?.hidden) element = this.shadowRoot.querySelector('[data-tab-picker]');
+      if (element?.matches('[data-tab-picker]') && element.hidden) element = this.shadowRoot.querySelector('[data-tab][aria-selected="true"]');
+      if (!element || element.disabled || element.closest('[hidden]')) return null;
+      element.focus({preventScroll:true}); return element;
+    }
     _updateUI() {
-      const html = this._buildHTML(); if (html === this._lastHtml) return;
+      const html = this._buildHTML();
+      if (html === this._lastHtml) { this._syncNavigation(); if (!this._busy) this._pendingControlFocus = null; return; }
       const active = this.shadowRoot.activeElement;
-      const keys = active ? [...active.attributes].filter((attr) => attr.name.startsWith('data-')) : [];
-      const selection = ['INPUT','TEXTAREA'].includes(active?.tagName) ? { value:active.tagName === 'INPUT' ? active.value : null, start:active.selectionStart, end:active.selectionEnd } : null;
-      this._lastHtml = html; this.shadowRoot.innerHTML = html; this._attachEvents();
-      if (!active) return;
-      const next = [...this.shadowRoot.querySelectorAll('button,input,select,textarea,[tabindex]')].find((element) => element.tagName === active.tagName && (active.id ? element.id === active.id : keys.length ? keys.every((attr) => element.getAttribute(attr.name) === attr.value) : element.className === active.className));
-      if (!next || next.disabled) {
-        if (active.hasAttribute('data-period-page')) this.shadowRoot.querySelector('[data-period-select]')?.focus({preventScroll:true});
+      const snapshot = this._pendingControlFocus && active === this._pendingControlFocus.anchor ? this._pendingControlFocus.snapshot : active ? {
+        tag:active.tagName, id:active.id, classes:active.className,
+        keys:[...active.attributes].filter(attr => attr.name.startsWith('data-')).map(attr => [attr.name,attr.value]),
+        selection:['INPUT','TEXTAREA'].includes(active.tagName) ? {value:active.tagName === 'INPUT' ? active.value : null,start:active.selectionStart,end:active.selectionEnd,direction:active.selectionDirection} : null,
+      } : null;
+      this._pendingControlFocus = null;
+      this._lastHtml = html; this.shadowRoot.innerHTML = html; this._attachEvents(); this._syncNavigation();
+      if (!snapshot) return;
+      const next = [...this.shadowRoot.querySelectorAll('button,input,select,textarea,[tabindex]')].find(element => element.tagName === snapshot.tag && (snapshot.id ? element.id === snapshot.id : snapshot.keys.length ? snapshot.keys.every(([name,value]) => element.getAttribute(name) === value) : element.className === snapshot.classes));
+      const restored = this._focusControl(next);
+      if (restored) {
+        if (snapshot.selection?.value != null) restored.value = snapshot.selection.value;
+        if (snapshot.selection?.start != null) restored.setSelectionRange(snapshot.selection.start,snapshot.selection.end,snapshot.selection.direction);
         return;
       }
-      if (selection?.value != null) next.value = selection.value;
-      next.focus({ preventScroll:true });
-      if (selection?.start != null) next.setSelectionRange(selection.start, selection.end);
+      const fallback = this._focusControl(this.shadowRoot.querySelector(snapshot.keys.some(([name]) => name === 'data-period-page') ? '[data-period-select]' : '[data-tab][aria-selected="true"]'));
+      // A visible anchor retains keyboard intent through disabled controls. User focus moves cancel it.
+      if (this._busy && fallback) this._pendingControlFocus = {snapshot,anchor:fallback};
     }
+
     _attachEvents() {
       this._attachPeriodEvents();
       const root=this.shadowRoot;root.querySelector('[data-action="dismiss-intro"]')?.addEventListener('click',()=>this._dismissIntro());root.querySelector('[data-action="dismiss-support"]')?.addEventListener('click',()=>this._dismissSupport());root.querySelector('[data-action="retry"]')?.addEventListener('click',()=>this._connectIntegration());
       root.querySelector('.action-kind')?.addEventListener('change',(event)=>{this._actionKind=event.target.value;this._updateUI();});
       root.querySelector('[data-action="copy-example"]')?.addEventListener('click',async()=>{const field=root.querySelector('.action-example');try{await navigator.clipboard.writeText(field.value);this._showToast(this._t.copied,'success');}catch(_){field.focus();field.select();}});
-      root.querySelectorAll('[data-tab]').forEach((button)=>button.addEventListener('click',()=>{this._activeTab=button.dataset.tab;this._updateUI();}));
+      root.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener('click',()=>this.setActiveTab(button.dataset.tab)));
+      root.querySelector('[data-tab-picker]')?.addEventListener('change',event=>{this.setActiveTab(event.target.value);this._focusControl(root.querySelector('[data-tab-picker]'));});
       root.querySelectorAll('[data-camera]').forEach((card)=>{const toggle=()=>{const id=card.dataset.camera;if(id==='__all__')this._selectedCameras.clear();else if(this._selectedCameras.has(id))this._selectedCameras.delete(id);else this._selectedCameras.add(id);this._updateUI();};card.addEventListener('click',toggle);card.addEventListener('keydown',(event)=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();toggle();}});});
       root.querySelectorAll('[data-preview-camera]').forEach((button)=>button.addEventListener('click',()=>this.dispatchEvent(new CustomEvent('hass-more-info',{detail:{entityId:button.dataset.previewCamera},bubbles:true,composed:true}))));
       root.querySelectorAll('[data-scope]').forEach((button)=>button.addEventListener('click',()=>{this._pauseStreamType=button.dataset.scope;haToolsPersistence.save('ha-frigate-privacy-pause-stream-type',this._pauseStreamType);this._updateUI();}));
@@ -564,8 +611,20 @@ function createUiV3({ language = 'en' } = {}) {
 
   if (!customElements.get('ha-frigate-privacy')) customElements.define('ha-frigate-privacy', HaFrigatePrivacy);
   class HaFrigatePrivacyEditor extends HTMLElement {
-    constructor(){super();this.attachShadow({mode:'open'});this._config={};}set hass(hass){this._hass=hass;this._render();}setConfig(config){this._config={...config};this._render();}connectedCallback(){this._render();}
-    _render(){this.shadowRoot.innerHTML=`<style>:host{display:block;padding:16px;font-size:15px;line-height:1.5}label{display:block;margin-bottom:7px;font-size:14px;color:var(--secondary-text-color)}input{width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;border:1px solid var(--divider-color);border-radius:10px;background:var(--card-background-color);color:var(--primary-text-color)}</style><label>Title</label><input maxlength="80" value="${_esc(this._config.title||'Frigate Privacy')}">`;this.shadowRoot.querySelector('input')?.addEventListener('input',(event)=>{this._config={...this._config,title:event.target.value};this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:this._config},bubbles:true,composed:true}));});}
+    constructor(){super();this.attachShadow({mode:'open'});this._config={};}
+    set hass(hass){this._hass=hass;this._render();}
+    setConfig(config){this._config={...config};this._render();}
+    connectedCallback(){this._render();}
+    _render(){
+      let input=this.shadowRoot.querySelector('#cf_title');
+      if(!input){
+        this.shadowRoot.innerHTML=`<style>:host{display:block;padding:16px;font-size:15px;line-height:1.5}label{display:block;margin-bottom:7px;font-size:14px;color:var(--secondary-text-color)}input{width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;border:1px solid var(--divider-color);border-radius:10px;background:var(--card-background-color);color:var(--primary-text-color)}input:focus-visible{outline:3px solid var(--primary-color,#3b82f6);outline-offset:2px}</style><label for="cf_title"></label><input id="cf_title" maxlength="80">`;
+        input=this.shadowRoot.querySelector('#cf_title');
+        input.addEventListener('input',event=>{this._config={...this._config,title:event.target.value};this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:this._config},bubbles:true,composed:true}));});
+      }
+      this.shadowRoot.querySelector('label').textContent=String(this._hass?.language||navigator.language||'').startsWith('pl')?'Tytuł':'Title';
+      const value=String(this._config.title??'Frigate Privacy');if(input.value!==value)input.value=value;
+    }
   }
   if (!customElements.get('ha-frigate-privacy-editor')) customElements.define('ha-frigate-privacy-editor', HaFrigatePrivacyEditor);
 })();
