@@ -76,6 +76,33 @@ separately, including unknown and unavailable states. Sound detection does not
 confirm microphone capture or listening. **Preview** opens Home Assistant's native
 camera dialog on demand; this integration never automatically fetches frames or audio.
 
+### Period history
+
+Open **Period history**, choose **7 or 30 days**, then press **Read history**.
+The timeline shows recorded start and end times in your Home Assistant time zone
+and UTC. Switch to **Data** for a table, or select a camera's period to inspect
+its channel evidence: what the pause changed, what resume restored, and the last
+observed state. Larger histories have pages of 50 periods.
+
+A successful restoration requires evidence for every managed target, including
+channels that were already off before the pause. Those channels stay off. Pending,
+partial, and unconfirmed results remain distinct. A planned deadline is not shown
+as an actual end, and a manual override does not count as a verified restoration.
+
+History contains transitions recorded by this integration, not continuous camera
+monitoring or a percentage of time protected. Storage is bounded to 200 periods,
+30 days and 1 MiB. Existing installations may initially show only the latest
+legacy record per camera, with missing dates marked unknown. New transitions
+build history automatically; reading it does not issue camera controls.
+
+### Confirmed action results
+
+Pause, resume and schedule changes keep a visible result in the card. **Success**
+requires a valid operation response and a fresh state read. A missing response or
+failed readback is **Unconfirmed**; confirmed partial work remains **Partial**.
+Changing the signed-in account or HA instance discards the previous account's
+cached state and late responses.
+
 ### Notifications, buttons, automations and scenes
 
 Open Settings → Devices & services → Frigate Privacy → Configure to select a
@@ -132,8 +159,15 @@ and opens HA editors; it does not silently create helpers or automations.
 |---|---|
 | ![Control tab, light theme](docs/screenshots/card-cameras-light.png) | ![Control tab, dark theme](docs/screenshots/card-cameras-dark.png) |
 
-*Synthetic, privacy-safe fixtures show the current Control tab: discovered cameras,
-pause scope and duration. Dark mode follows your Home Assistant theme automatically.*
+*Synthetic, privacy-safe fixtures show the current Control tab. Dark mode follows
+your Home Assistant theme automatically. These screenshots contain no camera images
+or household data.*
+
+![Recorded privacy periods and restoration status](docs/screenshots/card-history-light.png)
+
+*The history example uses synthetic transition evidence, including one verified
+restoration and one incomplete pause. Live HA installation and control tests are
+recorded separately from these documentation fixtures.*
 
 ## Installation
 

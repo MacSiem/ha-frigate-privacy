@@ -1,95 +1,129 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" data-fixture="privacy-safe-generic-home">
-<head>
-<meta charset="utf-8">
-<title>FP screenshot harness</title>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>Frigate Privacy — synthetic documentation</title>
 <style>
-  html, body { margin: 0; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  body.light { background: #f4f5f7; }
-  body.light ha-frigate-privacy { --card-background-color: #ffffff; --primary-background-color: #f4f5f7; }
-  body.dark { background: #111318; }
-  body.dark ha-frigate-privacy { --card-background-color: #1c1e26; --primary-background-color: #111318; }
-  ha-frigate-privacy { display: block; width: 480px; }
-</style>
-</head>
-<body>
-<ha-frigate-privacy id="card"></ha-frigate-privacy>
+html,body{margin:0;font:16px system-ui;background:#f4f7fb;color:#172335}
+body{padding:28px;box-sizing:border-box}main{max-width:980px;margin:auto}
+body.dark{background:#111827;color:#f0f3f9}
+ha-frigate-privacy{--primary-text-color:#172335;--secondary-text-color:#667085;--card-background-color:#fff;--primary-background-color:#f4f7fb;--divider-color:#dae1ed;--primary-color:#4f46e5}
+.dark ha-frigate-privacy{--primary-text-color:#f0f3f9;--secondary-text-color:#bcc7d7;--card-background-color:#182132;--primary-background-color:#111827;--divider-color:#3d4b60;--primary-color:#a5b4fc}
+</style></head><body><main><ha-frigate-privacy id="card"></ha-frigate-privacy></main>
 <script>
-  try { localStorage.setItem('ha-intro-dismissed-ha-frigate-privacy', '1'); } catch (e) {}
+// Offline documentation renderer for MDI 7.4.47 paths bundled by HA frontend.
+// Icons: Pictogrammers / Apache-2.0; see MDI-LICENSE.txt and Apache-2.0.txt.
+const iconPaths={"account-lock-outline": "M10 12C12.21 12 14 10.21 14 8S12.21 4 10 4 6 5.79 6 8 7.79 12 10 12M10 6C11.11 6 12 6.9 12 8S11.11 10 10 10 8 9.11 8 8 8.9 6 10 6M12 20H2V17C2 14.33 7.33 13 10 13C11 13 12.38 13.19 13.71 13.56C13.41 14.12 13.23 14.74 13.21 15.39C12.23 15.1 11.11 14.9 10 14.9C7.03 14.9 3.9 16.36 3.9 17V18.1H12C12 18.13 12 18.17 12 18.2V20M20.8 17V15.5C20.8 14.1 19.4 13 18 13C16.6 13 15.2 14.1 15.2 15.5V17C14.6 17 14 17.6 14 18.2V21.7C14 22.4 14.6 23 15.2 23H20.7C21.4 23 22 22.4 22 21.8V18.3C22 17.6 21.4 17 20.8 17M19.5 17H16.5V15.5C16.5 14.7 17.2 14.2 18 14.2C18.8 14.2 19.5 14.7 19.5 15.5V17Z", "alert-circle-outline": "M11,15H13V17H11V15M11,7H13V13H11V7M12,2C6.47,2 2,6.5 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20Z", "camera-outline": "M20,4H16.83L15,2H9L7.17,4H4A2,2 0 0,0 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6A2,2 0 0,0 20,4M20,18H4V6H8.05L9.88,4H14.12L15.95,6H20V18M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15Z", "cctv": "M6.03 12.03L8.03 15.5L5.5 18.68L2 12.62L6.03 12.03M17 18V15.29C17.88 14.9 18.5 14.03 18.5 13C18.5 12.43 18.3 11.9 17.97 11.5L19.94 10.35C20.95 9.76 21.3 8.47 20.71 7.46L19.33 5.06C18.74 4.05 17.45 3.7 16.44 4.28L8.31 9C7.36 9.53 7.03 10.75 7.58 11.71L9.08 14.31C9.63 15.26 10.86 15.59 11.81 15.04L13.69 13.96C13.94 14.55 14.41 15.03 15 15.29V18C15 19.1 15.9 20 17 20H22V18H17Z", "check-circle": "M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z", "close": "M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z", "delete-outline": "M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19M8,9H16V19H8V9M15.5,4L14.5,3H9.5L8.5,4H5V6H19V4H15.5Z", "lan-disconnect": "M4,1C2.89,1 2,1.89 2,3V7C2,8.11 2.89,9 4,9H1V11H13V9H10C11.11,9 12,8.11 12,7V3C12,1.89 11.11,1 10,1H4M4,3H10V7H4V3M14,13C12.89,13 12,13.89 12,15V19C12,20.11 12.89,21 14,21H11V23H23V21H20C21.11,21 22,20.11 22,19V15C22,13.89 21.11,13 20,13H14M3.88,13.46L2.46,14.88L4.59,17L2.46,19.12L3.88,20.54L6,18.41L8.12,20.54L9.54,19.12L7.41,17L9.54,14.88L8.12,13.46L6,15.59L3.88,13.46M14,15H20V19H14V15Z", "microphone-outline": "M17.3,11C17.3,14 14.76,16.1 12,16.1C9.24,16.1 6.7,14 6.7,11H5C5,14.41 7.72,17.23 11,17.72V21H13V17.72C16.28,17.23 19,14.41 19,11M10.8,4.9C10.8,4.24 11.34,3.7 12,3.7C12.66,3.7 13.2,4.24 13.2,4.9L13.19,11.1C13.19,11.76 12.66,12.3 12,12.3C11.34,12.3 10.8,11.76 10.8,11.1M12,14A3,3 0 0,0 15,11V5A3,3 0 0,0 12,2A3,3 0 0,0 9,5V11A3,3 0 0,0 12,14Z", "motion-sensor": "M10,0.2C9,0.2 8.2,1 8.2,2C8.2,3 9,3.8 10,3.8C11,3.8 11.8,3 11.8,2C11.8,1 11,0.2 10,0.2M15.67,1A7.33,7.33 0 0,0 23,8.33V7A6,6 0 0,1 17,1H15.67M18.33,1C18.33,3.58 20.42,5.67 23,5.67V4.33C21.16,4.33 19.67,2.84 19.67,1H18.33M21,1A2,2 0 0,0 23,3V1H21M7.92,4.03C7.75,4.03 7.58,4.06 7.42,4.11L2,5.8V11H3.8V7.33L5.91,6.67L2,22H3.8L6.67,13.89L9,17V22H10.8V15.59L8.31,11.05L9.04,8.18L10.12,10H15V8.2H11.38L9.38,4.87C9.08,4.37 8.54,4.03 7.92,4.03Z", "pencil-outline": "M14.06,9L15,9.94L5.92,19H5V18.08L14.06,9M17.66,3C17.41,3 17.15,3.1 16.96,3.29L15.13,5.12L18.88,8.87L20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18.17,3.09 17.92,3 17.66,3M14.06,6.19L3,17.25V21H6.75L17.81,9.94L14.06,6.19Z", "progress-clock": "M13,2.03V2.05L13,4.05C17.39,4.59 20.5,8.58 19.96,12.97C19.5,16.61 16.64,19.5 13,19.93V21.93C18.5,21.38 22.5,16.5 21.95,11C21.5,6.25 17.73,2.5 13,2.03M11,2.06C9.05,2.25 7.19,3 5.67,4.26L7.1,5.74C8.22,4.84 9.57,4.26 11,4.06V2.06M4.26,5.67C3,7.19 2.25,9.04 2.05,11H4.05C4.24,9.58 4.8,8.23 5.69,7.1L4.26,5.67M2.06,13C2.26,14.96 3.03,16.81 4.27,18.33L5.69,16.9C4.81,15.77 4.24,14.42 4.06,13H2.06M7.1,18.37L5.67,19.74C7.18,21 9.04,21.79 11,22V20C9.58,19.82 8.23,19.25 7.1,18.37M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z", "record-rec": "M12.5,5A7.5,7.5 0 0,0 5,12.5A7.5,7.5 0 0,0 12.5,20A7.5,7.5 0 0,0 20,12.5A7.5,7.5 0 0,0 12.5,5M7,10H9A1,1 0 0,1 10,11V12C10,12.5 9.62,12.9 9.14,12.97L10.31,15H9.15L8,13V15H7M12,10H14V11H12V12H14V13H12V14H14V15H12A1,1 0 0,1 11,14V11A1,1 0 0,1 12,10M16,10H18V11H16V14H18V15H16A1,1 0 0,1 15,14V11A1,1 0 0,1 16,10M8,11V12H9V11", "shield-lock-outline": "M21,11C21,16.55 17.16,21.74 12,23C6.84,21.74 3,16.55 3,11V5L12,1L21,5V11M12,21C15.75,20 19,15.54 19,11.22V6.3L12,3.18L5,6.3V11.22C5,15.54 8.25,20 12,21M14.8,11V9.5C14.8,8.1 13.4,7 12,7C10.6,7 9.2,8.1 9.2,9.5V11C8.6,11 8,11.6 8,12.2V15.7C8,16.4 8.6,17 9.2,17H14.7C15.4,17 16,16.4 16,15.8V12.3C16,11.6 15.4,11 14.8,11M13.5,11H10.5V9.5C10.5,8.7 11.2,8.2 12,8.2C12.8,8.2 13.5,8.7 13.5,9.5V11Z", "shield-sync-outline": "M12 21C8.25 20 5 15.54 5 11.22V6.3L12 3.18L19 6.3V12.07A6.45 6.45 0 0 1 20.91 12.67A11.63 11.63 0 0 0 21 11V5L12 1L3 5V11C3 16.55 6.84 21.74 12 23C12.35 22.91 12.7 22.8 13 22.68A6.3 6.3 0 0 1 12 21M18 14.5V13L15.75 15.25L18 17.5V16A2.5 2.5 0 0 1 20.24 19.62L21.33 20.71A4 4 0 0 0 18 14.5M18 21A2.5 2.5 0 0 1 15.76 17.38L14.67 16.29A4 4 0 0 0 18 22.5V24L20.25 21.75L18 19.5Z", "video-outline": "M15,8V16H5V8H15M16,6H4A1,1 0 0,0 3,7V17A1,1 0 0,0 4,18H16A1,1 0 0,0 17,17V13.5L21,17.5V6.5L17,10.5V7A1,1 0 0,0 16,6Z"};
+customElements.define('ha-icon',class extends HTMLElement {
+ connectedCallback(){const path=iconPaths[(this.getAttribute('icon')||'').replace('mdi:','')];
+  this.style.cssText='display:inline-flex;width:var(--mdc-icon-size,24px);height:var(--mdc-icon-size,24px);flex-shrink:0';
+  if(path)this.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true" style="width:100%;height:100%;fill:currentColor"><path d="'+path+'"></path></svg>';
+ }
+});
 </script>
-<script src="../../ha-frigate-privacy.js"></script>
+<script src="../../ha-frigate-privacy.js?sha256=2250640b81e84646edd24beb830e9bee486ce52debc01453b00a8d4a7c184e5e"></script>
 <script>
-(function () {
-  const params = new URLSearchParams(location.search);
-  const theme = params.get('theme') === 'dark' ? 'dark' : 'light';
-  document.body.className = theme;
-  const now = Date.now(); const h = 3600000;
-
-  const states = {};
-  const cam = (base, name, detect, recordings) => {
-    states['camera.' + base] = { entity_id: 'camera.' + base, state: 'recording',
-      attributes: { friendly_name: name }, last_changed: new Date(now - h).toISOString(), last_updated: new Date(now - h).toISOString() };
-    states['switch.' + base + '_detect'] = { entity_id: 'switch.' + base + '_detect', state: detect,
-      attributes: { friendly_name: name + ' Detect' }, last_changed: new Date(now - h).toISOString(), last_updated: new Date(now - h).toISOString() };
-    states['switch.' + base + '_recordings'] = { entity_id: 'switch.' + base + '_recordings', state: recordings,
-      attributes: { friendly_name: name + ' Recordings' }, last_changed: new Date(now - h).toISOString(), last_updated: new Date(now - h).toISOString() };
-  };
-  cam('front_door', 'Front Door', 'on', 'on');
-  cam('driveway', 'Driveway', 'on', 'on');
-  cam('backyard', 'Backyard', 'on', 'on');
-  cam('living_room', 'Living Room', 'off', 'off');
-
-  const cameras = ['front_door', 'driveway', 'backyard', 'living_room'].map(b => ({
-    camera_id: b,
-    entity_id: 'camera.' + b,
-    name: states['camera.' + b].attributes.friendly_name,
-    camera_state: 'idle',
-    camera_can_toggle: false,
-    switches: [
-      { entity_id: 'switch.' + b + '_detect', suffix: '_detect', state: states['switch.' + b + '_detect'].state },
-      { entity_id: 'switch.' + b + '_recordings', suffix: '_recordings', state: states['switch.' + b + '_recordings'].state },
-      { entity_id: 'switch.' + b + '_audio_detection', suffix: '_audio_detection', state: b === 'living_room' ? 'off' : 'on' },
-    ],
-    available_switches: ['switch.' + b + '_detect', 'switch.' + b + '_recordings'],
-    missing_switches: [],
-  }));
-  const serverState = {
-    cameras,
-    schedules: [
-      { id: 'fixture-evening', label: 'Weekday evening', days: [1, 2, 3, 4, 5],
-        startHour: 17, startMin: 0, endHour: 21, endMin: 0, repeat: true, enabled: true },
-    ],
-    paused: {},
-  };
-
-  const hass = {
-    language: 'en',
-    themes: { darkMode: theme === 'dark' },
-    states,
-    services: {},
-    user: { is_admin: true },
-    callWS: async (msg) => {
-      const t = String(msg && msg.type || '');
-      if (t === 'ha_frigate_privacy/get_state') return serverState;
-      if (t.startsWith('ha_frigate_privacy/')) return { state: serverState };
-      throw new Error('fixture rejected non-integration request');
+// Documentation fixture: synthetic state and actual periods.py projection only.
+// Mutations deliberately fail; integration acceptance uses a separate live HA fixture.
+const theme=new URLSearchParams(location.search).get('theme')==='dark'?'dark':'light';
+document.body.className=theme;
+const periods={
+  "schema": 1,
+  "status": "ready",
+  "durability": "confirmed",
+  "periods": [
+    {
+      "id": "5b5265fd5a83a2e41d6363e712e3f7d82da3d5cb163c7c2da2e7235279af6210",
+      "camera_id": "front_door",
+      "generation": 1,
+      "started_at": "2026-10-13T14:00:00Z",
+      "ended_at": "2026-10-13T15:00:00Z",
+      "planned_ends_at": null,
+      "observed_at": null,
+      "phase": "active",
+      "source": "manual",
+      "reason": null,
+      "end_reason": "admin_request",
+      "verified_restore": true,
+      "duration_seconds": 3600.0,
+      "channels": [
+        {
+          "channel": "detection",
+          "target": "switch.front_door_detect",
+          "pause_outcome": "paused",
+          "restore_outcome": "active",
+          "restore_expected": true,
+          "observed_state": "on",
+          "outcomes_seen": [
+            "active",
+            "paused"
+          ]
+        },
+        {
+          "channel": "recording",
+          "target": "switch.front_door_recordings",
+          "pause_outcome": "preexisting_off",
+          "restore_outcome": "preexisting_off",
+          "restore_expected": true,
+          "observed_state": "off",
+          "outcomes_seen": [
+            "preexisting_off"
+          ]
+        }
+      ],
+      "unknown_channels": [],
+      "evidence_scope": "transition_intent"
     },
-  };
-
-  const card = document.getElementById('card');
-  card.setConfig({ type: 'custom:ha-frigate-privacy' });
-  card.hass = hass;
-  setTimeout(() => { card.hass = { ...hass }; }, 400);
-  const scrub = () => { try {
-    if (!card.shadowRoot) return;
-    card.shadowRoot.querySelectorAll('.intro-banner, .donate-section').forEach(n => {
-      const p = n.parentElement && n.parentElement.children.length === 1 ? n.parentElement : n;
-      p.remove();
-    });
-  } catch (e) {} };
-  setInterval(scrub, 150);
-  setTimeout(() => { scrub(); document.title = 'FP-READY'; }, 1500);
-})();
-</script>
-</body>
-</html>
+    {
+      "id": "a0a11728d968d28e18ce7d019bd5a135b36d5eb0e9b3e81de7b49b5ba07762ad",
+      "camera_id": "garden",
+      "generation": 3,
+      "started_at": "2026-10-13T15:20:00Z",
+      "ended_at": null,
+      "planned_ends_at": null,
+      "observed_at": null,
+      "phase": "partial",
+      "source": "manual",
+      "reason": "pause_incomplete",
+      "end_reason": null,
+      "verified_restore": false,
+      "duration_seconds": null,
+      "channels": [
+        {
+          "channel": "detection",
+          "target": "switch.garden_detect",
+          "pause_outcome": "service_failed",
+          "restore_outcome": "unknown",
+          "restore_expected": true,
+          "observed_state": "unknown",
+          "outcomes_seen": [
+            "service_failed"
+          ]
+        }
+      ],
+      "unknown_channels": [],
+      "evidence_scope": "transition_intent"
+    }
+  ],
+  "retention": {
+    "max_periods": 200,
+    "max_days": 30,
+    "max_bytes": 1048576,
+    "read_filtered": true
+  },
+  "scope": "recorded_transitions",
+  "days": 30
+};
+const cameras=[['front_door','Front Door','off'],['garden','Garden','on']].map(([id,name,recording])=>({
+ camera_id:id,entity_id:'camera.'+id,name,camera_state:'idle',camera_can_toggle:false,
+ switches:[['_detect','on'],['_recordings',recording],['_snapshots','on'],['_audio','off']].map(([suffix,state])=>({entity_id:'switch.'+id+suffix,suffix,state})),
+ missing_switches:[],available_switches:['_detect','_recordings','_snapshots','_audio'].map(s=>'switch.'+id+s)
+}));
+const connection=new EventTarget();connection.connected=true;
+const hass={language:'en',themes:{darkMode:theme==='dark'},config:{time_zone:'Europe/Warsaw',instance_id:'documentation-only'},connection,states:{},user:{id:'synthetic-admin',is_admin:true,is_active:true},
+ callWS:async message=>{
+  if(message.type==='ha_frigate_privacy/get_state')return {cameras:structuredClone(cameras),schedules:[],paused:{},last_operations:{},recovery_ready:true};
+  if(message.type==='ha_frigate_privacy/get_periods')return {...structuredClone(periods),days:message.days};
+  throw new Error('Synthetic documentation does not control cameras');
+ }};
+const card=document.getElementById('card');card.setConfig({type:'custom:ha-frigate-privacy',show_support:false});card.hass=hass;
+</script></body></html>
