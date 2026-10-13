@@ -45,6 +45,6 @@ jobs:
       - name: Runtime smoke (jsdom render)
         run: npm run test:smoke
       - name: Security and integration-only contracts
-        run: npm run test:security
+        run: node --test --test-concurrency=1 tests/*.test.mjs
       - name: Root/shipped bundle parity
         run: cmp -s ha-frigate-privacy.js custom_components/ha_frigate_privacy/www/ha-frigate-privacy-card.js

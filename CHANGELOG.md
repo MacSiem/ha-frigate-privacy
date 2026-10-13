@@ -1,5 +1,14 @@
 # Changelog
 
+## 6.2.0 (2026-10-13)
+
+- Add administrator-only, server-stored privacy period history with per-channel outcomes, observed start/end times and bounded retention. Missing evidence and manual intervention remain explicit.
+- Confirm camera actions and schedule changes against both the operation response and the refreshed integration state; partial and unconfirmed outcomes remain visible.
+- Clear private state when the Home Assistant instance or account authority changes, and discard late results from previous contexts.
+- Improve narrow layouts, all six navigation tabs, 44px controls and keyboard/editor focus without removing actions.
+- Preserve the original recording and snapshot states through pause, resume and recovery; add regression coverage for every on/off combination.
+
+
 ## 6.1.0 (2026-10-07)
 
 - Add separate video, recording, snapshot, detection and sound-detection indicators, with explicit unknown/unavailable states and the limits of sound detection.
