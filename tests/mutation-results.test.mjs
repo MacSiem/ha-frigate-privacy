@@ -21,7 +21,7 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
     for(const [result,expected] of cases){f.wire(result,pausedState());assert.equal(await f.c._pause(),expected==='success');assert.equal(f.c._mutationOutcome.code,expected);assert.equal(f.c.shadowRoot.querySelector('[data-action-result] [data-result-state]')?.dataset.resultState,expected);}
     f.wire({...pauseResult(),results:[{camera_id:'front',paused:false,phase:'partial'}]},pausedState());assert.equal(await f.c._pause(),false);assert.equal(f.c._mutationOutcome.code,'partial');
     assert.match(f.c.shadowRoot.querySelector('[data-action-result]').textContent,lang==='pl'?/Częściowo/:/Partial/);
-    f.c._applyState({...pausedState(),paused:{front:{phase:'partial',active:true}}});assert.equal(f.c._phaseSummary().label,lang==='pl'?'Częściowo':'Partial');
+    f.c._applyState({...pausedState(),paused:{front:{phase:'partial',active:true}}});assert.equal(f.c._phaseSummary().label,lang==='pl'?'1 kamera: wynik częściowy':'1 camera: partial result');
     f.c._showToast('', '');f.c.setActiveTab('info');assert.equal(f.c.shadowRoot.querySelector('[data-action-result] [data-result-state]').dataset.resultState,'partial');
     f.wire(pauseResult(),new Error('RAW_PRIVATE_READ_ERROR'));assert.equal(await f.c._pause(),false);assert.equal(f.c._mutationOutcome.code,'unconfirmed');assert.doesNotMatch(f.c.shadowRoot.textContent,/RAW_PRIVATE_READ_ERROR/);
     f.wire(pauseResult(),{paused:{front:{phase:'paused'}}});await f.c._pause();assert.equal(f.c._mutationOutcome.code,'unconfirmed');

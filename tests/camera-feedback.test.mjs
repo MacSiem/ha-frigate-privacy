@@ -44,12 +44,13 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
  test(path+': independent server deadlines tick without DOM replacement or camera actions',async()=>{
   const f=await fixture();try{
    const a=f.c.shadowRoot.querySelector('[data-camera-countdown="front"]'),b=f.c.shadowRoot.querySelector('[data-camera-countdown="back"]');
-   assert.ok(a,'Front needs a visible timer');assert.match(a.textContent,/05:00/);assert.match(b.textContent,/10:00/);
+   assert.ok(a,'Front needs a visible timer');assert.match(a.textContent,/5 min/);assert.match(b.textContent,/10 min/);
    const input=f.c.shadowRoot.querySelector('.input-minutes');input.focus();input.value='73';
    const count=f.calls.length;await f.advance(1000);
-   assert.equal(f.c.shadowRoot.querySelector('[data-camera-countdown="front"]'),a);assert.match(a.textContent,/04:59/);assert.match(b.textContent,/09:59/);
+   assert.equal(f.c.shadowRoot.querySelector('[data-camera-countdown="front"]'),a);assert.match(a.textContent,/5 min/);assert.match(b.textContent,/10 min/);
    assert.equal(f.c.shadowRoot.activeElement,input);assert.equal(input.value,'73');assert.equal(f.calls.length,count);
-   await f.advance(5*60000);assert.match(a.textContent,/Awaiting.*backend/i);assert.notEqual(f.c._paused.front.phase,'active');
+   await f.advance(60000);assert.match(a.textContent,/4 min/);assert.match(b.textContent,/9 min/);
+   await f.advance(4*60000);assert.match(a.textContent,/Awaiting.*backend/i);assert.notEqual(f.c._paused.front.phase,'active');
    f.c.remove();assert.equal(f.clock.timers.size,0);f.w.document.body.append(f.c);assert.equal([...f.clock.timers].filter(t=>t.delay===1000).length,1);
   }finally{f.close();}
  });
@@ -57,7 +58,7 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
   const f=await fixture();try{
    const front=f.c.shadowRoot.querySelector('[data-camera-feedback="front"]'),back=f.c.shadowRoot.querySelector('[data-camera-feedback="back"]');
    assert.ok(front);assert.match(front.textContent,/Recording/);assert.match(front.textContent,/switch.front_recordings.*paused/);assert.match(back.textContent,/Partial/);assert.match(back.textContent,/Detection/);
-   for(const [channel,state] of [['video','on'],['recording','off'],['detection','unknown'],['snapshots','unavailable']])assert.equal(f.c.shadowRoot.querySelector(`[data-channel="${channel}"]`).dataset.channelState,state);
+   for(const [channel,state] of [['video','on'],['recording','off'],['detection','unknown'],['snapshots','unavailable']])assert.equal(f.c.shadowRoot.querySelector(`[data-camera="front"] [data-channel="${channel}"]`).dataset.channelState,state);
    f.c._applyState({...f.state,paused:{front:{active:true,phase:'pausing',stream_type:'main',ends_at:null}}});
    assert.match(f.c.shadowRoot.querySelector('[data-camera-feedback="front"]').textContent,/Pausing/);
    assert.doesNotMatch(f.c.shadowRoot.querySelector('[data-camera-countdown="front"]').textContent,/00:00|NaN/);
