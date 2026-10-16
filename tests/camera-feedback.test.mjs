@@ -58,7 +58,7 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
   const f=await fixture();try{
    const front=f.c.shadowRoot.querySelector('[data-camera-feedback="front"]'),back=f.c.shadowRoot.querySelector('[data-camera-feedback="back"]');
    assert.ok(front);assert.match(front.textContent,/Recording/);assert.match(front.textContent,/switch.front_recordings.*paused/);assert.match(back.textContent,/Partial/);assert.match(back.textContent,/Detection/);
-   for(const [channel,state] of [['video','on'],['recording','off'],['detection','unknown'],['snapshots','unavailable']])assert.equal(f.c.shadowRoot.querySelector(`[data-camera="front"] [data-channel="${channel}"]`).dataset.channelState,state);
+   for(const [channel,state] of [['video','on'],['recording','off'],['detection','unknown'],['snapshots','unavailable']])assert.equal(f.c.shadowRoot.querySelector(`[data-camera="front"] + .channel-status [data-channel="${channel}"]`).dataset.channelState,state);
    f.c._applyState({...f.state,paused:{front:{active:true,phase:'pausing',stream_type:'main',ends_at:null}}});
    assert.match(f.c.shadowRoot.querySelector('[data-camera-feedback="front"]').textContent,/Pausing/);
    assert.doesNotMatch(f.c.shadowRoot.querySelector('[data-camera-countdown="front"]').textContent,/00:00|NaN/);
