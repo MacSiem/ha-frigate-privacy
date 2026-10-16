@@ -6,7 +6,7 @@ import {JSDOM} from 'jsdom';
 const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
 // Run the real pause/extension producer with its existing HA service/storage doubles.
 // No handcrafted persisted fields: these regressions must follow backend changes.
-const schedulePauses=JSON.parse(execFileSync('python3',['-B','-c',`
+const schedulePauses=JSON.parse(execFileSync(process.env.PYTHON || 'python3',['-B','-c',`
 import asyncio, importlib.util, json
 from pathlib import Path
 spec = importlib.util.spec_from_file_location('recovery_fixture', Path('tests/test_restart_recovery.py'))
