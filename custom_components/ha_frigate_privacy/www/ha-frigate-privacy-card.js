@@ -104,6 +104,7 @@ function createUiV3({ language = 'en' } = {}) {
     .channel-status .channel-badge[data-channel-state="unknown"],.channel-status .channel-badge[data-channel-state="mixed"] { color:var(--fp-warning);border-color:currentColor; }
     .channel-status .channel-badge[data-channel-state="unavailable"] { color:var(--fp-danger);border-color:currentColor; }
     .camera-feedback { display:grid;gap:8px;padding:12px 0;margin:8px 0;border-top:1px solid var(--fp-border);overflow-wrap:anywhere; }
+    [data-video-stop-unconfirmed] { color:var(--fp-warning); }
     .camera-feedback .phase { justify-self:start; } .phase.pausing { color:var(--fp-warning); }
     .camera-countdown { font-weight:750;font-variant-numeric:tabular-nums;overflow-wrap:anywhere; }
     .camera-preview { margin-top:12px;display:grid;gap:8px;min-width:0; } [data-preview-host] { min-width:0;overflow:hidden;border-radius:12px; }
@@ -464,8 +465,12 @@ function createUiV3({ language = 'en' } = {}) {
         ...Object.entries(record.resume_target_outcomes || {}).map(([target,value])=>`${resumeLabel} · ${target}: ${String(value)}`),
         ...Object.entries(record.last_verified_actual_state || {}).map(([target,value])=>`${t.observed} · ${target}: ${String(value)}`),
       ];
-      const scopeLabel = phase==='paused' ? labels.scope : (this._lang==='pl'?'Żądany zakres':'Requested scope');
-      return `<div class="camera-feedback" data-camera-feedback="${_esc(cam.camera_id)}">${request}<span class="phase ${phase}" data-camera-phase="${phase}">${_esc(this._periodText(phase))}</span><div class="helper">${_esc(scopeLabel)}: ${_esc(scope)}${minutes !== null ? ` · ${_esc(this._lang==='pl'?'Czas timera':'Timer duration')}: ${minutes} min` : ''}</div>${activeRecord ? `<div class="camera-countdown" data-camera-countdown="${_esc(cam.camera_id)}" role="timer"></div><div class="helper">${_esc(t.deadline)}: ${_esc(Number.isFinite(end) ? this._formatCameraTime(end) : '—')}</div>` : ''}${evidence.length ? `<details class="evidence"><summary>${_esc(t.evidence)}</summary><div class="evidence-list">${evidence.map(text=>`<div>${_esc(text)}</div>`).join('')}</div></details>` : ''}</div>`;
+      const videoUnconfirmed = phase==='paused' && record.stream_type==='all' && cam.camera_can_toggle===false && cam.camera_state!=='off';
+      const scopeLabel = phase==='paused' && !videoUnconfirmed ? labels.scope : (this._lang==='pl'?'Żądany zakres':'Requested scope');
+      const videoNote = videoUnconfirmed ? `<div class="helper" data-video-stop-unconfirmed>${_esc(this._lang==='pl'
+        ? 'Brak bezpośredniego sterowania obrazem kamery. Wynik dotyczy przełączników Frigate; zatrzymanie obrazu nie jest potwierdzone.'
+        : 'No direct camera video on/off control. The result covers Frigate switches; video stop is not confirmed.')}</div>` : '';
+      return `<div class="camera-feedback" data-camera-feedback="${_esc(cam.camera_id)}">${request}<span class="phase ${phase}" data-camera-phase="${phase}">${_esc(this._periodText(phase))}</span><div class="helper">${_esc(scopeLabel)}: ${_esc(scope)}${minutes !== null ? ` · ${_esc(this._lang==='pl'?'Czas timera':'Timer duration')}: ${minutes} min` : ''}</div>${videoNote}${activeRecord ? `<div class="camera-countdown" data-camera-countdown="${_esc(cam.camera_id)}" role="timer"></div><div class="helper">${_esc(t.deadline)}: ${_esc(Number.isFinite(end) ? this._formatCameraTime(end) : '—')}</div>` : ''}${evidence.length ? `<details class="evidence"><summary>${_esc(t.evidence)}</summary><div class="evidence-list">${evidence.map(text=>`<div>${_esc(text)}</div>`).join('')}</div></details>` : ''}</div>`;
     }
     _formatCameraTime(value) {
       const zone = this._hass?.config?.time_zone || 'UTC';

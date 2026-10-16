@@ -121,4 +121,14 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
    assert.match(f.c.shadowRoot.querySelector('[data-camera-feedback="front"]').textContent,/Requested scope/);assert.doesNotMatch(f.c.shadowRoot.querySelector('[data-camera-feedback="front"]').textContent,/Applied scope/);
   }finally{f.close();}
  });
+ test(path+': Everything does not imply confirmed video stop on a camera without direct video control',async()=>{
+  const f=await fixture();try{
+   const state={...f.state,cameras:[{...f.state.cameras[0],camera_can_toggle:false,camera_state:'idle'}],paused:{front:{...f.state.paused.front,stream_type:'all'}}};
+   f.c._applyState(state);
+   const tile=f.c.shadowRoot.querySelector('[data-camera-feedback="front"]');
+   assert.match(tile.textContent,/Requested scope: Everything/);assert.doesNotMatch(tile.textContent,/Applied scope/);
+   assert.match(tile.querySelector('[data-video-stop-unconfirmed]')?.textContent||'',/video stop is not confirmed/i);
+   assert.equal(f.c.shadowRoot.querySelector('[data-channel="video"]').dataset.channelState,'idle');
+  }finally{f.close();}
+ });
 }
