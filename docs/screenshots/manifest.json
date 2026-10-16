@@ -1,51 +1,58 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-16",
+  "generated_at": "2026-10-17",
   "fixture": "privacy-safe-generic-home",
   "source": {
     "path": "ha-frigate-privacy.js",
-    "sha256": "5e493e2751a6741882cdcae94a0ca6d3e07fa04c044732bfcc2add44fbe077a2"
+    "sha256": "5641ced8360e46f985cd73d642f22f949e88e4aef03aa45407aa5a22c56682bb"
   },
   "harness": {
     "path": "docs/screenshots/_harness.html",
-    "sha256": "a3c058e4af3d417e55ce3144216ded6af2963c8d67e7b0ec82e4a3b6494d8d0d"
+    "sha256": "d6327a3fc7a328c8759473ab21165cd64ef0262371c29c79db5376cdd8b15347"
   },
   "images": [
     {
-      "path": "docs/screenshots/card-cameras-light.png",
+      "path": "docs/screenshots/card-cameras-light.jpg",
       "theme": "light",
       "width": 1920,
-      "height": 1308,
-      "sha256": "c16c0f648b31a7abe3e3b4f1a90ee961ca67c18302c66ad542c15a0b6008bd50"
+      "height": 1306,
+      "sha256": "5b2362b2a1d39ecd25439bfdfa5a1fd5ba6cbeb667c3590095ec18563adac780"
     },
     {
-      "path": "docs/screenshots/card-cameras-dark.png",
+      "path": "docs/screenshots/card-cameras-dark.jpg",
       "theme": "dark",
       "width": 1920,
-      "height": 1308,
-      "sha256": "3d9a7b157690a94de46c6e33ebfde3c615601ef1355c5d4e9a9736bdda92c5af"
+      "height": 1306,
+      "sha256": "291d6d2e5d93399312932a73bdfb3031bff3f2b74e2e217ab9bbdbdf1d6ed053"
     },
     {
-      "path": "docs/screenshots/card-history-light.png",
+      "path": "docs/screenshots/card-history-light.jpg",
       "theme": "light",
       "width": 1920,
       "height": 1987,
-      "sha256": "889e17b92553142f5081afe28011a9bc9cd68a68ec79bdfaae5dc3fff6006c31"
+      "sha256": "a6716303bbe19ec52138512090a538b86ac7553fe30bc2d1de11ee1201d8e7df"
+    },
+    {
+      "path": "docs/screenshots/card-notifications-light.jpg",
+      "theme": "light",
+      "width": 1920,
+      "height": 1563,
+      "sha256": "3378fc0ada64bf7bbca5f1af7747dd590db9261e6e7cc42b24080c7a7a54439a"
     }
   ],
   "privacy": {
     "synthetic_only": true,
-    "ocr_reviewed": true,
+    "ocr_reviewed": false,
     "external_requests": false
   },
   "capture": {
-    "method": "Native Chrome CDP full-document PNG capture; no image editing, resizing or overlays",
+    "method": "Native Chrome full-document JPEG capture; original returned bytes, no image editing, resizing or overlays",
     "viewport_css_width": 1920,
     "viewport_css_height": 1000,
     "device_pixel_ratio": 1,
-    "source_head": "f029e66a21db57a5be180cd9dda9232cfd131774",
-    "scope": "Synthetic documentation only: generic actual-producer-shaped camera records, relative15/30minute deadlines, existing periods.py projection, offline MDI renderer. Native HA acceptance is separate.",
-    "review": "Personally inspected generic names/timers/partial-vs-paused/coverage and dark danger text. Local OCR review follows; no household data, addresses, credentials or actual camera images.",
-    "source_qualification": "Current JS source hash above is authoritative: after f029e66, only CSS for full-width group selector and contrasting danger foreground changed; exact current source bound in final candidate commit."
+    "source_head": "d64cc17119d6dd3396c1374c361a7ee5fd3f2428",
+    "scope": "Synthetic documentation only: generic producer-shaped records, relative deadlines, periods.py projection and explicit OFF notification snapshot. Actual HA/HACS acceptance is separate.",
+    "review": "Owner personally inspected light/dark controls, local history timestamps and notification instructions; generic data only. OCR pending.",
+    "source_qualification": "Exact JS and harness hashes above bind these captures to the current implementation."
   }
 }

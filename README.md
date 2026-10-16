@@ -185,13 +185,13 @@ and opens HA editors; it does not silently create helpers or automations.
 
 | Light | Dark |
 |---|---|
-| ![Control tab, light theme](docs/screenshots/card-cameras-light.png) | ![Control tab, dark theme](docs/screenshots/card-cameras-dark.png) |
+| ![Control tab, light theme](docs/screenshots/card-cameras-light.jpg) | ![Control tab, dark theme](docs/screenshots/card-cameras-dark.jpg) |
 
 *Synthetic, privacy-safe fixtures show the current Control tab. Dark mode follows
 your Home Assistant theme automatically. These screenshots contain no camera images
 or household data.*
 
-![Recorded privacy periods and restoration status](docs/screenshots/card-history-light.png)
+![Recorded privacy periods and restoration status](docs/screenshots/card-history-light.jpg)
 
 *The history example uses synthetic transition evidence, including one verified
 restoration and one incomplete pause. Live HA installation and control tests are
