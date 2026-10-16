@@ -478,7 +478,8 @@ function createUiV3({ language = 'en' } = {}) {
       catch (_) { return new Date(value).toISOString(); }
     }
     _channelBadge(channel,label,values,icon) {
-      const known = value => ({streaming:'on',recording:'on',on:'on',off:'off',idle:'idle',unavailable:'unavailable'}[value] || 'unknown');
+      const normalized = {streaming:'on',recording:'on',on:'on',off:'off',idle:'idle',unavailable:'unavailable'};
+      const known = value => typeof value==='string' && Object.hasOwn(normalized,value) ? normalized[value] : 'unknown';
       const states = values.length ? [...new Set(values.map(known))] : ['unknown'];
       const state = states.length === 1 ? states[0] : 'mixed';
       const names = {on:this._t.statusOn,off:this._t.statusOff,idle:this._t.statusIdle,unavailable:this._t.statusUnavailable,unknown:this._t.statusUnknown};

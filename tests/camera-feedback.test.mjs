@@ -133,4 +133,12 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
    assert.equal(f.c.shadowRoot.querySelector('[data-channel="video"]').dataset.channelState,'idle');
   }finally{f.close();}
  });
+ test(path+': unrecognized channel states cannot inherit Object prototype entries',async()=>{
+  const f=await fixture();try{
+   f.c._applyState({...f.state,cameras:[{...f.state.cameras[0],camera_state:'constructor',switches:[{suffix:'_recordings',state:'__proto__'},{suffix:'_detect',state:'toString'}]}]});
+   for(const name of ['video','recording','detection']){
+    const badge=f.c.shadowRoot.querySelector(`[data-channel="${name}"]`);assert.equal(badge.dataset.channelState,'unknown');assert.match(badge.textContent,/Unknown/);
+   }
+  }finally{f.close();}
+ });
 }
