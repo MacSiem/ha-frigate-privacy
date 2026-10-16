@@ -465,12 +465,21 @@ function createUiV3({ language = 'en' } = {}) {
         ...Object.entries(record.resume_target_outcomes || {}).map(([target,value])=>`${resumeLabel} · ${target}: ${String(value)}`),
         ...Object.entries(record.last_verified_actual_state || {}).map(([target,value])=>`${t.observed} · ${target}: ${String(value)}`),
       ];
-      const videoUnconfirmed = phase==='paused' && record.stream_type==='all' && record.camera_planned!==true && cam.camera_state!=='off';
-      const scopeLabel = phase==='paused' && !videoUnconfirmed ? labels.scope : (this._lang==='pl'?'Żądany zakres':'Requested scope');
+      // An extension keeps the original request's stream_type and may replace
+      // camera_planned while preserving proof that the original action stopped video.
+      const cameraEntity = record.camera_entity_id || cam.entity_id;
+      const videoStopped = cam.camera_state==='off' || (record.camera_toggled===true &&
+        record.target_outcomes?.[cameraEntity]==='paused' &&
+        ['off','idle'].includes(record.last_verified_actual_state?.[cameraEntity]) && cam.camera_state==='idle');
+      const videoUnconfirmed = phase==='paused' && record.stream_type==='all' && record.camera_planned!==true && !videoStopped;
+      const scopeLabel = phase==='paused' && !videoUnconfirmed && record.extension!==true ? labels.scope : (this._lang==='pl'?'Żądany zakres':'Requested scope');
+      const scheduleNote = record.extension===true ? `<div class="helper" data-schedule-coverage>${_esc(this._lang==='pl'
+        ? 'Rozszerzenie harmonogramem: potwierdzone cele w dowodach poniżej.'
+        : 'Schedule extension: see evidence below for confirmed targets.')}</div>` : '';
       const videoNote = videoUnconfirmed ? `<div class="helper" data-video-stop-unconfirmed>${_esc(this._lang==='pl'
-        ? 'W tej operacji nie przełączano obrazu kamery. Wynik dotyczy przełączników Frigate; zatrzymanie obrazu nie jest potwierdzone.'
-        : 'Camera video was not switched by this action. The result covers Frigate switches; video stop is not confirmed.')}</div>` : '';
-      return `<div class="camera-feedback" data-camera-feedback="${_esc(cam.camera_id)}">${request}<span class="phase ${phase}" data-camera-phase="${phase}">${_esc(this._periodText(phase))}</span><div class="helper">${_esc(scopeLabel)}: ${_esc(scope)}${minutes !== null ? ` · ${_esc(this._lang==='pl'?'Czas timera':'Timer duration')}: ${minutes} min` : ''}</div>${videoNote}${activeRecord ? `<div class="camera-countdown" data-camera-countdown="${_esc(cam.camera_id)}" role="timer"></div><div class="helper">${_esc(t.deadline)}: ${_esc(Number.isFinite(end) ? this._formatCameraTime(end) : '—')}</div>` : ''}${evidence.length ? `<details class="evidence"><summary>${_esc(t.evidence)}</summary><div class="evidence-list">${evidence.map(text=>`<div>${_esc(text)}</div>`).join('')}</div></details>` : ''}</div>`;
+        ? record.camera_toggled===true ? 'Bieżące dowody nie potwierdzają zatrzymania obrazu kamery.' : 'W tej operacji nie przełączano obrazu kamery. Wynik dotyczy przełączników Frigate; zatrzymanie obrazu nie jest potwierdzone.'
+        : record.camera_toggled===true ? 'Camera video stop is not confirmed by current evidence.' : 'Camera video was not switched by this action. The result covers Frigate switches; video stop is not confirmed.')}</div>` : '';
+      return `<div class="camera-feedback" data-camera-feedback="${_esc(cam.camera_id)}">${request}<span class="phase ${phase}" data-camera-phase="${phase}">${_esc(this._periodText(phase))}</span><div class="helper">${_esc(scopeLabel)}: ${_esc(scope)}${minutes !== null ? ` · ${_esc(this._lang==='pl'?'Czas timera':'Timer duration')}: ${minutes} min` : ''}</div>${scheduleNote}${videoNote}${activeRecord ? `<div class="camera-countdown" data-camera-countdown="${_esc(cam.camera_id)}" role="timer"></div><div class="helper">${_esc(t.deadline)}: ${_esc(Number.isFinite(end) ? this._formatCameraTime(end) : '—')}</div>` : ''}${evidence.length ? `<details class="evidence"><summary>${_esc(t.evidence)}</summary><div class="evidence-list">${evidence.map(text=>`<div>${_esc(text)}</div>`).join('')}</div></details>` : ''}</div>`;
     }
     _formatCameraTime(value) {
       const zone = this._hass?.config?.time_zone || 'UTC';
