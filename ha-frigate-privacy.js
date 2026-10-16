@@ -92,7 +92,7 @@ function createUiV3({ language = 'en' } = {}) {
     .section { margin-top: 18px; padding: 20px; border: 1px solid var(--fp-border); border-radius: 18px; } .section:first-child { margin-top: 0; }
     .section-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; } .section h3 { font-size: 16px; line-height: 1.4; letter-spacing: -.01em; }
     .helper { color: var(--fp-muted); font-size: 13.5px; line-height: 1.6; }
-    .camera-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .camera-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
     .camera-card { display: flex; align-items: center; gap: 11px; min-height: 58px; padding: 14px; border: 1px solid var(--fp-border); border-radius: 14px; background: var(--fp-card); cursor: pointer; transition: border-color .18s, background .18s, transform .18s; }
     .camera-card:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--fp-primary) 45%, var(--fp-border)); } .camera-card.selected { border-color: var(--fp-primary); background: var(--fp-soft); }
     .camera-card ha-icon { flex: 0 0 auto; color: var(--fp-primary); --mdc-icon-size: 22px; } .camera-name { min-width: 0; overflow-wrap: break-word; font-size: 14px; line-height: 1.4; font-weight: 700; } .camera-check { margin-left: auto; color: var(--fp-primary); }
