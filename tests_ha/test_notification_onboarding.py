@@ -26,13 +26,17 @@ async def test_explicit_test_is_generic_and_has_no_privacy_or_preference_writes(
     storage = hass.data[DOMAIN]['storage']
     state = deepcopy(await storage.async_get_state())
     last = deepcopy(notifier._last)
+    # Observe the real event bus: HA uses slots and instance methods are read-only.
+    events = []
+    remove_listener = hass.bus.async_listen(EVENT_STATE_CHANGED, lambda event: events.append(event))
     # Test requires no record read/save and emits no synthetic camera event.
     with patch.object(storage, 'async_get_record', side_effect=AssertionError('test read camera record')), \
          patch.object(storage._store, 'async_save', side_effect=AssertionError('test saved storage')), \
-         patch.object(hass.config_entries, 'async_update_entry', side_effect=AssertionError('test wrote preferences')), \
-         patch.object(hass.bus, 'async_fire', wraps=hass.bus.async_fire) as fire:
+         patch.object(hass.config_entries, 'async_update_entry', side_effect=AssertionError('test wrote preferences')):
         assert await notifier.async_test() == {'status': 'ha_accepted'}
-        assert all(call.args[0] != EVENT_STATE_CHANGED for call in fire.call_args_list)
+        await hass.async_block_till_done()
+        assert events == []
+    remove_listener()
     assert len(calls) == 1 and calls[0]['message'] == 'Frigate Privacy — test'
     assert calls[0]['title'] == 'Frigate Privacy'
     if entity: assert calls[0]['entity_id'] == entity
@@ -51,7 +55,7 @@ async def test_no_saved_available_destination_never_calls_a_service(hass, destin
     hass.services.async_remove('persistent_notification', 'create')
     hass.config_entries.async_update_entry(entry, options={'notify_destination': destination})
     notifier = hass.data[DOMAIN]['notifications']
-    with patch.object(hass.services, 'async_call', side_effect=AssertionError('no channel must not call HA')):
+    with patch.object(type(hass.services), 'async_call', side_effect=AssertionError('no channel must not call HA')):
         assert await notifier.async_test() == {'status': 'no_channel'}
     assert notifier.snapshot()['available'] is False
     assert await hass.config_entries.async_unload(entry.entry_id)
