@@ -189,7 +189,7 @@ function createUiV3({ language = 'en' } = {}) {
       this._periodOffline = () => { this._historyBrowserOnline = false; this._clearPrivateState(); this._invalidatePeriods('offline'); this._updateUI(); };
       this._periodOnline = () => { this._historyBrowserOnline = true; this._invalidatePeriods('discarded'); this._updateUI(); };
       this._editingScheduleIdx = null; this._scheduleForm = this._emptySchedule(); this._lastHtml = ''; this._toastTimer = null;
-      this._previewCamera = null; this._previewNode = null; this._previewLoad = null; this._previewEpoch = 0;
+      this._previewCamera = null; this._previewNode = null; this._previewLoad = null; this._previewEpoch = 0; this._previewFailed = false;
       this._cameraActions = {};
     }
 
@@ -463,6 +463,7 @@ function createUiV3({ language = 'en' } = {}) {
     }
     _closePreview() {
       this._previewEpoch += 1; this._previewCamera = null; this._previewLoad = null;
+      this._previewFailed = false;
       this._previewNode?.remove(); this._previewNode = null;
     }
     _togglePreview(entity) {
@@ -474,6 +475,7 @@ function createUiV3({ language = 'en' } = {}) {
     async _syncPreview() {
       const entity = this._previewCamera, host = this.shadowRoot.querySelector('[data-preview-host]');
       if (!entity || !host || !this._previewAllowed(entity)) return;
+      if (this._previewFailed) { host.textContent = this._cameraStrings().failed; return; }
       if (this._previewNode) { if (this._previewNode.parentNode !== host) host.replaceChildren(this._previewNode); this._previewNode.hass = this._hass; return; }
       if (this._previewLoad) return;
       const epoch = this._previewEpoch, wire = {}; this._previewLoad = wire;
@@ -488,7 +490,7 @@ function createUiV3({ language = 'en' } = {}) {
         node.hass = this._hass; this._previewNode = node;
         this.shadowRoot.querySelector('[data-preview-host]').replaceChildren(node);
       } catch (_) {
-        if (current()) this.shadowRoot.querySelector('[data-preview-host]').textContent = this._cameraStrings().failed;
+        if (current()) { this._previewFailed = true; this.shadowRoot.querySelector('[data-preview-host]').textContent = this._cameraStrings().failed; }
       } finally { if (this._previewLoad === wire) this._previewLoad = null; }
     }
     _buildControlTab() {

@@ -106,7 +106,9 @@ const initial = {
   let previewEntity = null;
   card.addEventListener('hass-more-info', (event) => { previewEntity = event.detail.entityId; });
   card.shadowRoot.querySelector('[data-preview-camera="camera.front"]').click();
-  assert.equal(previewEntity, 'camera.front');
+  assert.equal(previewEntity, null, 'preview belongs inside the tool, not a native more-info dialog');
+  assert.equal(card.shadowRoot.querySelector('[data-preview-host]').dataset.previewHost, 'camera.front');
+  assert.equal(card.shadowRoot.querySelector('[data-preview-camera="camera.front"]').getAttribute('aria-expanded'), 'true');
   dom.window.close();
 }
 
