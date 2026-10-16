@@ -2,6 +2,113 @@
 (function () {
   'use strict';
 
+// HA_FORMAT_UI_START
+// Localized presentation; raw values remain available to callers for details/export.
+function createFormatUi(language = 'en', timeZone = 'UTC', preferences = {}) {
+  const hourCycle = preferences.hourCycle || 'h23';
+  const dateLanguage = preferences.dateLanguage || language;
+  const stamp = value => typeof value === 'number' ? (Number.isFinite(value) ? value : NaN) : typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value) ? Date.parse(value) : NaN;
+  const localized = (value, options, locale = language) => {
+    const time = stamp(value);
+    if (!Number.isFinite(time)) return null;
+    try { return new Intl.DateTimeFormat(locale, {timeZone, ...options}).format(time); } catch (_) { return null; }
+  };
+  const clock = (value, withOffset = false) => localized(value, {hour:'2-digit', minute:'2-digit', hourCycle, ...(withOffset ? {timeZoneName:'shortOffset'} : {})});
+  const date = (value, short = false) => localized(value, {day:'numeric', month:'short', ...(short ? {} : {year:'numeric'})}, dateLanguage);
+  const pointLabel = value => localized(value, {year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', hourCycle, timeZoneName:'shortOffset'});
+  const chartLabels = (values, resolution = 'hour') => {
+    const showDate = resolution === 'day' || values.length > 1 && stamp(values.at(-1)) - stamp(values[0]) >= 86400000;
+    const labels = values.map(value => resolution === 'day' ? date(value, true) : `${showDate ? date(value, true) + ' ' : ''}${clock(value)}`);
+    const counts = new Map();
+    for (const label of labels) counts.set(label, (counts.get(label) || 0) + 1);
+    return labels.map((label, index) => counts.get(label) < 2 ? label : resolution === 'day' ? pointLabel(values[index])
+      : `${showDate ? date(values[index], true) + ' ' : ''}${clock(values[index], true)}`);
+  };
+  const key = JSON.stringify([language, timeZone, hourCycle, dateLanguage]);
+  const numbers = new Intl.NumberFormat(language);
+  const plurals = new Intl.PluralRules(language);
+  const count = (value, forms) => `${numbers.format(value)} ${forms[plurals.select(value)] || forms.other}`;
+  const dateTime = value => {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T/.test(value)) return null;
+    const time = Date.parse(value);
+    if (!Number.isFinite(time)) return null;
+    try { return new Intl.DateTimeFormat(dateLanguage, {timeZone, dateStyle:'medium', timeStyle:'short', hourCycle}).format(new Date(time)); }
+    catch (_) { return null; }
+  };
+  const range = (from, to) => {
+    const first = Date.parse(from), last = Date.parse(to);
+    if (!Number.isFinite(first) || !Number.isFinite(last) || last < first) return null;
+    try {
+      const day = new Intl.DateTimeFormat(dateLanguage, {timeZone, dateStyle:'medium'});
+      const clock = new Intl.DateTimeFormat(language, {timeZone, hour:'2-digit', minute:'2-digit', hourCycle});
+      return day.format(first) === day.format(last)
+        ? `${day.format(first)} (${clock.format(first)}–${clock.format(last)})`
+        : `${dateTime(from)} – ${dateTime(to)}`;
+    } catch (_) { return null; }
+  };
+  const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const periodMarkup = ({start, end, label, source, measured, expected, unit, details = '', sourceTimeZone = ''}) => {
+    const local = range(start, end);
+    if (!local) return '';
+    const coverage = typeof measured === 'number' && Number.isFinite(measured) && typeof expected === 'number' && Number.isFinite(expected)
+      ? `${numbers.format(measured)}/${numbers.format(expected)} ${unit}` : '';
+    const pl = String(language).startsWith('pl');
+    return `<div class="energy-period-v4" style="overflow-wrap:anywhere"><p data-energy-period-summary>${[source, label, local, coverage, timeZone].filter(Boolean).map(escape).join(' · ')}</p><details data-energy-period-details data-energy-period-key="${escape(start + '|' + end)}"><summary style="min-height:44px;box-sizing:border-box;padding:12px 0;display:list-item;list-style-position:inside;cursor:pointer">${pl ? 'Źródło i szczegóły czasu' : 'Source and time details'}</summary><p>${escape(details)}</p>${sourceTimeZone && sourceTimeZone !== timeZone ? `<p>${escape(pl ? 'Strefa pomiarów i granic okresu' : 'Measurement calendar time zone')}: ${escape(sourceTimeZone)}</p>` : ''}<p>UTC: ${escape(start)} — ${escape(end)}</p></details></div>`;
+  };
+  const capturePeriods = (root, previous, current) => {
+    if (!previous || ['epoch','connection','user'].some(key => previous[key] !== current[key])) return [];
+    return [...root.querySelectorAll('[data-energy-period-key]')].map(element => ({
+      key:element.dataset.energyPeriodKey, open:element.open, focused:root.activeElement === element.querySelector('summary')
+    }));
+  };
+  const restorePeriods = (root, records) => {
+    for (const element of root.querySelectorAll('[data-energy-period-key]')) {
+      const record = records.find(row => row.key === element.dataset.energyPeriodKey);
+      if (!record) continue;
+      element.open = record.open;
+      if (record.focused) element.querySelector('summary')?.focus({preventScroll:true});
+    }
+  };
+  return {timeZone, key, clock, date, pointLabel, chartLabels, number:(value, options)=>options ? new Intl.NumberFormat(language, options).format(value) : numbers.format(value), count, dateTime, range, periodMarkup, capturePeriods, restorePeriods};
+}
+// Presentation follows the HA profile; measurement and tariff calendars remain separate.
+createFormatUi.forHass = hass => {
+  const locale = hass?.locale || {};
+  const systemLanguage = typeof navigator !== 'undefined' ? navigator.language : undefined;
+  const language = locale.language || hass?.language || systemLanguage || 'en';
+  const validZone = value => {
+    if (typeof value !== 'string' || !(value === 'UTC' || value.includes('/')) || /^[+-]/.test(value)) return null;
+    try { new Intl.DateTimeFormat('en', {timeZone:value}).format(0); return value; } catch (_) { return null; }
+  };
+  let systemZone;
+  try { systemZone = validZone(Intl.DateTimeFormat().resolvedOptions().timeZone); } catch (_) {}
+  const serverZone = validZone(hass?.config?.time_zone);
+  const timeZone = (locale.time_zone === 'server' ? serverZone : systemZone) || serverZone || 'UTC';
+  const clockLanguage = locale.time_format === 'system' ? systemLanguage || language : language;
+  const hourCycle = locale.time_format === '12' ? 'h12' : locale.time_format === '24' ? 'h23'
+    : new Intl.DateTimeFormat(clockLanguage, {hour:'numeric'}).resolvedOptions().hourCycle;
+  return createFormatUi(language, timeZone, {hourCycle, dateLanguage:locale.date_format === 'system' ? systemLanguage || language : language});
+};
+// HA_FORMAT_UI_END
+// HA_LIST_UI_START
+// Shared list presentation. No registry writes, storage or global state.
+function createListUi(language = 'en') {
+  const collator = new Intl.Collator(language, {numeric:true, sensitivity:'base'});
+  const compare = (a,b) => collator.compare(String(a ?? ''), String(b ?? ''));
+  const createdAt = value => {
+    if (typeof value === 'number') return Number.isFinite(value) && value > 0 ? value * 1000 : 0;
+    if (typeof value !== 'string' || !value.trim() || /^0(?:\.0+)?$/.test(value.trim())) return 0;
+    const time = Date.parse(value);
+    return Number.isFinite(time) && time > 0 ? time : 0;
+  };
+  const isNew = (value, now = Date.now()) => {
+    const time = createdAt(value);
+    return time > 0 && time <= now && now - time < 7 * 86400000;
+  };
+  return {compare, createdAt, isNew};
+}
+// HA_LIST_UI_END
+
 // BEGIN canonical W4 closure SHA256 029c06206e55abad9aa09dfcf65bb13027ec24ce6a0bfacc45a938891b27254e
 // HA Tools v3: vendored inside each consumer's own closure, never a window API.
 function createUiV3({ language = 'en' } = {}) {
@@ -107,6 +214,7 @@ function createUiV3({ language = 'en' } = {}) {
     .camera-feedback { display:grid;gap:8px;padding:12px 0;margin:8px 0;border-top:1px solid var(--fp-border);overflow-wrap:anywhere; }
     [data-video-stop-unconfirmed] { color:var(--fp-warning); }
     .camera-feedback .phase { justify-self:start; } .phase.pausing { color:var(--fp-warning); }
+    .camera-deadline-row {display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}.camera-progress{width:100%;height:5px;accent-color:var(--fp-primary);display:block;margin:7px 0}.notification-steps{padding-inline-start:24px;line-height:1.6}.notification-steps li+li{margin-top:8px}.notification-actions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.notification-actions .btn{min-height:44px;text-align:center;text-decoration:none}.status-pill[data-camera-summary]{cursor:pointer;font:inherit}.status-pill[data-camera-summary]:focus-visible{outline:2px solid var(--fp-primary);outline-offset:3px}
     .camera-countdown { font-weight:750;font-variant-numeric:tabular-nums;overflow-wrap:anywhere; }
     .camera-preview { margin-top:12px;display:grid;gap:8px;min-width:0; } [data-preview-host] { min-width:0;overflow:hidden;border-radius:12px; }
     .seg { display: flex; gap: 5px; padding: 4px; border-radius: 13px; background: var(--fp-bg); }
@@ -193,6 +301,7 @@ function createUiV3({ language = 'en' } = {}) {
       this._editingScheduleIdx = null; this._scheduleForm = this._emptySchedule(); this._lastHtml = ''; this._toastTimer = null;
       this._previewCamera = null; this._previewNode = null; this._previewLoad = null; this._previewEpoch = 0; this._previewFailed = false;
       this._cameraActions = Object.create(null);
+      this._notifications=null;this._notificationWire=null;this._notificationResult=null;this._notificationEpoch=0;this._notificationTimer=null;
     }
 
     connectedCallback() {
@@ -251,6 +360,8 @@ function createUiV3({ language = 'en' } = {}) {
       this._clearPrivateState(); this._invalidatePeriods('discarded'); this._updateUI();
       if (this._statePollTimer) clearInterval(this._statePollTimer); this._statePollTimer = null; this._requestEpoch += 1; this._connectPromise = null; this._lastStatePollAt = 0; this._busy = false; this._integrationChecked = false; this._integrationAvailable = false; if (this._toastTimer) clearTimeout(this._toastTimer); }
     _clearPrivateState() {
+      this._notifications=null;this._notificationResult=null;this._notificationEpoch+=1;
+      if(this._notificationTimer)clearTimeout(this._notificationTimer);this._notificationTimer=null;
       this._closePreview();
       this._cameraActions = Object.create(null);
       this._pendingControlFocus = null;
@@ -275,6 +386,8 @@ function createUiV3({ language = 'en' } = {}) {
     }
     _applyState(state) {
       const safe = state && typeof state === 'object' && !Array.isArray(state) ? state : {};
+      const n=safe.notifications;
+      this._notifications=n&&typeof n==='object'&&!Array.isArray(n)&&typeof n.destination==='string'&&typeof n.available==='boolean'?{destination:n.destination,label:typeof n.label==='string'?n.label:n.destination,available:n.available,events:n.events&&typeof n.events==='object'?n.events:{}}:null;
       const producerKey = JSON.stringify([safe.paused || {}, safe.last_operations || {}]);
       if (producerKey !== this._periodProducerKey && (this._periodInfo || this._periodWire)) this._invalidatePeriods('discarded');
       this._periodProducerKey = producerKey;
@@ -410,8 +523,32 @@ function createUiV3({ language = 'en' } = {}) {
     _editSchedule(index) { const source = this._schedules[index]; if (!source) return; this._editingScheduleIdx = index; this._scheduleForm = { ...source, days:[...(source.days||[])] }; this._updateUI(); }
     _deleteSchedule(index) { const schedule = this._schedules[index]; if (!schedule?.id) return; return this._runMutation('set_schedule', { action:'delete', schedule_id:schedule.id, operation_id:this._newOperationId('schedule-delete') }); }
     _toggleSchedule(index) { const schedule = this._schedules[index]; if (!schedule) return; return this._runMutation('set_schedule', { action:'upsert', schedule:{ ...schedule, enabled:!schedule.enabled }, operation_id:this._newOperationId('schedule-toggle') }); }
-    _phaseSummary() { if (this._permissionDenied) return { phase:'error',label:this._t.adminRequired }; if (!this._integrationChecked) return { phase:'connecting',label:this._t.connecting }; if (!this._integrationAvailable) return { phase:'error',label:this._t.unavailable }; if (!this._recoveryReady) return { phase:'recovering',label:this._t.recovering }; const records = Object.values(this._paused || {}); if (!records.length) return { phase:'active',label:this._t.online }; const precedence=['error','partial','resuming','pausing','paused']; const phase=precedence.find((candidate)=>records.some((record)=>(record.phase||'paused')===candidate))||'paused'; return { phase,label:this._periodText(phase) }; }
-
+    _phaseSummary() {
+      if(this._permissionDenied)return{phase:'error',label:this._t.adminRequired};
+      if(!this._integrationChecked)return{phase:'connecting',label:this._t.connecting};
+      if(!this._integrationAvailable)return{phase:'error',label:this._t.unavailable};
+      if(!this._recoveryReady)return{phase:'recovering',label:this._t.recovering};
+      const records=Object.entries(this._paused||{});
+      if(!records.length)return{phase:'active',label:this._t.online};
+      const phase=['error','partial','resuming','pausing','paused'].find(candidate=>records.some(([,r])=>(r.phase||'paused')===candidate))||'paused';
+      const matching=records.filter(([,r])=>(r.phase||'paused')===phase);
+      const camera=matching.find(([id])=>this._cameras.some(c=>c.camera_id===id))?.[0];
+      if(phase!=='partial'&&phase!=='error')return{phase,label:this._periodText(phase)};
+      const format=this._formatUi(),count=format.count(matching.length,this._lang==='pl'?{one:'kamera',few:'kamery',many:'kamer',other:'kamery'}:{one:'camera',other:'cameras'});
+      return{phase,camera,label:`${count}: ${this._lang==='pl'?(phase==='partial'?'wynik częściowy':'błąd'):(phase==='partial'?'partial result':'error')}`};
+    }
+    _formatUi() { return createFormatUi.forHass(this._hass); }
+    _cameraDeadline(record,format=this._formatUi()) {
+      const end=typeof record?.ends_at==='string'?Date.parse(record.ends_at):NaN;
+      if(!Number.isFinite(end))return record?.ends_at===null?this._cameraStrings().untimed:this._cameraStrings().invalid;
+      const label=(format.date(end)===format.date(Date.now())?'':format.date(end,true)+' ')+format.clock(end);
+      return `${this._lang==='pl'?'Prywatność do':'Privacy until'} ${label}`;
+    }
+    _cameraProgress(record) {
+      const start=typeof record?.started_at==='string'?Date.parse(record.started_at):NaN;
+      const end=typeof record?.ends_at==='string'?Date.parse(record.ends_at):NaN;
+      return Number.isFinite(start)&&Number.isFinite(end)&&end>start?Math.max(0,Math.min(100,(Date.now()-start)/(end-start)*100)):null;
+    }
     _buildIntroBanner() {
       if (haToolsPersistence.loadSync('ha-intro-dismissed-ha-frigate-privacy') === '1') return ''; const t = this._t;
       return `<div class="intro-banner" data-intro="ha-frigate-privacy"><button class="intro-dismiss" data-action="dismiss-intro" aria-label="${_esc(t.close)}"><ha-icon icon="mdi:close"></ha-icon></button><div class="intro-headline"><ha-icon icon="mdi:shield-lock-outline"></ha-icon>${_esc(t.introTitle)}</div><ol class="intro-steps"><li>${_esc(t.intro1)}</li><li>${_esc(t.intro2)}</li><li>${_esc(t.intro3)}</li></ol></div>`;
@@ -426,22 +563,32 @@ function createUiV3({ language = 'en' } = {}) {
         : {remaining:'Remaining',awaiting:'Deadline reached — awaiting backend',untimed:'No automatic resume deadline',invalid:'Deadline unconfirmed',duration:'Applied duration',scope:'Applied scope',pending:'Applying — result unconfirmed',preview:'Preview',hide:'Close preview',loading:'Loading HA preview…',failed:'HA preview is unavailable. Close and try again.',hint:'HA preview on demand. An image alone does not confirm privacy.'};
     }
     _countdownText(record) {
-      const t = this._cameraStrings();
-      if (record?.ends_at === null) return t.untimed;
-      const end = typeof record?.ends_at === 'string' ? Date.parse(record.ends_at) : NaN;
-      if (!Number.isFinite(end)) return t.invalid;
-      const seconds = Math.ceil((end - Date.now()) / 1000);
-      if (seconds <= 0) return t.awaiting;
-      const hh = Math.floor(seconds / 3600), mm = Math.floor(seconds % 3600 / 60), ss = seconds % 60;
-      return `${t.remaining}: ${hh ? String(hh).padStart(2,'0') + ':' : ''}${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+      const t=this._cameraStrings();
+      if(record?.ends_at===null)return t.untimed;
+      const end=typeof record?.ends_at==='string'?Date.parse(record.ends_at):NaN;
+      if(!Number.isFinite(end))return t.invalid;
+      const minutes=Math.ceil((end-Date.now())/60000);
+      if(minutes<=0)return t.awaiting;
+      const format=this._formatUi(),hours=Math.floor(minutes/60),rest=minutes%60;
+      const value=hours?`${format.number(hours)} ${this._lang==='pl'?'godz.':'h'}${rest?' '+format.number(rest)+' min':''}`:`${format.number(minutes)} min`;
+      return `${t.remaining}: ${value}`;
     }
     _tickCountdowns() {
-      // Only text changes: never replace controls, restart preview or trigger camera actions.
-      if (!this.isConnected || !this._periodAuthority()) return;
-      this.shadowRoot.querySelectorAll('[data-camera-countdown]').forEach(node => {
-        const record = this._ownCameraRecord(this._paused, node.dataset.cameraCountdown);
-        if (record) node.textContent = this._countdownText(record);
-      });
+      // Text/progress only: retain controls, their focus and any running preview.
+      if(!this.isConnected||!this._periodAuthority())return;
+      const format=this._formatUi();
+      for(const node of this.shadowRoot.querySelectorAll('[data-camera-countdown]')) {
+        const record=this._ownCameraRecord(this._paused,node.dataset.cameraCountdown);
+        if(record)node.textContent=this._countdownText(record);
+      }
+      for(const node of this.shadowRoot.querySelectorAll('[data-camera-deadline]')) {
+        const record=this._ownCameraRecord(this._paused,node.dataset.cameraDeadline);
+        if(record)node.textContent=this._cameraDeadline(record,format);
+      }
+      for(const node of this.shadowRoot.querySelectorAll('[data-camera-progress]')) {
+        const record=this._ownCameraRecord(this._paused,node.dataset.cameraProgress),value=this._cameraProgress(record);
+        if(value!==null)node.value=value;
+      }
     }
     _ownCameraRecord(records, id) {
       if (!records || typeof records !== 'object' || !Object.hasOwn(records, id)) return null;
@@ -462,6 +609,7 @@ function createUiV3({ language = 'en' } = {}) {
       const minutes = Number.isFinite(start) && Number.isFinite(end) && end > start ? Math.round((end-start)/60000) : null;
       const pauseLabel = this._lang==='pl'?'Pauza':'Pause', resumeLabel = this._lang==='pl'?'Wznowienie':'Resume';
       const evidence = [
+        ...(activeRecord ? [`${t.deadline}: ${this._formatCameraTime(record.ends_at)}`, `UTC: ${record.started_at || '—'} → ${record.ends_at || '—'}`] : []),
         ...Object.entries(record.target_outcomes || {}).map(([target,value])=>`${pauseLabel} · ${target}: ${String(value)}`),
         ...Object.entries(record.resume_target_outcomes || {}).map(([target,value])=>`${resumeLabel} · ${target}: ${String(value)}`),
         ...Object.entries(record.last_verified_actual_state || {}).map(([target,value])=>`${t.observed} · ${target}: ${String(value)}`),
@@ -480,12 +628,10 @@ function createUiV3({ language = 'en' } = {}) {
       const videoNote = videoUnconfirmed ? `<div class="helper" data-video-stop-unconfirmed>${_esc(this._lang==='pl'
         ? record.camera_toggled===true ? 'Bieżące dowody nie potwierdzają zatrzymania obrazu kamery.' : 'W tej operacji nie przełączano obrazu kamery. Wynik dotyczy przełączników Frigate; zatrzymanie obrazu nie jest potwierdzone.'
         : record.camera_toggled===true ? 'Camera video stop is not confirmed by current evidence.' : 'Camera video was not switched by this action. The result covers Frigate switches; video stop is not confirmed.')}</div>` : '';
-      return `<div class="camera-feedback" data-camera-feedback="${_esc(cam.camera_id)}">${request}<span class="phase ${phase}" data-camera-phase="${phase}">${_esc(this._periodText(phase))}</span><div class="helper">${_esc(scopeLabel)}: ${_esc(scope)}${minutes !== null ? ` · ${_esc(this._lang==='pl'?'Czas timera':'Timer duration')}: ${minutes} min` : ''}</div>${scheduleNote}${videoNote}${activeRecord ? `<div class="camera-countdown" data-camera-countdown="${_esc(cam.camera_id)}" role="timer"></div><div class="helper">${_esc(t.deadline)}: ${_esc(Number.isFinite(end) ? this._formatCameraTime(end) : '—')}</div>` : ''}${evidence.length ? `<details class="evidence"><summary>${_esc(t.evidence)}</summary><div class="evidence-list">${evidence.map(text=>`<div>${_esc(text)}</div>`).join('')}</div></details>` : ''}</div>`;
+      return `<div class="camera-feedback" data-camera-feedback="${_esc(cam.camera_id)}">${request}<span class="phase ${phase}" data-camera-phase="${phase}">${_esc(this._periodText(phase))}</span><div class="helper">${_esc(scopeLabel)}: ${_esc(scope)}${minutes !== null ? ` · ${_esc(this._lang==='pl'?'Czas timera':'Timer duration')}: ${minutes} min` : ''}</div>${scheduleNote}${videoNote}${activeRecord ? `<div class="camera-deadline-row"><span class="helper" data-camera-deadline="${_esc(cam.camera_id)}">${_esc(this._cameraDeadline(record))}</span><span class="camera-countdown" data-camera-countdown="${_esc(cam.camera_id)}" role="timer"></span></div>${this._cameraProgress(record)!==null?`<progress class="camera-progress" data-camera-progress="${_esc(cam.camera_id)}" max="100" value="0" aria-label="${_esc(this._lang==='pl'?'Upływ zaplanowanego czasu':'Planned time elapsed')}"></progress>`:''}` : ''}${evidence.length ? `<details class="evidence"><summary>${_esc(t.evidence)}</summary><div class="evidence-list">${evidence.map(text=>`<div>${_esc(text)}</div>`).join('')}</div></details>` : ''}</div>`;
     }
     _formatCameraTime(value) {
-      const zone = this._hass?.config?.time_zone || 'UTC';
-      try { return new Intl.DateTimeFormat(this._lang, {dateStyle:'short',timeStyle:'medium',timeZone:zone}).format(value) + ' · ' + zone; }
-      catch (_) { return new Date(value).toISOString(); }
+      const format=this._formatUi();return (format.pointLabel(value)||this._periodStrings().unknown)+' · '+format.timeZone;
     }
     _channelBadge(channel,label,values,icon) {
       const normalized = {streaming:'on',recording:'on',on:'on',off:'off',idle:'idle',unavailable:'unavailable'};
@@ -575,7 +721,7 @@ function createUiV3({ language = 'en' } = {}) {
     }
     _buildControlTab() {
       const t=this._t;
-      const cameras=this._cameras.map(cam=>this._cameraTile(cam)).join('');
+      const lists=createListUi(this._hass?.language||this._lang);const cameras=[...this._cameras].sort((a,b)=>lists.compare(a.name,b.name)||lists.compare(a.camera_id,b.camera_id)).map(cam=>this._cameraTile(cam)).join('');
       const allSelected=this._selectedCameras.size===0; const phases=Object.values(this._paused||{});
       return `<div class="section"><div class="section-head"><h3>${_esc(t.cameras)}</h3><span class="helper">${this._cameras.length}</span></div><div class="camera-grid"><div class="camera-card ${allSelected?'selected':''}" data-camera="__all__" role="button" tabindex="0" aria-pressed="${allSelected}"><ha-icon icon="mdi:camera-outline"></ha-icon><span class="camera-name">${_esc(t.all)}</span>${allSelected?'<ha-icon class="camera-check" icon="mdi:check-circle"></ha-icon>':''}</div>${cameras||`<div class="empty">${_esc(t.noCameras)}</div>`}</div><p class="helper channel-hint">${_esc(t.soundHint)}</p></div>
       <div class="section"><div class="section-head"><h3>${_esc(t.scope)}</h3></div><div class="seg" role="radiogroup">${[['all',t.allScope],['main',t.main],['sub',t.sub]].map(([value,label])=>`<button class="seg-item ${this._pauseStreamType===value?'selected':''}" data-scope="${value}" role="radio" aria-checked="${this._pauseStreamType===value}">${_esc(label)}</button>`).join('')}</div><div class="duration-row"><input class="input-minutes" type="number" min="1" max="1440" value="${_esc(this._customMinutes)}" aria-label="${_esc(t.duration)}"><button class="btn btn-primary" data-action="pause-custom" ${this._busy||this._mutationWire||!this._cameras.length?'disabled':''}>${_esc(t.pause)}</button></div>${phases.length?`<button class="btn btn-danger btn-full" data-action="resume" ${this._busy||this._mutationWire?'disabled':''}>${_esc(t.resume)}</button>`:''}</div>`;
@@ -584,7 +730,7 @@ function createUiV3({ language = 'en' } = {}) {
       const t=this._t; const list=this._schedules.map((schedule,index)=>{const days=[...(schedule.days||[])].sort().map((day)=>t.days[day-1]).filter(Boolean).join(', ');const time=`${String(schedule.startHour).padStart(2,'0')}:${String(schedule.startMin).padStart(2,'0')} – ${String(schedule.endHour).padStart(2,'0')}:${String(schedule.endMin).padStart(2,'0')}`;return `<div class="schedule-item"><div><div class="schedule-title">${_esc(schedule.label||t.schedule)}</div><div class="schedule-meta">${_esc(days)} · ${_esc(time)} · ${_esc(schedule.enabled?t.enabled:t.cancel)}</div></div><div class="schedule-actions"><button class="icon-btn" ${this._busy||this._mutationWire?'disabled':''} data-schedule-toggle="${index}" data-schedule-id="${_esc(schedule.id)}" aria-label="${_esc(t.enabled)}"><ha-icon icon="mdi:${schedule.enabled?'toggle-switch':'toggle-switch-off-outline'}"></ha-icon></button><button class="icon-btn" data-schedule-edit="${index}" data-schedule-id="${_esc(schedule.id)}" aria-label="${_esc(t.edit)}"><ha-icon icon="mdi:pencil-outline"></ha-icon></button><button class="icon-btn" ${this._busy||this._mutationWire?'disabled':''} data-schedule-delete="${index}" data-schedule-id="${_esc(schedule.id)}" aria-label="${_esc(t.remove)}"><ha-icon icon="mdi:delete-outline"></ha-icon></button></div></div>`;}).join(''); const form=this._scheduleForm;
       return `<div class="section"><div class="section-head"><h3>${_esc(t.schedules)}</h3><span class="helper">${this._schedules.length}</span></div><div class="schedule-list">${list||`<div class="empty">${_esc(t.noSchedules)}</div>`}</div></div><div class="section"><div class="section-head"><h3>${_esc(this._editingScheduleIdx==null?t.add:t.edit)}</h3></div><div class="form-grid"><div class="field field-wide"><label>${_esc(t.label)}</label><input class="input-label" aria-label="${_esc(t.label)}" maxlength="120" value="${_esc(form.label)}"></div><div class="field"><label>${_esc(t.start)}</label><input class="input-start" aria-label="${_esc(t.start)}" type="time" value="${_esc(`${String(form.startHour).padStart(2,'0')}:${String(form.startMin).padStart(2,'0')}`)}"></div><div class="field"><label>${_esc(t.end)}</label><input class="input-end" aria-label="${_esc(t.end)}" type="time" value="${_esc(`${String(form.endHour).padStart(2,'0')}:${String(form.endMin).padStart(2,'0')}`)}"></div><div class="field field-wide"><label>${_esc(t.schedule)}</label><div class="days">${t.days.map((label,index)=>`<button class="day-btn ${form.days.includes(index+1)?'selected':''}" data-day="${index+1}" aria-pressed="${form.days.includes(index+1)}" type="button">${_esc(label)}</button>`).join('')}</div></div></div><div class="form-actions"><button class="btn btn-primary" data-action="save-schedule" ${this._busy||this._mutationWire||!form.days.length?'disabled':''}>${_esc(t.save)}</button>${this._editingScheduleIdx==null?'':`<button class="btn btn-secondary" data-action="cancel-edit">${_esc(t.cancel)}</button>`}</div></div>`;
     }
-    _buildStateTab() { const t=this._t; const render=(records,terminal=false)=>Object.entries(records||{}).map(([cameraId,state])=>{const outcomes=state.target_outcomes&&typeof state.target_outcomes==='object'?Object.entries(state.target_outcomes):[];const resumeOutcomes=state.resume_target_outcomes&&typeof state.resume_target_outcomes==='object'?Object.entries(state.resume_target_outcomes):[];const actual=state.last_verified_actual_state&&typeof state.last_verified_actual_state==='object'?Object.entries(state.last_verified_actual_state):[];const evidence=[...outcomes.map(([target,value])=>`${target}: ${value}`),...resumeOutcomes.map(([target,value])=>`${target}: ${value}`),...actual.map(([target,value])=>`${target}: actual=${value??'missing'}`)];const retry=!terminal&&(['error','partial'].includes(state.phase)||state.resume_blocked);return `<div class="state-row"><div><div class="state-name">${_esc(state.name||cameraId)}</div><div class="state-meta">${_esc(t.source)}: ${_esc(state.source||'unknown')} · ${_esc(t.deadline)}: ${_esc(state.ends_at||'—')}<br>${_esc(t.operation)}: ${_esc(state.resume_operation_id||state.operation_id||'—')}<br>${_esc(t.observed)}: ${_esc(state.observed_at||'—')} · ${_esc(t.attempts)}: ${_esc(state.resume_attempt_count||0)}${state.reason?`<br>${_esc(t.reason)}: ${_esc(state.reason)}`:''}</div></div><span class="phase ${_esc(state.phase||'paused')}">${_esc(this._periodText(state.phase||'paused'))}</span>${evidence.length?`<details class="evidence"><summary>${_esc(t.evidence)}</summary><div class="evidence-list">${evidence.map((item)=>`<div>${_esc(item)}</div>`).join('')}</div></details>`:''}${retry?`<div class="state-actions"><button class="btn btn-secondary" data-retry-camera="${_esc(cameraId)}" ${this._busy||this._mutationWire?'disabled':''}>${_esc(t.retryResume)}</button></div>`:''}</div>`;}).join('');const activeRows=render(this._paused);const terminalRows=render(this._lastOperations,true);return `<div class="section"><div class="section-head"><h3>${_esc(t.currentState)}</h3></div><div class="state-grid">${activeRows||`<div class="empty">${_esc(t.noActive)}</div>`}</div></div><div class="section"><div class="section-head"><h3>${_esc(t.lastVerified)}</h3></div><div class="state-grid">${terminalRows||`<div class="empty">${_esc(t.noHistory)}</div>`}</div></div>`; }
+    _buildStateTab() { const t=this._t; const render=(records,terminal=false)=>Object.entries(records||{}).map(([cameraId,state])=>{const outcomes=state.target_outcomes&&typeof state.target_outcomes==='object'?Object.entries(state.target_outcomes):[];const resumeOutcomes=state.resume_target_outcomes&&typeof state.resume_target_outcomes==='object'?Object.entries(state.resume_target_outcomes):[];const actual=state.last_verified_actual_state&&typeof state.last_verified_actual_state==='object'?Object.entries(state.last_verified_actual_state):[];const evidence=[...outcomes.map(([target,value])=>`${target}: ${value}`),...resumeOutcomes.map(([target,value])=>`${target}: ${value}`),...actual.map(([target,value])=>`${target}: actual=${value??'missing'}`)];const retry=!terminal&&(['error','partial'].includes(state.phase)||state.resume_blocked);return `<div class="state-row"><div><div class="state-name">${_esc(state.name||cameraId)}</div><div class="state-meta">${_esc(t.source)}: ${_esc(state.source||'unknown')} · ${_esc(t.deadline)}: ${_esc(this._formatCameraTime(state.ends_at))}<br>${_esc(t.operation)}: ${_esc(state.resume_operation_id||state.operation_id||'—')}<br>${_esc(t.observed)}: ${_esc(this._formatCameraTime(state.observed_at))} · ${_esc(t.attempts)}: ${_esc(state.resume_attempt_count||0)}${state.reason?`<br>${_esc(t.reason)}: ${_esc(state.reason)}`:''}</div></div><span class="phase ${_esc(state.phase||'paused')}">${_esc(this._periodText(state.phase||'paused'))}</span>${evidence.length?`<details class="evidence"><summary>${_esc(t.evidence)}</summary><div class="evidence-list">${evidence.map((item)=>`<div>${_esc(item)}</div>`).join('')}</div></details>`:''}${retry?`<div class="state-actions"><button class="btn btn-secondary" data-retry-camera="${_esc(cameraId)}" ${this._busy||this._mutationWire?'disabled':''}>${_esc(t.retryResume)}</button></div>`:''}</div>`;}).join('');const activeRows=render(this._paused);const terminalRows=render(this._lastOperations,true);return `<div class="section"><div class="section-head"><h3>${_esc(t.currentState)}</h3></div><div class="state-grid">${activeRows||`<div class="empty">${_esc(t.noActive)}</div>`}</div></div><div class="section"><div class="section-head"><h3>${_esc(t.lastVerified)}</h3></div><div class="state-grid">${terminalRows||`<div class="empty">${_esc(t.noHistory)}</div>`}</div></div>`; }
     _periodAuthority() {
       return this.isConnected && this._hass?.user?.is_admin === true && this._hass.user.is_active !== false &&
         !this._permissionDenied && this._historyBrowserOnline && !this._periodConnectionOffline &&
@@ -723,7 +869,7 @@ function createUiV3({ language = 'en' } = {}) {
         reason:'Powód zakończenia',source:'Źródło',generation:'Generacja pauzy',restore:'Przywrócenie potwierdzone odczytem celów',
         noRestore:'Brak dowodu przywrócenia',previous:'Poprzednie',next:'Następne',page:'Strona',rows:'okresów',empty:'Brak zapisanych okresów w zakresie.',
         selected:'Szczegóły wybranego okresu',channels:'Wyniki kanałów',unknownChannels:'Nierozpoznane kanały',pause:'Pauza',resume:'Wznowienie',observed:'Odczyt celu',seen:'Zachowane wyniki',
-        retained:'Do 200 okresów / 30 dni / 1 MiB; odczyt filtruje retencję bez zapisu.',zone:'Strefa HA',legacy:'Dane legacy: tylko ostatni rekord każdej kamery. Daty i pełna historia mogą być nieznane.',
+        retained:'Do 200 okresów / 30 dni / 1 MiB; odczyt filtruje retencję bez zapisu.',zone:'Strefa wyświetlania',legacy:'Dane legacy: tylko ostatni rekord każdej kamery. Daty i pełna historia mogą być nieznane.',
         storage:'Trwałość zapisu',status:'Stan historii',ready:'Dostępna',corrupt:'Uszkodzony format — dane zachowano',unsupported:'Nieobsługiwana wersja — dane zachowano',unavailable:'Niedostępna',
         confirmed:'Potwierdzony zapis',loaded:'Odczytano ze Store',not_written:'Brak potwierdzonego zapisu',not_loaded:'Nie załadowano',save_failed:'Zapis nie powiódł się; pokazano ostatni trwały stan',capture_failed:'Nie udało się utrwalić projekcji historii',
         detection:'Detekcja',recording:'Nagrywanie',snapshots:'Zdjęcia',sound_detection:'Detekcja dźwięku',motion:'Ruch',camera_control:'Sterowanie kamerą',
@@ -737,18 +883,13 @@ function createUiV3({ language = 'en' } = {}) {
         reason:'End reason',source:'Source',generation:'Pause generation',restore:'Restore verified by target readback',noRestore:'No verified restore',
         previous:'Previous',next:'Next',page:'Page',rows:'periods',empty:'No recorded periods in this range.',selected:'Selected period details',
         channels:'Channel outcomes',unknownChannels:'Unrecognized channels',pause:'Pause',resume:'Resume',observed:'Target readback',seen:'Retained outcomes',
-        retained:'Up to 200 periods / 30 days / 1 MiB; reads filter retention without writes.',zone:'HA time zone',legacy:'Legacy data: only the latest record per camera. Dates and complete history may be unknown.',
+        retained:'Up to 200 periods / 30 days / 1 MiB; reads filter retention without writes.',zone:'Display time zone',legacy:'Legacy data: only the latest record per camera. Dates and complete history may be unknown.',
         storage:'Storage durability',status:'History status',ready:'Available',corrupt:'Corrupt format — data preserved',unsupported:'Unsupported version — data preserved',unavailable:'Unavailable',
         confirmed:'Write confirmed',loaded:'Loaded from Store',not_written:'No confirmed write',not_loaded:'Not loaded',save_failed:'Save failed; last durable state shown',capture_failed:'History projection could not be saved',
         detection:'Detection',recording:'Recording',snapshots:'Snapshots',sound_detection:'Sound detection',motion:'Motion',camera_control:'Camera control',
       };
     }
-    _periodTime(value) {
-      const t = this._periodStrings(); if (!value) return t.unknown;
-      const zone = this._hass?.config?.time_zone || 'UTC';
-      try { return new Intl.DateTimeFormat(this._lang === 'pl' ? 'pl-PL' : 'en-GB', {timeZone:zone,dateStyle:'medium',timeStyle:'medium'}).format(new Date(value)); }
-      catch (_) { return value; }
-    }
+    _periodTime(value) { return this._formatUi().dateTime(value)||this._periodStrings().unknown; }
     _periodText(value) {
       const labels = {
         unknown:['Unknown','Nieznany'], manual:['Manual','Ręczne'], schedule:['Schedule','Harmonogram'],
@@ -783,7 +924,7 @@ function createUiV3({ language = 'en' } = {}) {
       this._periodPage = Math.min(this._periodPage,pages-1);
       const rows = this._periods.slice(this._periodPage*50,this._periodPage*50+50);
       const unavailable = !this._periodAuthority();
-      const info = this._periodInfo; const zone = this._hass?.config?.time_zone || 'UTC';
+      const info = this._periodInfo; const zone = this._formatUi().timeZone;
       const end = row => row.ended_at ? this._periodTime(row.ended_at) : t.open;
       const selection = row => `<button type="button" class="period-select ${this._periodSelected===row.id?'selected':''}" data-period-select="${_esc(row.id)}" aria-pressed="${this._periodSelected===row.id}" title="${_esc(row.camera_id)}">${_esc(this._periodCameraLabel(row.camera_id))}</button>`;
       const timeline = `<ol class="period-timeline">${rows.map(row => `<li>${selection(row)}<div class="period-event"><span>${_esc(t.start)}</span><time datetime="${_esc(row.started_at||'')}">${_esc(this._periodTime(row.started_at))}</time><span>${_esc(t.end)}</span><span>${_esc(end(row))}</span></div>${ui.statusHtml(this._periodResult(row))}</li>`).join('')}</ol>`;
@@ -816,10 +957,49 @@ function createUiV3({ language = 'en' } = {}) {
       return `# Add your physical-button or other trigger in the HA editor.\n# Add this automation to Frigate Privacy trusted actions.\n- action: ${action}${lines.length ? `\n  data:\n${lines.map((line)=>'    '+line).join('\n')}` : ''}`;
     }
     _buildActionsTab() {
-      const t = this._t; const kind = this._actionKind || 'button_pause';
-      return `<div class="section"><div class="section-head"><h3>${_esc(t.actions)}</h3></div><p>${_esc(t.actionHint)}</p><p class="helper" style="margin-top:12px">${_esc(t.trustHint)}</p><div class="action-links"><a href="/config/integrations/integration/ha_frigate_privacy">${_esc(t.notificationSettings)}</a></div></div><div class="section"><label for="action-kind">${_esc(t.example)}</label><select id="action-kind" class="action-kind">${[['button_pause',t.buttonPause],['button_resume',t.buttonResume],['script_pause',t.scriptPause],['script_resume',t.scriptResume],['automation_pause',t.automationPause],['scene',t.sceneHelper]].map(([value,label])=>`<option value="${value}" ${kind===value?'selected':''}>${_esc(label)}</option>`).join('')}</select>${kind==='scene'?`<p class="helper">${_esc(t.sceneHint)}</p>`:''}<textarea class="action-example" aria-label="${_esc(t.example)}" readonly>${_esc(this._actionExample())}</textarea><button class="btn btn-secondary" data-action="copy-example">${_esc(t.copy)}</button><div class="action-links"><a href="/config/automation/dashboard">${_esc(t.automationPause)}</a><a href="/config/script/dashboard">${_esc(t.scriptPause)}</a><a href="/config/scene/dashboard">${_esc(t.sceneHelper)}</a></div></div>`;
+      const t=this._t,kind=this._actionKind||'button_pause';
+      return `${this._buildNotificationSetup()}<div class="section"><div class="section-head"><h3>${_esc(t.actions)}</h3></div><p>${_esc(t.actionHint)}</p><p class="helper" style="margin-top:12px">${_esc(t.trustHint)}</p><div class="action-links"><a href="/config/integrations/integration/ha_frigate_privacy">${_esc(this._lang==='pl'?'Ustaw zaufaną automatyzację':'Set up a trusted automation')}</a></div></div><div class="section"><label for="action-kind">${_esc(t.example)}</label><select id="action-kind" class="action-kind">${[['button_pause',t.buttonPause],['button_resume',t.buttonResume],['script_pause',t.scriptPause],['script_resume',t.scriptResume],['automation_pause',t.automationPause],['scene',t.sceneHelper]].map(([value,label])=>`<option value="${value}" ${kind===value?'selected':''}>${_esc(label)}</option>`).join('')}</select>${kind==='scene'?`<p class="helper">${_esc(t.sceneHint)}</p>`:''}<textarea class="action-example" aria-label="${_esc(t.example)}" readonly>${_esc(this._actionExample())}</textarea><button class="btn btn-secondary" data-action="copy-example">${_esc(t.copy)}</button><div class="action-links"><a href="/config/automation/dashboard">${_esc(t.automationPause)}</a><a href="/config/script/dashboard">${_esc(t.scriptPause)}</a><a href="/config/scene/dashboard">${_esc(t.sceneHelper)}</a></div></div>`;
     }
-    _buildHTML() { const t=this._t;const gate=this._buildGate();const summary=this._phaseSummary();const title=this._config.title||'Frigate Privacy';const main=gate||`<select class="tab-picker" data-tab-picker aria-label="${_esc(this._lang==='pl'?'Sekcje karty':'Card sections')}" hidden>${[['control',t.control],['schedule',t.schedule],['state',t.state],['history',this._periodStrings().title],['actions',t.actions],['info',t.info]].map(([id,label])=>`<option value="${id}" ${this._activeTab===id?'selected':''}>${_esc(label)}</option>`).join('')}</select><div class="tabs" role="tablist" aria-label="${_esc(this._lang==='pl'?'Sekcje karty':'Card sections')}">${[['control',t.control],['schedule',t.schedule],['state',t.state],['history',this._periodStrings().title],['actions',t.actions],['info',t.info]].map(([id,label])=>`<button class="tab-btn ${this._activeTab===id?'active':''}" data-tab="${id}" role="tab" aria-selected="${this._activeTab===id}">${_esc(label)}</button>`).join('')}</div>${this._activeTab==='control'?this._buildControlTab():this._activeTab==='schedule'?this._buildScheduleTab():this._activeTab==='state'?this._buildStateTab():this._activeTab==='history'?this._buildHistoryTab():this._activeTab==='actions'?this._buildActionsTab():this._buildInfoTab()}`;return `<style>${CSS}${createUiV3({language:this._lang}).css}</style><div class="card"><div class="header"><div class="brand"><div class="brand-mark"><ha-icon icon="mdi:shield-lock-outline"></ha-icon></div><div><h2>${_esc(title)}</h2><p class="subtitle">${_esc(t.subtitle)}</p></div></div><div class="status-pill ${_esc(summary.phase)}"><span class="status-dot"></span>${_esc(this._integrationChecked?summary.label:t.connecting)}</div></div><div class="body">${this._buildIntroBanner()}${this._buildMutationResult()}${this._error&&!this._mutationOutcome?`<div class="notice error" style="margin-bottom:16px"><ha-icon icon="mdi:alert-circle-outline"></ha-icon><div><h3>${_esc(t.failed)}</h3><p>${_esc(this._error)}</p></div></div>`:''}${main}${this._buildDonateFooter()}</div><div class="toast"></div></div>`; }
+    _notificationStrings() {
+      return this._lang==='pl'?{
+        title:'Powiadomienia',off:'Wyłączone — nie wybrano odbiorcy',unknown:'Zapisane ustawienia niepotwierdzone. Odśwież je po powrocie z Konfiguruj.',unavailable:'Zapisany odbiorca jest obecnie niedostępny. Wybierz innego w ustawieniach.',destination:'Zapisany odbiorca',events:'Zdarzenia',none:'Żadne — powiadomienia o zdarzeniach nie będą wysyłane',labels:{errors:'Błędy i częściowa prywatność',paused:'Pauza',resumed:'Przywrócenie',scheduled:'Początek i koniec harmonogramu'},
+        steps:['Otwórz ustawienia powiadomień. Na stronie integracji wybierz Konfiguruj.','W polu Odbiorca wybierz powiadomienia w Home Assistant albo dostępny kanał lub urządzenie. Jeśli telefonu nie ma na liście, najpierw skonfiguruj jego powiadomienia w Home Assistant.','Wybierz zdarzenia i zapisz formularz. Wróć tutaj i odśwież zapisane ustawienia.','Kliknij Wyślij test, aby sprawdzić zapisany kanał.'],path:'Ustawienia → Urządzenia i usługi → Frigate Privacy → Konfiguruj',setup:'Ustaw powiadomienia',refresh:'Odśwież zapisane ustawienia',test:'Wyślij test',sending:'Wysyłanie…',independent:'Powiadomienia nie wymagają dodawania zaufanych automatyzacji.',ha_accepted:'Home Assistant przyjął test. Sprawdź wybrany kanał. To nie potwierdza doręczenia na telefon.',error:'Nie udało się wysłać testu przez Home Assistant. Sprawdź kanał w ustawieniach i spróbuj ponownie.',no_channel:'Nie ma dostępnego zapisanego kanału. Wybierz odbiorcę i zapisz ustawienia.',unconfirmed:'Wynik testu niepotwierdzony. Nie wysyłamy go ponownie automatycznie.'
+      }:{
+        title:'Notifications',off:'Off — no destination selected',unknown:'Saved settings unconfirmed. Refresh them after returning from Configure.',unavailable:'The saved destination is currently unavailable. Choose another in settings.',destination:'Saved destination',events:'Events',none:'None — event notifications will not be sent',labels:{errors:'Errors and partial privacy',paused:'Pause',resumed:'Restoration',scheduled:'Scheduled start and restoration'},
+        steps:['Open notification settings. On the integration page, choose Configure.','Under Destination, choose notifications in Home Assistant or an available channel or device. If your phone is missing, set up its notifications in Home Assistant first.','Choose events and save the form. Return here and refresh the saved settings.','Choose Send test to check the saved destination.'],path:'Settings → Devices & services → Frigate Privacy → Configure',setup:'Set up notifications',refresh:'Refresh saved settings',test:'Send test',sending:'Sending…',independent:'Notifications do not require trusted automations.',ha_accepted:'Home Assistant accepted the test. Check the selected destination. This does not confirm delivery to a phone.',error:'Home Assistant could not send the test. Check the destination in settings and try again.',no_channel:'No saved destination is available. Choose a destination and save the settings.',unconfirmed:'Test result unconfirmed. We do not send it again automatically.'
+      };
+    }
+    _buildNotificationSetup() {
+      const t=this._notificationStrings(),n=this._notifications;
+      const labels=n?Object.entries(t.labels).filter(([key])=>n.events[key]===true).map(([,label])=>label):[];
+      const status=!n?t.unknown:!n.destination?t.off:!n.available?t.unavailable:`${t.destination}: ${n.label}`;
+      const result=this._notificationResult&&Object.hasOwn(t,this._notificationResult)?t[this._notificationResult]:'';
+      return `<section class="section" data-notification-setup><div class="section-head"><h3>${_esc(t.title)}</h3></div><p role="status" data-notification-saved>${_esc(status)}</p>${n?.destination?`<p>${_esc(t.events)}: ${_esc(labels.join(', ')||t.none)}</p>`:''}<ol class="notification-steps">${t.steps.map(step=>`<li>${_esc(step)}</li>`).join('')}</ol><p class="helper">${_esc(t.path)}</p><div class="notification-actions"><a class="btn btn-primary" href="/config/integrations/integration/ha_frigate_privacy">${_esc(t.setup)}</a><button type="button" class="btn btn-secondary" data-notification-refresh ${this._connectPromise?'disabled':''}>${_esc(t.refresh)}</button><button type="button" class="btn btn-secondary" data-notification-test ${!n?.destination||!n.available||this._notificationWire?'disabled':''}>${_esc(this._notificationWire?t.sending:t.test)}</button></div><p class="helper">${_esc(t.independent)}</p><p role="status" data-notification-result>${_esc(result)}</p></section>`;
+    }
+    async _testNotification() {
+      if(this._notificationWire||!this._periodAuthority()||!this._notifications?.destination||!this._notifications.available)return;
+      const epoch=this._notificationEpoch,hass=this._hass,connection=this._connection,user=this._userId,instance=this._instanceId;
+      const current=()=>epoch===this._notificationEpoch&&connection===this._connection&&user===this._userId&&instance===this._instanceId&&this._hass?.user?.id===user&&this._hass?.connection===connection&&(this._hass?.config?.instance_id||null)===instance&&this._periodAuthority();
+      let expired=false;this._notificationResult=null;
+      const wire=Promise.resolve().then(()=>{if(!current())throw new Error('context_changed');return hass.callWS({type:'ha_frigate_privacy/test_notification'});});
+      this._notificationWire=wire;
+      this._notificationTimer=setTimeout(()=>{expired=true;if(current()){this._notificationResult='unconfirmed';this._updateUI();}},15000);
+      this._updateUI();
+      try {
+        const result=await wire;
+        if(current()&&!expired)this._notificationResult=['ha_accepted','error','no_channel'].includes(result?.status)?result.status:'unconfirmed';
+      } catch(error) {
+        if(current()){
+          if(error?.code==='unauthorized'){this._denyAccess();return;}
+          this._notificationResult='unconfirmed';
+        }
+      } finally {
+        if(this._notificationWire===wire)this._notificationWire=null;
+        if(epoch===this._notificationEpoch){if(this._notificationTimer)clearTimeout(this._notificationTimer);this._notificationTimer=null;}
+        if(current())this._updateUI();
+      }
+    }
+    _buildHTML() { const t=this._t;const gate=this._buildGate();const summary=this._phaseSummary();const title=this._config.title||'Frigate Privacy';const main=gate||`<select class="tab-picker" data-tab-picker aria-label="${_esc(this._lang==='pl'?'Sekcje karty':'Card sections')}" hidden>${[['control',t.control],['schedule',t.schedule],['state',t.state],['history',this._periodStrings().title],['actions',t.actions],['info',t.info]].map(([id,label])=>`<option value="${id}" ${this._activeTab===id?'selected':''}>${_esc(label)}</option>`).join('')}</select><div class="tabs" role="tablist" aria-label="${_esc(this._lang==='pl'?'Sekcje karty':'Card sections')}">${[['control',t.control],['schedule',t.schedule],['state',t.state],['history',this._periodStrings().title],['actions',t.actions],['info',t.info]].map(([id,label])=>`<button class="tab-btn ${this._activeTab===id?'active':''}" data-tab="${id}" role="tab" aria-selected="${this._activeTab===id}">${_esc(label)}</button>`).join('')}</div>${this._activeTab==='control'?this._buildControlTab():this._activeTab==='schedule'?this._buildScheduleTab():this._activeTab==='state'?this._buildStateTab():this._activeTab==='history'?this._buildHistoryTab():this._activeTab==='actions'?this._buildActionsTab():this._buildInfoTab()}`;return `<style>${CSS}${createUiV3({language:this._lang}).css}</style><div class="card"><div class="header"><div class="brand"><div class="brand-mark"><ha-icon icon="mdi:shield-lock-outline"></ha-icon></div><div><h2>${_esc(title)}</h2><p class="subtitle">${_esc(t.subtitle)}</p></div></div>${summary.camera?`<button type="button" class="status-pill ${_esc(summary.phase)}" data-camera-summary="${_esc(summary.camera)}"><span class="status-dot" aria-hidden="true"></span>${_esc(summary.label)}</button>`:`<div class="status-pill ${_esc(summary.phase)}"><span class="status-dot"></span>${_esc(this._integrationChecked?summary.label:t.connecting)}</div>`}</div><div class="body">${this._buildIntroBanner()}${this._buildMutationResult()}${this._error&&!this._mutationOutcome?`<div class="notice error" style="margin-bottom:16px"><ha-icon icon="mdi:alert-circle-outline"></ha-icon><div><h3>${_esc(t.failed)}</h3><p>${_esc(this._error)}</p></div></div>`:''}${main}${this._buildDonateFooter()}</div><div class="toast"></div></div>`; }
     _syncNavigation() {
       if (!this._navigationObserver && this.isConnected && typeof ResizeObserver === 'function') {
         this._navigationObserver = new ResizeObserver(() => this._syncNavigation()); this._navigationObserver.observe(this);
@@ -873,6 +1053,13 @@ function createUiV3({ language = 'en' } = {}) {
 
     _attachEvents() {
       this._attachPeriodEvents();
+      this.shadowRoot.querySelector('[data-camera-summary]')?.addEventListener('click',event=>{
+        const id=event.currentTarget.dataset.cameraSummary;this.setActiveTab('control');
+        const camera=[...this.shadowRoot.querySelectorAll('[data-camera]')].find(node=>node.dataset.camera===id);
+        camera?.scrollIntoView?.({block:'nearest',behavior:'smooth'});this._focusControl(camera);
+      });
+      this.shadowRoot.querySelector('[data-notification-refresh]')?.addEventListener('click',()=>{if(!this._connectPromise)this._connectIntegration();});
+      this.shadowRoot.querySelector('[data-notification-test]')?.addEventListener('click',()=>this._testNotification());
       const root=this.shadowRoot;root.querySelector('[data-action="dismiss-intro"]')?.addEventListener('click',()=>this._dismissIntro());root.querySelector('[data-action="dismiss-support"]')?.addEventListener('click',()=>this._dismissSupport());root.querySelector('[data-action="retry"]')?.addEventListener('click',()=>this._connectIntegration());
       root.querySelector('.action-kind')?.addEventListener('change',(event)=>{this._actionKind=event.target.value;this._updateUI();});
       root.querySelector('[data-action="copy-example"]')?.addEventListener('click',async()=>{const field=root.querySelector('.action-example');try{await navigator.clipboard.writeText(field.value);this._showToast(this._t.copied,'success');}catch(_){field.focus();field.select();}});

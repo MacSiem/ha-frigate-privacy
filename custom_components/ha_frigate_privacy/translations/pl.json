@@ -21,9 +21,9 @@
     "step": {
       "init": {
         "title": "Frigate Privacy",
-        "description": "Dodatkowe powiadomienia są opcjonalne. Wybierz odbiorcę i zdarzenia. Ufaj tylko sprawdzonym automatyzacjom i skryptom: ich działania systemowe będą mogły sterować prywatnością bez sesji użytkownika.",
+        "description": "Powiadomienia są opcjonalne. W polu Odbiorca wybierz Home Assistant lub dostępny kanał/urządzenie, a następnie zdarzenia. Jeśli telefonu nie ma na liście, najpierw skonfiguruj jego powiadomienia w Home Assistant. Zapisz, wróć do karty Frigate Privacy, odśwież zapisane ustawienia i wybierz Wyślij test. Powiadomienia nie wymagają zaufanych automatyzacji. Ufaj tylko sprawdzonym automatyzacjom i skryptom: ich działania systemowe będą mogły sterować prywatnością bez sesji użytkownika.",
         "data": {
-          "notify_destination": "Odbiorca powiadomień",
+          "notify_destination": "Odbiorca",
           "notify_errors": "Błędy i częściowa prywatność",
           "notify_paused": "Pauza wybranego zakresu",
           "notify_resumed": "Przywrócenie zapisanych stanów",
@@ -35,6 +35,14 @@
     "error": {
       "invalid_destination": "Wybierz dostępnego odbiorcę powiadomień.",
       "invalid_action": "Wybierz automatyzację lub skrypt."
+    }
+  },
+  "selector": {
+    "notification_destination": {
+      "options": {
+        "": "Wyłączone",
+        "persistent_notification.create": "Powiadomienia w Home Assistant"
+      }
     }
   }
 }

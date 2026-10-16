@@ -35,7 +35,7 @@ class FrigatePrivacyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 def notification_destinations(hass):
     """Only available HA notification actions or notify entities are selectable."""
-    values = {'': 'Disabled', 'persistent_notification.create': 'Home Assistant'}
+    values = {'': 'Off', 'persistent_notification.create': 'Notifications in Home Assistant'}
     for service in hass.services.async_services().get('notify', {}):
         if service not in {'reload', 'send_message'}:
             values['notify.' + service] = 'notify.' + service
@@ -54,7 +54,8 @@ class FrigatePrivacyOptionsFlow(config_entries.OptionsFlow):
         destinations = notification_destinations(self.hass)
         errors = {}
         if user_input is not None:
-            if user_input.get('notify_destination', '') not in destinations:
+            if (user_input.get('notify_destination', '') not in destinations
+                    and user_input.get('notify_destination', '') != self.config_entry.options.get('notify_destination', '')):
                 errors['notify_destination'] = 'invalid_destination'
             elif any(not isinstance(value, str) or not value.startswith(('automation.', 'script.'))
                      for value in user_input.get('trusted_actions', [])):
@@ -62,9 +63,16 @@ class FrigatePrivacyOptionsFlow(config_entries.OptionsFlow):
             else:
                 return self.async_create_entry(title='', data=user_input)
         options = {**self.config_entry.options, **(user_input or {})}
+        # Keep a saved, currently unavailable destination visible without making
+        # it valid for a new selection or silently redirecting to Home Assistant.
+        saved_destination = self.config_entry.options.get('notify_destination', '')
+        if saved_destination and saved_destination not in destinations:
+            unavailable = ('niedostępny' if self.hass.config.language.startswith('pl')
+                           else 'unavailable')
+            destinations[saved_destination] = f'{saved_destination} ({unavailable})'
         return self.async_show_form(step_id='init', errors=errors, data_schema=vol.Schema({
             vol.Required('notify_destination', default=options.get('notify_destination', '')): selector.SelectSelector(selector.SelectSelectorConfig(
-                options=[{'value':value, 'label':label} for value,label in destinations.items()], mode=selector.SelectSelectorMode.DROPDOWN)),
+                options=[{'value':value, 'label':label} for value,label in destinations.items()], translation_key='notification_destination', mode=selector.SelectSelectorMode.DROPDOWN)),
             vol.Required('notify_errors', default=options.get('notify_errors', True)): bool,
             vol.Required('notify_paused', default=options.get('notify_paused', False)): bool,
             vol.Required('notify_resumed', default=options.get('notify_resumed', False)): bool,

@@ -51,19 +51,56 @@ class FrigatePrivacyNotifications:
                 return
             # Reserve before delivery: repeated state events must not flood a phone.
             self._last[camera_id] = signature
-            data = {'title':'Frigate Privacy', 'message':message}
-            if destination == 'persistent_notification.create':
-                data['notification_id'] = 'ha_frigate_privacy_optional_' + hashlib.sha256(camera_id.encode()).hexdigest()[:16]
-                domain, service = 'persistent_notification', 'create'
-            elif destination.startswith('entity:'):
-                data['entity_id'] = destination.removeprefix('entity:')
-                domain, service = 'notify', 'send_message'
-            else:
-                domain, service = destination.split('.', 1)
-            try:
-                await self.hass.services.async_call(domain, service, data, blocking=True)
-            except Exception as error:
-                _LOGGER.warning('Optional privacy notification failed (%s)', type(error).__name__)
+            notification_id = 'ha_frigate_privacy_optional_' + hashlib.sha256(camera_id.encode()).hexdigest()[:16]
+            await self._async_deliver(destination, message, notification_id)
+
+    def snapshot(self):
+        """Read saved preferences only; never imply confirmed delivery."""
+        options = self.entry.options
+        destination = options.get('notify_destination', '')
+        destinations = notification_destinations(self.hass)
+        return {
+            'destination': destination,
+            'label': destinations.get(destination, destination),
+            'available': self._destination_available(destination, destinations),
+            'events': {name: bool(options.get('notify_' + name, name == 'errors'))
+                       for name in ('errors', 'paused', 'resumed', 'scheduled')},
+        }
+
+    def _destination_available(self, destination, destinations):
+        if not destination or destination not in destinations:
+            return False
+        if destination.startswith('entity:'):
+            return self.hass.services.has_service('notify', 'send_message')
+        domain, service = destination.split('.', 1)
+        return self.hass.services.has_service(domain, service)
+
+    async def async_test(self):
+        """Explicit generic test of the latest saved channel; no state or dedup writes."""
+        destination = self.entry.options.get('notify_destination', '')
+        if not self._destination_available(destination, notification_destinations(self.hass)):
+            return {'status': 'no_channel'}
+        status = await self._async_deliver(
+            destination, 'Frigate Privacy — test', 'ha_frigate_privacy_notification_test'
+        )
+        return {'status': status}
+
+    async def _async_deliver(self, destination, message, notification_id):
+        data = {'title': 'Frigate Privacy', 'message': message}
+        if destination == 'persistent_notification.create':
+            data['notification_id'] = notification_id
+            domain, service = 'persistent_notification', 'create'
+        elif destination.startswith('entity:'):
+            data['entity_id'] = destination.removeprefix('entity:')
+            domain, service = 'notify', 'send_message'
+        else:
+            domain, service = destination.split('.', 1)
+        try:
+            await self.hass.services.async_call(domain, service, data, blocking=True)
+        except Exception as error:
+            _LOGGER.warning('Optional privacy notification failed (%s)', type(error).__name__)
+            return 'error'
+        return 'ha_accepted'
 
     async def async_stop(self):
         if self._unsubscribe:

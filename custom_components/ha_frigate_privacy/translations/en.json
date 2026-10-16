@@ -21,9 +21,9 @@
     "step": {
       "init": {
         "title": "Frigate Privacy",
-        "description": "Additional notifications are optional. Select a destination and the events to send. Trust only automations and scripts that you have reviewed: this allows their system actions to control privacy without a user session.",
+        "description": "Notifications are optional. Choose Home Assistant or an available channel/device under Destination, then choose the events. If your phone is missing, configure its notifications in Home Assistant first. Save, return to the Frigate Privacy card, refresh saved settings, and choose Send test. Notifications do not require trusted automations. Trust only automations and scripts that you have reviewed: this allows their system actions to control privacy without a user session.",
         "data": {
-          "notify_destination": "Notification destination",
+          "notify_destination": "Destination",
           "notify_errors": "Errors and partial privacy",
           "notify_paused": "Selected scope paused",
           "notify_resumed": "Targets restored",
@@ -35,6 +35,14 @@
     "error": {
       "invalid_destination": "Choose an available notification destination.",
       "invalid_action": "Choose an automation or script."
+    }
+  },
+  "selector": {
+    "notification_destination": {
+      "options": {
+        "": "Off",
+        "persistent_notification.create": "Notifications in Home Assistant"
+      }
     }
   }
 }

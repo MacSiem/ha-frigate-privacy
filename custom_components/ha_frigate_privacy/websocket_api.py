@@ -304,12 +304,66 @@ async def _ws_get_state(
     msg: dict[str, Any],
 ) -> None:
     """Return persisted state plus current Frigate camera discovery."""
-    state = await _storage(hass).async_get_state()
-    state["recovery_ready"] = hass.data.get(DOMAIN, {}).get(
-        DATA_RECOVERY_READY, False
-    )
+    if not _notification_authorized(connection, msg):
+        connection.send_error(msg["id"], "unauthorized", "Administrator required")
+        return
+    bucket = hass.data.get(DOMAIN, {})
+    storage, notifier = bucket.get(DATA_STORAGE), bucket.get("notifications")
+    if storage is None or notifier is None:
+        connection.send_error(msg["id"], "integration_unavailable", "Integration unavailable")
+        return
+    user = connection.user
+    user_id = user.id
+    state = dict(await storage.async_get_state())
+    if not _notification_authorized(connection, msg) or connection.user is not user or connection.user.id != user_id:
+        connection.send_error(msg["id"], "unauthorized", "Administrator required")
+        return
+    bucket = hass.data.get(DOMAIN, {})
+    if bucket.get(DATA_STORAGE) is not storage or bucket.get("notifications") is not notifier:
+        connection.send_error(msg["id"], "integration_unavailable", "Integration unavailable")
+        return
+    state["recovery_ready"] = bucket.get(DATA_RECOVERY_READY, False)
     state["cameras"] = discover_frigate_cameras(hass)
+    state["notifications"] = notifier.snapshot()
     connection.send_result(msg["id"], state)
+
+
+def _notification_authorized(connection, msg):
+    """Only an active human admin session; trusted system actions do not apply."""
+    user = getattr(connection, "user", None)
+    return bool(
+        user and user.is_admin and getattr(user, "is_active", False)
+        and not getattr(user, "system_generated", False)
+        and getattr(user, "id", None)
+        and getattr(connection.context(msg), "user_id", None) == user.id
+    )
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/test_notification"})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def _ws_test_notification(hass, connection, msg):
+    """Send one explicit test to the saved destination, never to client input."""
+    if not _notification_authorized(connection, msg):
+        connection.send_error(msg["id"], "unauthorized", "Administrator required")
+        return
+    notifier = hass.data.get(DOMAIN, {}).get("notifications")
+    if notifier is None:
+        connection.send_error(msg["id"], "integration_unavailable", "Integration unavailable")
+        return
+    user = connection.user
+    user_id = user.id
+    try:
+        result = await notifier.async_test()
+    except Exception:
+        result = {"status": "error"}
+    if not _notification_authorized(connection, msg) or connection.user is not user or connection.user.id != user_id:
+        connection.send_error(msg["id"], "unauthorized", "Administrator required")
+        return
+    if hass.data.get(DOMAIN, {}).get("notifications") is not notifier:
+        connection.send_error(msg["id"], "integration_unavailable", "Integration unavailable")
+        return
+    connection.send_result(msg["id"], result)
 
 
 def _period_read_authorized(connection: websocket_api.ActiveConnection) -> bool:
@@ -361,6 +415,7 @@ def async_register_commands(hass: HomeAssistant) -> None:
         _ws_resume_camera,
         _ws_get_state,
         _ws_get_periods,
+        _ws_test_notification,
     ):
         websocket_api.async_register_command(hass, handler)
 

@@ -51,3 +51,10 @@ jobs:
         run: node --test --test-concurrency=1 tests/*.test.mjs
       - name: Root/shipped bundle parity
         run: cmp -s ha-frigate-privacy.js custom_components/ha_frigate_privacy/www/ha-frigate-privacy-card.js
+      - name: Canonical shared UI in actual shipped closures
+        run: node scripts/verify-shared.cjs
+      - name: HA frontend review hints
+        continue-on-error: true
+        run: |
+          python3 scripts/ha_ci_advisory.py --root . ha-frigate-privacy.js shared/ha-tools-format.js shared/ha-tools-lists.js > "$RUNNER_TEMP/ha-ci-advisory.json"
+          python3 -m json.tool "$RUNNER_TEMP/ha-ci-advisory.json"
