@@ -149,3 +149,19 @@ test('camera names use one natural locale order without changing selected IDs',a
     assert.deepEqual([...f.c._selectedCameras],['front']);
   } finally {f.close();}
 });
+
+test('history distinguishes repeated local DST times and profile formatting does not fetch again',async()=>{
+  const f=await fixture();try {
+    const count=f.calls.length;
+    const first='2026-11-01T05:30:00Z',second='2026-11-01T06:30:00Z';
+    assert.notEqual(f.c._periodTime(first),f.c._periodTime(second),'two actual instants must not share an ambiguous local label');
+    assert.match(f.c._periodTime(first),/GMT-4/);
+    assert.match(f.c._periodTime(second),/GMT-5/);
+    f.hass.locale.time_format='12';f.c.hass=f.hass;
+    assert.match(f.c._periodTime(first),/01:30.*AM/i);
+    assert.equal(f.calls.length,count,'format-only updates do not request data');
+    f.c.setActiveTab('schedule');
+    assert.match(f.c.shadowRoot.querySelector('[data-schedule-zone]')?.textContent||'',/Asia\/Tokyo/);
+    assert.equal(f.c.shadowRoot.querySelector('.input-start').value,'22:00','display zone does not reinterpret operational schedule hours');
+  }finally{f.close();}
+});
