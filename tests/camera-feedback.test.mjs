@@ -1,8 +1,28 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
 import {JSDOM} from 'jsdom';
 const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
+// Run the real pause/extension producer with its existing HA service/storage doubles.
+// No handcrafted persisted fields: these regressions must follow backend changes.
+const schedulePauses=JSON.parse(execFileSync('python3',['-B','-c',`
+import asyncio, importlib.util, json
+from pathlib import Path
+spec = importlib.util.spec_from_file_location('recovery_fixture', Path('tests/test_restart_recovery.py'))
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+async def scenario(stream_type, initial_camera):
+    hass, storage = m._Hass(), m._Storage()
+    hass.states.values['camera.front'].state = initial_camera
+    hass.states.values['camera.front'].attributes['supported_features'] = 0 if initial_camera == 'idle' else 2
+    await m.control.async_pause_camera(hass, storage, 'front', stream_type=stream_type, duration_minutes=15, source='manual')
+    await m.control.async_pause_camera(hass, storage, 'front', stream_type='all', source='schedule', schedule_id='B')
+    return {'cameras':m.control.discover_frigate_cameras(hass), 'paused':storage.paused, 'last_operations':{}, 'schedules':[]}
+async def main():
+    return {'subset':await scenario('main', 'streaming'), 'toggled':await scenario('all', 'streaming'), 'neverToggled':await scenario('all', 'idle')}
+print(json.dumps(asyncio.run(main())))
+`],{cwd:new URL('..',import.meta.url),encoding:'utf8'}));
 for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy/www/ha-frigate-privacy-card.js']){
  async function fixture(){
   const dom=new JSDOM('<html><body></body></html>',{runScripts:'dangerously',pretendToBeVisual:true,url:'http://localhost/'}),w=dom.window;
@@ -131,6 +151,48 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
    assert.match(tile.textContent,/Requested scope: Everything/);assert.doesNotMatch(tile.textContent,/Applied scope/);
    assert.match(tile.querySelector('[data-video-stop-unconfirmed]')?.textContent||'',/video stop is not confirmed/i);
    assert.equal(f.c.shadowRoot.querySelector('[data-channel="video"]').dataset.channelState,'idle');
+  }finally{f.close();}
+ });
+ test(path+': real schedule extension separates original requested subset from additional coverage',async()=>{
+  const f=await fixture();try{
+   const state=schedulePauses.subset,record=state.paused.front;
+   assert.equal(record.stream_type,'main');assert.equal(record.source,'manual');assert.equal(record.extension,true);
+   assert.deepEqual(record.switches,['switch.front_recordings','switch.front_detect']);assert.equal(record.camera_toggled,true);
+   f.c._applyState(state);
+   const tile=f.c.shadowRoot.querySelector('[data-camera-feedback="front"]');
+   assert.match(tile.textContent,/Requested scope: Recording/);assert.doesNotMatch(tile.textContent,/Applied scope/);
+   assert.match(tile.querySelector('[data-schedule-coverage]')?.textContent||'',/schedule.*confirmed targets/i);
+   assert.match(tile.textContent,/Pause.*switch.front_detect: paused/s);assert.match(tile.textContent,/Pause.*camera.front: paused/s);
+  }finally{f.close();}
+ });
+ test(path+': real schedule extension retains confirmed idle video stop from the original pause',async()=>{
+  const f=await fixture();try{
+   const state=schedulePauses.toggled,record=state.paused.front;
+   assert.equal(record.phase,'paused');assert.equal(record.camera_planned,false);assert.equal(record.camera_toggled,true);
+   assert.equal(record.target_outcomes['camera.front'],'paused');assert.equal(record.last_verified_actual_state['camera.front'],'idle');
+   assert.equal(state.cameras[0].camera_state,'idle');
+   f.c._applyState(state);
+   const tile=f.c.shadowRoot.querySelector('[data-camera-feedback="front"]');
+   assert.equal(tile.querySelector('[data-video-stop-unconfirmed]'),null);
+   assert.doesNotMatch(tile.textContent,/video was not switched|video stop is not confirmed/i);
+   assert.match(tile.textContent,/Pause.*camera.front: paused/s);
+   // Missing evidence or a newly streaming camera cannot inherit the prior proof.
+   for(const invalid of [
+    {...state,cameras:[{...state.cameras[0],camera_state:'streaming'}]},
+    {...state,paused:{front:{...record,target_outcomes:{}}}},
+    {...state,paused:{front:{...record,last_verified_actual_state:{}}}},
+   ]){
+    f.c._applyState(invalid);
+    assert.ok(f.c.shadowRoot.querySelector('[data-video-stop-unconfirmed]'));
+   }
+  }finally{f.close();}
+ });
+ test(path+': real schedule extension preserves the warning when idle video was never toggled',async()=>{
+  const f=await fixture();try{
+   const state=schedulePauses.neverToggled,record=state.paused.front;
+   assert.equal(record.camera_planned,false);assert.equal(record.camera_toggled,false);assert.equal(record.phase,'paused');
+   f.c._applyState(state);
+   assert.match(f.c.shadowRoot.querySelector('[data-video-stop-unconfirmed]')?.textContent||'',/video stop is not confirmed/i);
   }finally{f.close();}
  });
  test(path+': unrecognized channel states cannot inherit Object prototype entries',async()=>{
