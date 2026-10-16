@@ -84,4 +84,24 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
    f.c.shadowRoot.querySelector('[data-preview-camera="camera.front"]').click();f.c.shadowRoot.querySelector('[data-preview-camera="camera.front"]').click();await tick();assert.equal(calls,2);
   }finally{f.close();}
  });
+ test(path+': mixed camera results keep confirmed success and error separate',async()=>{
+  const f=await fixture();try{
+   f.c._applyState({...f.state,paused:{}});
+   f.c._hass.callWS=async m=>m.type.endsWith('/get_state')?{...f.state,paused:{front:f.state.paused.front}}:{ok:false,phase:'partial',results:[{camera_id:'front',paused:true,phase:'paused'},{camera_id:'back',paused:false,phase:'error'}]};
+   assert.equal(await f.c._pause(),false);assert.equal(f.c._mutationOutcome.code,'partial');
+   assert.equal(f.c.shadowRoot.querySelector('[data-camera-feedback="front"] [data-result-state]').dataset.resultState,'success');
+   assert.equal(f.c.shadowRoot.querySelector('[data-camera-feedback="back"] [data-result-state]').dataset.resultState,'error');
+   f.c._hass.callWS=async m=>m.type.endsWith('/get_state')?f.state:{ok:false,phase:'partial',results:[{camera_id:'front',paused:true,phase:'paused'}]};
+   await f.c._pause();assert.equal(f.c.shadowRoot.querySelector('[data-camera-feedback="back"] [data-result-state]').dataset.resultState,'unconfirmed');
+  }finally{f.close();}
+ });
+ test(path+': tile distinguishes pause from resume evidence and requested from applied scope',async()=>{
+  const f=await fixture();try{
+   const restored={active:false,phase:'active',stream_type:'main',target_outcomes:{'switch.front_recordings':'paused'},resume_target_outcomes:{'switch.front_recordings':'active'},last_verified_actual_state:{'switch.front_recordings':'on'}};
+   f.c._applyState({...f.state,paused:{},last_operations:{front:restored}});
+   const tile=f.c.shadowRoot.querySelector('[data-camera-feedback="front"]');assert.match(tile.textContent,/Resume.*switch.front_recordings.*active/s);assert.match(tile.textContent,/Pause.*switch.front_recordings.*paused/s);
+   f.c._applyState({...f.state,paused:{front:{...f.state.paused.front,phase:'pausing'}}});
+   assert.match(f.c.shadowRoot.querySelector('[data-camera-feedback="front"]').textContent,/Requested scope/);assert.doesNotMatch(f.c.shadowRoot.querySelector('[data-camera-feedback="front"]').textContent,/Applied scope/);
+  }finally{f.close();}
+ });
 }
