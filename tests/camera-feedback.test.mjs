@@ -123,7 +123,9 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
  });
  test(path+': Everything does not imply confirmed video stop on a camera without direct video control',async()=>{
   const f=await fixture();try{
-   const state={...f.state,cameras:[{...f.state.cameras[0],camera_can_toggle:false,camera_state:'idle'}],paused:{front:{...f.state.paused.front,stream_type:'all'}}};
+   // The actual producer marks every registered Frigate camera as can_toggle;
+   // whether this action switched video is persisted separately in its plan.
+   const state={...f.state,cameras:[{...f.state.cameras[0],camera_can_toggle:true,camera_state:'idle'}],paused:{front:{...f.state.paused.front,stream_type:'all',camera_planned:false}}};
    f.c._applyState(state);
    const tile=f.c.shadowRoot.querySelector('[data-camera-feedback="front"]');
    assert.match(tile.textContent,/Requested scope: Everything/);assert.doesNotMatch(tile.textContent,/Applied scope/);
