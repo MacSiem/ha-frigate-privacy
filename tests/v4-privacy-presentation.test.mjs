@@ -121,3 +121,31 @@ test('unavailable and missing snapshots do not claim notification delivery or en
     } finally {f.close();}
   }
 });
+
+test('ordinary hass updates retain pending test acceptance; timeout is unconfirmed without retry',async()=>{
+  let resolve,timeout;
+  const f=await fixture({notifications:{destination:'notify.qa',label:'QA',available:true,events:{errors:true}},reply:()=>new Promise(r=>resolve=r)});try {
+    f.c.setActiveTab('actions');
+    const button=f.c.shadowRoot.querySelector('[data-notification-test]');assert.ok(button);
+    const originalTimeout=f.w.setTimeout;
+    f.w.setTimeout=(callback,ms,...args)=>ms===15000?(timeout=callback,999):originalTimeout(callback,ms,...args);
+    button.click();await settle();
+    f.c.hass={...f.hass};resolve({status:'ha_accepted'});await settle();
+    assert.match(f.c.shadowRoot.querySelector('[data-notification-result]').textContent,/Home Assistant accepted/);
+    f.c.shadowRoot.querySelector('[data-notification-test]').click();await settle();timeout();
+    assert.match(f.c.shadowRoot.querySelector('[data-notification-result]').textContent,/unconfirmed/i);
+    assert.equal(f.c.shadowRoot.querySelector('[data-notification-test]').disabled,true);
+    resolve({status:'ha_accepted'});await settle();
+    assert.match(f.c.shadowRoot.querySelector('[data-notification-result]').textContent,/unconfirmed/i);
+    assert.equal(f.calls.filter(m=>m.type.endsWith('/test_notification')).length,2,'one request for each explicit click; timeout never retries');
+  } finally {f.close();}
+});
+
+test('camera names use one natural locale order without changing selected IDs',async()=>{
+  const f=await fixture({language:'pl'});try {
+    f.state.cameras[0].name='Kamera 10';f.state.cameras[1].name='Kamera 2';f.c._selectedCameras.add('front');f.c._applyState(f.state);
+    const rows=[...f.c.shadowRoot.querySelectorAll('[data-camera]')].filter(e=>e.dataset.camera!=='__all__');
+    assert.deepEqual(rows.map(e=>e.querySelector('.camera-name').textContent),['Kamera 2','Kamera 10']);
+    assert.deepEqual([...f.c._selectedCameras],['front']);
+  } finally {f.close();}
+});
