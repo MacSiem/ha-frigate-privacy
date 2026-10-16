@@ -74,4 +74,14 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
    assert.equal(f.c.shadowRoot.querySelector('[data-camera-pending]'),null);
   }finally{f.close();}
  });
+ test(path+': preview failure stays visible until an explicit retry; unavailable capture is not success',async()=>{
+  const f=await fixture();try{
+   let calls=0;f.w.loadCardHelpers=async()=>{calls++;throw Error('PRIVATE_ERROR_CANARY');};
+   f.c.shadowRoot.querySelector('[data-preview-camera="camera.front"]').click();await tick();
+   assert.match(f.c.shadowRoot.querySelector('[data-preview-host]').textContent,/unavailable/);
+   assert.doesNotMatch(f.c.shadowRoot.textContent,/PRIVATE_ERROR_CANARY/);
+   f.c._updateUI();f.c.hass=f.hass;await tick();assert.equal(calls,1,'normal HA updates must not retry preview after failure');
+   f.c.shadowRoot.querySelector('[data-preview-camera="camera.front"]').click();f.c.shadowRoot.querySelector('[data-preview-camera="camera.front"]').click();await tick();assert.equal(calls,2);
+  }finally{f.close();}
+ });
 }
