@@ -42,7 +42,7 @@
   ],
   "privacy": {
     "synthetic_only": true,
-    "ocr_reviewed": false,
+    "ocr_reviewed": true,
     "external_requests": false
   },
   "capture": {
@@ -52,7 +52,7 @@
     "device_pixel_ratio": 1,
     "source_head": "d64cc17119d6dd3396c1374c361a7ee5fd3f2428",
     "scope": "Synthetic documentation only: generic producer-shaped records, relative deadlines, periods.py projection and explicit OFF notification snapshot. Actual HA/HACS acceptance is separate.",
-    "review": "Owner personally inspected light/dark controls, local history timestamps and notification instructions; generic data only. OCR pending.",
+    "review": "Owner personally inspected light/dark controls, local history timestamps and notification instructions. OCR of all four captures reviewed: generic camera labels, no household data, addresses or credentials. Exact original JPEG bytes retained.",
     "source_qualification": "Exact JS and harness hashes above bind these captures to the current implementation."
   }
 }
