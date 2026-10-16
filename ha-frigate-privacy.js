@@ -190,7 +190,7 @@ function createUiV3({ language = 'en' } = {}) {
       this._periodOnline = () => { this._historyBrowserOnline = true; this._invalidatePeriods('discarded'); this._updateUI(); };
       this._editingScheduleIdx = null; this._scheduleForm = this._emptySchedule(); this._lastHtml = ''; this._toastTimer = null;
       this._previewCamera = null; this._previewNode = null; this._previewLoad = null; this._previewEpoch = 0; this._previewFailed = false;
-      this._cameraActions = {};
+      this._cameraActions = Object.create(null);
     }
 
     connectedCallback() {
@@ -250,7 +250,7 @@ function createUiV3({ language = 'en' } = {}) {
       if (this._statePollTimer) clearInterval(this._statePollTimer); this._statePollTimer = null; this._requestEpoch += 1; this._connectPromise = null; this._lastStatePollAt = 0; this._busy = false; this._integrationChecked = false; this._integrationAvailable = false; if (this._toastTimer) clearTimeout(this._toastTimer); }
     _clearPrivateState() {
       this._closePreview();
-      this._cameraActions = {};
+      this._cameraActions = Object.create(null);
       this._pendingControlFocus = null;
       this._invalidatePeriods('discarded');
       this.shadowRoot.activeElement?.blur(); this._busy = false; this._mutationOutcome = null; this._error = ''; this._editingScheduleIdx = null; this._scheduleForm = this._emptySchedule();
@@ -437,14 +437,20 @@ function createUiV3({ language = 'en' } = {}) {
       // Only text changes: never replace controls, restart preview or trigger camera actions.
       if (!this.isConnected || !this._periodAuthority()) return;
       this.shadowRoot.querySelectorAll('[data-camera-countdown]').forEach(node => {
-        const record = this._paused[node.dataset.cameraCountdown];
+        const record = this._ownCameraRecord(this._paused, node.dataset.cameraCountdown);
         if (record) node.textContent = this._countdownText(record);
       });
     }
+    _ownCameraRecord(records, id) {
+      if (!records || typeof records !== 'object' || !Object.hasOwn(records, id)) return null;
+      const record = records[id];
+      return record && typeof record === 'object' && !Array.isArray(record) ? record : null;
+    }
     _cameraFeedback(cam) {
-      const record = this._paused[cam.camera_id] || this._lastOperations[cam.camera_id];
+      const activeRecord = this._ownCameraRecord(this._paused, cam.camera_id);
+      const record = activeRecord || this._ownCameraRecord(this._lastOperations, cam.camera_id);
       const t = this._t, labels = this._cameraStrings();
-      const attempt = this._cameraActions[cam.camera_id];
+      const attempt = this._ownCameraRecord(this._cameraActions, cam.camera_id);
       const request = attempt ? `<div class="helper" ${attempt.pending ? 'data-camera-pending' : ''}>${_esc(this._lang==='pl'?'Ostatnie żądanie':'Last request')}: ${attempt.pending ? _esc(labels.pending) : createUiV3({language:this._lang}).statusHtml(attempt.code)}</div>` : '';
       if (!record) return request ? `<div class="camera-feedback" data-camera-feedback="${_esc(cam.camera_id)}">${request}</div>` : '';
       const phase = ['pausing','paused','resuming','partial','error','active'].includes(record.phase) ? record.phase : 'unknown';
@@ -459,7 +465,7 @@ function createUiV3({ language = 'en' } = {}) {
         ...Object.entries(record.last_verified_actual_state || {}).map(([target,value])=>`${t.observed} · ${target}: ${String(value)}`),
       ];
       const scopeLabel = phase==='paused' ? labels.scope : (this._lang==='pl'?'Żądany zakres':'Requested scope');
-      return `<div class="camera-feedback" data-camera-feedback="${_esc(cam.camera_id)}">${request}<span class="phase ${phase}" data-camera-phase="${phase}">${_esc(this._periodText(phase))}</span><div class="helper">${_esc(scopeLabel)}: ${_esc(scope)}${minutes !== null ? ` · ${_esc(this._lang==='pl'?'Czas timera':'Timer duration')}: ${minutes} min` : ''}</div>${this._paused[cam.camera_id] ? `<div class="camera-countdown" data-camera-countdown="${_esc(cam.camera_id)}" role="timer"></div><div class="helper">${_esc(t.deadline)}: ${_esc(Number.isFinite(end) ? this._formatCameraTime(end) : '—')}</div>` : ''}${evidence.length ? `<details class="evidence"><summary>${_esc(t.evidence)}</summary><div class="evidence-list">${evidence.map(text=>`<div>${_esc(text)}</div>`).join('')}</div></details>` : ''}</div>`;
+      return `<div class="camera-feedback" data-camera-feedback="${_esc(cam.camera_id)}">${request}<span class="phase ${phase}" data-camera-phase="${phase}">${_esc(this._periodText(phase))}</span><div class="helper">${_esc(scopeLabel)}: ${_esc(scope)}${minutes !== null ? ` · ${_esc(this._lang==='pl'?'Czas timera':'Timer duration')}: ${minutes} min` : ''}</div>${activeRecord ? `<div class="camera-countdown" data-camera-countdown="${_esc(cam.camera_id)}" role="timer"></div><div class="helper">${_esc(t.deadline)}: ${_esc(Number.isFinite(end) ? this._formatCameraTime(end) : '—')}</div>` : ''}${evidence.length ? `<details class="evidence"><summary>${_esc(t.evidence)}</summary><div class="evidence-list">${evidence.map(text=>`<div>${_esc(text)}</div>`).join('')}</div></details>` : ''}</div>`;
     }
     _formatCameraTime(value) {
       const zone = this._hass?.config?.time_zone || 'UTC';

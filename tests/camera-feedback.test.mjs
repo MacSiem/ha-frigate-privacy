@@ -95,6 +95,22 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
    await f.c._pause();assert.equal(f.c.shadowRoot.querySelector('[data-camera-feedback="back"] [data-result-state]').dataset.resultState,'unconfirmed');
   }finally{f.close();}
  });
+ test(path+': reserved camera slugs never inherit phantom operations',async()=>{
+  const f=await fixture();try{
+   const state={...f.state,cameras:[
+    {camera_id:'constructor',entity_id:'camera.constructor',name:'Constructor',state:'on',switches:[]},
+    {camera_id:'__proto__',entity_id:'camera.__proto__',name:'Prototype',state:'on',switches:[]}],paused:{},last_operations:{}};
+   f.c._applyState(state);
+   assert.equal(f.c.shadowRoot.querySelectorAll('[data-camera-feedback]').length,0);
+   const own=JSON.parse('{"__proto__":{"active":true,"phase":"paused","stream_type":"main","ends_at":null}}');
+   f.c._hass.callWS=async m=>m.type.endsWith('/get_state')?{...state,paused:own}:{ok:true,phase:'paused',results:[{camera_id:'__proto__',paused:true,phase:'paused'}]};
+   assert.equal(await f.c._runMutation('pause_camera',{cameras:['__proto__']}),true);
+   assert.equal(f.c.shadowRoot.querySelector('[data-camera-feedback="__proto__"] [data-result-state]').dataset.resultState,'success');
+   assert.equal(f.c.shadowRoot.querySelector('[data-camera-feedback="constructor"]'),null);
+   f.c._applyState({...state,paused:{},last_operations:JSON.parse('{"constructor":{"phase":"active","stream_type":"main"}}')});
+   assert.equal(f.c.shadowRoot.querySelector('[data-camera-feedback="constructor"] [data-camera-countdown]'),null);
+  }finally{f.close();}
+ });
  test(path+': tile distinguishes pause from resume evidence and requested from applied scope',async()=>{
   const f=await fixture();try{
    const restored={active:false,phase:'active',stream_type:'main',target_outcomes:{'switch.front_recordings':'paused'},resume_target_outcomes:{'switch.front_recordings':'active'},last_verified_actual_state:{'switch.front_recordings':'on'}};
