@@ -40,8 +40,8 @@
   "selector": {
     "notification_destination": {
       "options": {
-        "": "Wyłączone",
-        "persistent_notification.create": "Powiadomienia w Home Assistant"
+        "off": "Wyłączone",
+        "home_assistant": "Powiadomienia w Home Assistant"
       }
     }
   }

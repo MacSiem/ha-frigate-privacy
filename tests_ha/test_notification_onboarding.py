@@ -161,3 +161,20 @@ async def test_test_does_not_consume_normal_dedup_and_failed_event_reservation_s
     await notifier._notify('private_camera')
     assert len(calls) == 2, 'failed event remains reserved; explicit test is independent'
     assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+@pytest.mark.parametrize('saved,ui_value', [('', 'off'), ('persistent_notification.create', 'home_assistant')])
+async def test_localized_destination_values_preserve_the_saved_channel(hass, saved, ui_value):
+    entry = MockConfigEntry(domain=DOMAIN, data={}, unique_id=DOMAIN, options={'notify_destination': saved})
+    entry.add_to_hass(hass)
+    flow = await hass.config_entries.options.async_init(entry.entry_id)
+    schema = flow['data_schema'].schema
+    key = next(key for key in schema if key.schema == 'notify_destination')
+    assert key.default() == ui_value
+    assert any(option['value'] == ui_value for option in schema[key].config['options'])
+    result = await hass.config_entries.options.async_configure(flow['flow_id'], {
+        'notify_destination': ui_value, 'notify_errors': True, 'notify_paused': False,
+        'notify_resumed': False, 'notify_scheduled': False, 'trusted_actions': []})
+    assert result['type'] == 'create_entry'
+    assert entry.options['notify_destination'] == saved
+    assert entry.options['trusted_actions'] == []

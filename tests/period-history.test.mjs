@@ -12,7 +12,7 @@ function fixture() {
   const connection = {connected:true,addEventListener(type,cb){listeners.set(type,cb);},removeEventListener(type,cb){if(listeners.get(type)===cb)listeners.delete(type);}};
   let resolveHistory; const calls = [];
   const callWS = message => {calls.push(message); if(message.type.endsWith('/get_periods')) return new Promise(resolve => {resolveHistory=resolve;});return Promise.resolve({cameras:[],schedules:[],paused:{},last_operations:{},recovery_ready:true});};
-  const hass = {states:{},themes:{darkMode:false},language:'en',config:{time_zone:'Europe/Warsaw'},user:{id:'admin',is_admin:true,is_active:true,groups:[{id:'system-admin'}]},connection,callWS};
+  const hass = {states:{},themes:{darkMode:false},language:'en',locale:{language:'en',time_zone:'server',time_format:'24'},config:{time_zone:'Europe/Warsaw'},user:{id:'admin',is_admin:true,is_active:true,groups:[{id:'system-admin'}]},connection,callWS};
   card.setConfig({type:'custom:ha-frigate-privacy',unknown_field:'preserved'});card.hass=hass;
   dom.window.document.body.append(card);
   return {dom,card,hass,calls,listeners,resolve(value){resolveHistory(value);}};

@@ -53,7 +53,11 @@ class FrigatePrivacyOptionsFlow(config_entries.OptionsFlow):
         from homeassistant.helpers import selector
         destinations = notification_destinations(self.hass)
         errors = {}
+        ui_values = {'': 'off', 'persistent_notification.create': 'home_assistant'}
+        saved_values = {value: key for key, value in ui_values.items()}
         if user_input is not None:
+            user_input = dict(user_input)
+            user_input['notify_destination'] = saved_values.get(user_input.get('notify_destination', ''), user_input.get('notify_destination', ''))
             if (user_input.get('notify_destination', '') not in destinations
                     and user_input.get('notify_destination', '') != self.config_entry.options.get('notify_destination', '')):
                 errors['notify_destination'] = 'invalid_destination'
@@ -71,8 +75,8 @@ class FrigatePrivacyOptionsFlow(config_entries.OptionsFlow):
                            else 'unavailable')
             destinations[saved_destination] = f'{saved_destination} ({unavailable})'
         return self.async_show_form(step_id='init', errors=errors, data_schema=vol.Schema({
-            vol.Required('notify_destination', default=options.get('notify_destination', '')): selector.SelectSelector(selector.SelectSelectorConfig(
-                options=[{'value':value, 'label':label} for value,label in destinations.items()], translation_key='notification_destination', mode=selector.SelectSelectorMode.DROPDOWN)),
+            vol.Required('notify_destination', default=ui_values.get(options.get('notify_destination', ''), options.get('notify_destination', ''))): selector.SelectSelector(selector.SelectSelectorConfig(
+                options=[{'value':ui_values.get(value, value), 'label':label} for value,label in destinations.items()], translation_key='notification_destination', mode=selector.SelectSelectorMode.DROPDOWN)),
             vol.Required('notify_errors', default=options.get('notify_errors', True)): bool,
             vol.Required('notify_paused', default=options.get('notify_paused', False)): bool,
             vol.Required('notify_resumed', default=options.get('notify_resumed', False)): bool,
