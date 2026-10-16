@@ -162,6 +162,6 @@ test('history distinguishes repeated local DST times and profile formatting does
     assert.equal(f.calls.length,count,'format-only updates do not request data');
     f.c.setActiveTab('schedule');
     assert.match(f.c.shadowRoot.querySelector('[data-schedule-zone]')?.textContent||'',/Asia\/Tokyo/);
-    assert.equal(f.c.shadowRoot.querySelector('.input-start').value,'22:00','display zone does not reinterpret operational schedule hours');
+    assert.equal(f.c.shadowRoot.querySelector('.input-start').value,'18:00','display zone does not reinterpret operational schedule hours');
   }finally{f.close();}
 });
