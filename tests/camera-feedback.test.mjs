@@ -11,7 +11,8 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
   w.setInterval=(callback,delay)=>{const t={callback,delay};clock.timers.add(t);return t;};
   w.clearInterval=t=>clock.timers.delete(t);
   const created=[];
-  w.loadCardHelpers=async()=>({createCardElement:config=>{const e=w.document.createElement('div');e.dataset.nativePreview=config.entity;e.previewConfig=config;created.push(e);return e;}});
+  w.customElements.define('hui-picture-entity-card',class extends w.HTMLElement {setConfig(config){this.previewConfig=config;}});
+  w.loadCardHelpers=async()=>({createCardElement:config=>{const e=w.document.createElement('hui-picture-entity-card');e.setConfig(config);e.dataset.nativePreview=config.entity;created.push(e);return e;}});
   w.eval(readFileSync(new URL('../'+path,import.meta.url),'utf8'));
   const c=w.document.createElement('ha-frigate-privacy');c.setConfig({show_support:false});w.document.body.append(c);
   const record=(minutes,phase='paused')=>({active:true,phase,stream_type:'main',source:'manual',started_at:'2026-10-16T04:00:00Z',ends_at:new Date(clock.now+minutes*60000).toISOString(),target_outcomes:{'switch.front_recordings':phase==='paused'?'paused':'unavailable'},last_verified_actual_state:{'switch.front_recordings':phase==='paused'?'off':'unavailable'}});

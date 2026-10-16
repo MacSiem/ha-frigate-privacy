@@ -501,6 +501,36 @@ function createUiV3({ language = 'en' } = {}) {
       if (!same && this._previewAllowed(entity)) this._previewCamera = entity;
       this._updateUI();
     }
+    _previewWait(promise) {
+      // A stalled frontend import must leave an explicit retryable result.
+      let timer;
+      return Promise.race([promise, new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('preview_unavailable')), 10000);
+      })]).finally(() => clearTimeout(timer));
+    }
+    async _loadPreviewHelpers() {
+      if (typeof window.loadCardHelpers !== 'function') {
+        if (!this._previewBootstrap) {
+          this._previewBootstrap = (async () => {
+            await this._previewWait(customElements.whenDefined('partial-panel-resolver'));
+            // HA's own route loader imports Lovelace without mounting a dashboard.
+            // Feature detection covers current HA and the declared 2024.7 minimum.
+            const resolver = document.createElement('partial-panel-resolver');
+            const getRoutes = resolver._getRoutes || resolver.getRoutes;
+            if (typeof getRoutes !== 'function') throw new Error('preview_unavailable');
+            const path = 'ha-frigate-privacy-preview';
+            const route = getRoutes.call(resolver, [{component_name:'lovelace',url_path:path}])?.routes?.[path];
+            if (typeof route?.load !== 'function') throw new Error('preview_unavailable');
+            await this._previewWait(route.load());
+            if (typeof window.loadCardHelpers !== 'function') throw new Error('preview_unavailable');
+          })().finally(() => { this._previewBootstrap = null; });
+        }
+        await this._previewBootstrap;
+      }
+      const helpers = await this._previewWait(window.loadCardHelpers());
+      if (typeof helpers?.createCardElement !== 'function') throw new Error('preview_unavailable');
+      return helpers;
+    }
     async _syncPreview() {
       const entity = this._previewCamera, host = this.shadowRoot.querySelector('[data-preview-host]');
       if (!entity || !host || !this._previewAllowed(entity)) return;
@@ -510,12 +540,17 @@ function createUiV3({ language = 'en' } = {}) {
       const epoch = this._previewEpoch, wire = {}; this._previewLoad = wire;
       const current = () => epoch === this._previewEpoch && this._previewCamera === entity && this._previewAllowed(entity) && !!this.shadowRoot.querySelector('[data-preview-host]');
       try {
-        if (typeof window.loadCardHelpers !== 'function') throw new Error('preview_unavailable');
-        const helpers = await window.loadCardHelpers();
+        const helpers = await this._loadPreviewHelpers();
         if (!current()) return;
         // Native HA card owns authentication and stream lifecycle. No external camera URLs or secrets.
         const node = await helpers.createCardElement({type:'picture-entity',entity,camera_view:'live',show_name:false,show_state:false,tap_action:{action:'none'},hold_action:{action:'none'},double_tap_action:{action:'none'}});
         if (!current()) { node?.remove(); return; }
+        if (node?.localName !== 'hui-picture-entity-card') throw new Error('preview_unavailable');
+        // createCardElement starts the lazy import but can return before upgrade.
+        await this._previewWait(customElements.whenDefined(node.localName));
+        if (!current()) { node.remove(); return; }
+        customElements.upgrade(node);
+        if (typeof node.setConfig !== 'function') throw new Error('preview_unavailable');
         node.hass = this._hass; this._previewNode = node;
         this.shadowRoot.querySelector('[data-preview-host]').replaceChildren(node);
       } catch (_) {
