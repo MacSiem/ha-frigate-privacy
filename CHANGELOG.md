@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.3.0 (2026-10-16)
+
+- Show a separate server-derived deadline, remaining time, scope and action result under each camera. Expiry waits for the backend instead of claiming a successful resume.
+- Keep confirmed, pending, partial, failed and unconfirmed camera results distinct, including mixed outcomes across a group. Show separate pause and resume evidence with verified target states.
+- Give channel indicators semantic state colors in both themes, with text labels for on, off, idle, unknown, mixed and unavailable states.
+- Expand Preview inside the camera tile using Home Assistant's native camera card, only on demand. Close it on toggle, camera change, navigation or authority loss; discard late loads and require an explicit retry after loading errors.
+- Update countdown text without replacing controls or restarting a preview every second.
+
 ## 6.2.0 (2026-10-13)
 
 - Add administrator-only, server-stored privacy period history with per-channel outcomes, observed start/end times and bounded retention. Missing evidence and manual intervention remain explicit.

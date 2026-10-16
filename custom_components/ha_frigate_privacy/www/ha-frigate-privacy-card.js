@@ -1,4 +1,4 @@
-/* Frigate Privacy v6.2.0 — integration-owned Home Assistant card */
+/* Frigate Privacy v6.3.0 — integration-owned Home Assistant card */
 (function () {
   'use strict';
 
@@ -341,6 +341,22 @@ function createUiV3({ language = 'en' } = {}) {
       return `<div class="notice" data-action-result role="status" style="margin-bottom:16px"><div>${ui.statusHtml(this._mutationOutcome.code)}<p>${_esc(this._safeError({code:this._mutationOutcome.reason}))}</p></div></div>`;
     }
     _newOperationId(action) { const random = globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`; return `${action}-${random}`.slice(0, 128); }
+    _cameraMutationResults(command,result,state,expectedIds) {
+      const flag = command === 'pause_camera' ? 'paused' : 'resumed';
+      const phase = command === 'pause_camera' ? 'paused' : 'active';
+      const rows = Array.isArray(result?.results) ? result.results : [];
+      return Object.fromEntries(expectedIds.map(id => {
+        const matches = rows.filter(row=>row && typeof row==='object' && !Array.isArray(row) && row.camera_id===id);
+        const row = matches.length===1 ? matches[0] : null;
+        let code = 'unconfirmed';
+        if (row && typeof row[flag]==='boolean') {
+          if (row[flag]===true && row.phase===phase && this._mutationReadback(command,{},result,state,[id])) code='success';
+          else if (row[flag]===false && row.phase==='error') code='error';
+          else if (row[flag]===false && row.phase==='partial') code='partial';
+        }
+        return [id,code];
+      }));
+    }
     async _runMutation(command, payload = {}) {
       if (this._mutationWire || this._busy || !this._integrationAvailable || !this._recoveryReady) return false;
       const epoch = this._requestEpoch; const wire = {};
@@ -348,7 +364,7 @@ function createUiV3({ language = 'en' } = {}) {
       const expectedIds = [...(payload.cameras?.length ? payload.cameras : command === 'resume_camera' && pausedIds.length ? pausedIds : this._cameras.map(camera => camera.camera_id))];
       if (command === 'pause_camera' || command === 'resume_camera') for (const id of expectedIds) this._cameraActions[id] = {pending:true,code:'not_checked'};
       this._mutationWire = wire; this._busy = true; this._error = ''; this._mutationOutcome = {code:'not_checked',reason:'not_checked'}; this._updateUI();
-      let accepted = false; let outcome = 'unconfirmed';
+      let accepted = false; let outcome = 'unconfirmed'; let cameraResults = null;
       try {
         const result = await this._callIntegration(command, payload); accepted = true;
         if (epoch !== this._requestEpoch) return false;
@@ -356,6 +372,7 @@ function createUiV3({ language = 'en' } = {}) {
         const nextState = await this._callIntegration('get_state');
         if (epoch !== this._requestEpoch) return false;
         const verified = this._mutationReadback(command, payload, result, nextState, expectedIds);
+        if (command === 'pause_camera' || command === 'resume_camera') cameraResults = this._cameraMutationResults(command,result,nextState,expectedIds);
         if (command === 'set_schedule') outcome = verified ? 'success' : 'unconfirmed';
         else if (outcome === 'success' && !verified) outcome = 'unconfirmed';
         if (nextState && typeof nextState === 'object' && !Array.isArray(nextState) && Array.isArray(nextState.cameras) && Array.isArray(nextState.schedules) && nextState.paused && typeof nextState.paused === 'object' && !Array.isArray(nextState.paused)) this._applyState(nextState);
@@ -375,7 +392,7 @@ function createUiV3({ language = 'en' } = {}) {
         if (this._mutationWire === wire) this._mutationWire = null;
         if (epoch === this._requestEpoch) {
           this._busy = false;
-          if (command === 'pause_camera' || command === 'resume_camera') for (const id of expectedIds) this._cameraActions[id] = {pending:false,code:this._mutationOutcome?.code || 'unconfirmed'};
+          if (command === 'pause_camera' || command === 'resume_camera') for (const id of expectedIds) this._cameraActions[id] = {pending:false,code:cameraResults?.[id] || (this._mutationOutcome?.code==='error'?'error':'unconfirmed')};
         }
         this._updateUI();
       }
@@ -435,8 +452,14 @@ function createUiV3({ language = 'en' } = {}) {
       const start = typeof record.started_at === 'string' ? Date.parse(record.started_at) : NaN;
       const end = typeof record.ends_at === 'string' ? Date.parse(record.ends_at) : NaN;
       const minutes = Number.isFinite(start) && Number.isFinite(end) && end > start ? Math.round((end-start)/60000) : null;
-      const evidence = Object.entries(record.target_outcomes || {}).map(([target,value]) => `${target}: ${String(value)}${Object.hasOwn(record.last_verified_actual_state || {},target) ? ` · ${t.observed}: ${String(record.last_verified_actual_state[target])}` : ''}`);
-      return `<div class="camera-feedback" data-camera-feedback="${_esc(cam.camera_id)}">${request}<span class="phase ${phase}" data-camera-phase="${phase}">${_esc(this._periodText(phase))}</span><div class="helper">${_esc(labels.scope)}: ${_esc(scope)}${minutes !== null ? ` · ${_esc(labels.duration)}: ${minutes} min` : ''}</div>${this._paused[cam.camera_id] ? `<div class="camera-countdown" data-camera-countdown="${_esc(cam.camera_id)}" role="timer"></div><div class="helper">${_esc(t.deadline)}: ${_esc(Number.isFinite(end) ? this._formatCameraTime(end) : '—')}</div>` : ''}${evidence.length ? `<details class="evidence"><summary>${_esc(t.evidence)}</summary><div class="evidence-list">${evidence.map(text=>`<div>${_esc(text)}</div>`).join('')}</div></details>` : ''}</div>`;
+      const pauseLabel = this._lang==='pl'?'Pauza':'Pause', resumeLabel = this._lang==='pl'?'Wznowienie':'Resume';
+      const evidence = [
+        ...Object.entries(record.target_outcomes || {}).map(([target,value])=>`${pauseLabel} · ${target}: ${String(value)}`),
+        ...Object.entries(record.resume_target_outcomes || {}).map(([target,value])=>`${resumeLabel} · ${target}: ${String(value)}`),
+        ...Object.entries(record.last_verified_actual_state || {}).map(([target,value])=>`${t.observed} · ${target}: ${String(value)}`),
+      ];
+      const scopeLabel = phase==='paused' ? labels.scope : (this._lang==='pl'?'Żądany zakres':'Requested scope');
+      return `<div class="camera-feedback" data-camera-feedback="${_esc(cam.camera_id)}">${request}<span class="phase ${phase}" data-camera-phase="${phase}">${_esc(this._periodText(phase))}</span><div class="helper">${_esc(scopeLabel)}: ${_esc(scope)}${minutes !== null ? ` · ${_esc(this._lang==='pl'?'Czas timera':'Timer duration')}: ${minutes} min` : ''}</div>${this._paused[cam.camera_id] ? `<div class="camera-countdown" data-camera-countdown="${_esc(cam.camera_id)}" role="timer"></div><div class="helper">${_esc(t.deadline)}: ${_esc(Number.isFinite(end) ? this._formatCameraTime(end) : '—')}</div>` : ''}${evidence.length ? `<details class="evidence"><summary>${_esc(t.evidence)}</summary><div class="evidence-list">${evidence.map(text=>`<div>${_esc(text)}</div>`).join('')}</div></details>` : ''}</div>`;
     }
     _formatCameraTime(value) {
       const zone = this._hass?.config?.time_zone || 'UTC';

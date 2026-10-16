@@ -72,9 +72,21 @@ check the video and per-target evidence rather than assuming the live feed is of
 ### Channel indicators and preview
 
 The card shows video, recording, snapshots, detection, and sound detection
-separately, including unknown and unavailable states. Sound detection does not
-confirm microphone capture or listening. **Preview** opens Home Assistant's native
-camera dialog on demand; this integration never automatically fetches frames or audio.
+separately, with state colors and explicit on/off, unknown and unavailable labels.
+Green means a channel is on; it does not mean privacy is enforced. Sound detection
+does not confirm microphone capture or listening.
+
+Each camera with an active timed operation shows its own backend deadline and
+remaining time. The timer keeps counting independently of the selected duration
+input; reaching zero means the card is waiting for the backend's verified resume.
+Pending, partial, failed and unconfirmed results stay separate. Expand the camera's
+per-target evidence to see pause outcomes, resume outcomes and verified states.
+
+**Preview** expands Home Assistant's native camera card directly below that camera.
+Press **Close preview** to collapse it. Only one preview is open at a time; changing
+tabs, leaving the card or losing administrator authority closes it. Camera media is
+requested only after a click. A visible image alone does not confirm that privacy
+is active, and the preview does not change camera controls.
 
 ### Period history
 
