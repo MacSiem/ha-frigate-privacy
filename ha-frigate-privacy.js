@@ -99,6 +99,14 @@ function createUiV3({ language = 'en' } = {}) {
     .camera-tile { min-width: 0; padding: 8px; border: 1px solid var(--fp-border); border-radius: 14px; } .camera-tile .camera-card { border: 0; padding: 7px; min-height: 42px; }
     .channel-status { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0; } .channel-status span { padding: 3px 7px; border-radius: 7px; background: var(--fp-bg); color: var(--fp-muted); font-size: 12px; }
     .preview-btn { min-height: 34px; padding: 5px 8px; border: 1px solid var(--fp-border); border-radius: 8px; background: var(--fp-card); color: var(--fp-primary); cursor: pointer; font-size: 12px; font-weight: 700; }
+    .channel-status .channel-badge[data-channel-state="on"] { color:var(--fp-success);border-color:currentColor; }
+    .channel-status .channel-badge[data-channel-state="off"],.channel-status .channel-badge[data-channel-state="idle"] { color:var(--fp-muted); }
+    .channel-status .channel-badge[data-channel-state="unknown"],.channel-status .channel-badge[data-channel-state="mixed"] { color:var(--fp-warning);border-color:currentColor; }
+    .channel-status .channel-badge[data-channel-state="unavailable"] { color:var(--fp-danger);border-color:currentColor; }
+    .camera-feedback { display:grid;gap:8px;padding:12px 0;margin:8px 0;border-top:1px solid var(--fp-border);overflow-wrap:anywhere; }
+    .camera-feedback .phase { justify-self:start; } .phase.pausing { color:var(--fp-warning); }
+    .camera-countdown { font-weight:750;font-variant-numeric:tabular-nums;overflow-wrap:anywhere; }
+    .camera-preview { margin-top:12px;display:grid;gap:8px;min-width:0; } [data-preview-host] { min-width:0;overflow:hidden;border-radius:12px; }
     .seg { display: flex; gap: 5px; padding: 4px; border-radius: 13px; background: var(--fp-bg); }
     .seg-item { flex: 1; min-height: 42px; padding: 8px 10px; border: 0; border-radius: 10px; background: transparent; color: var(--fp-muted); cursor: pointer; font-size: 13.5px; line-height: 1.35; font-weight: 700; }
     .seg-item.selected { background: var(--fp-card); color: var(--fp-primary); box-shadow: 0 2px 8px rgba(16,24,40,.08); }
@@ -181,6 +189,7 @@ function createUiV3({ language = 'en' } = {}) {
       this._periodOffline = () => { this._historyBrowserOnline = false; this._clearPrivateState(); this._invalidatePeriods('offline'); this._updateUI(); };
       this._periodOnline = () => { this._historyBrowserOnline = true; this._invalidatePeriods('discarded'); this._updateUI(); };
       this._editingScheduleIdx = null; this._scheduleForm = this._emptySchedule(); this._lastHtml = ''; this._toastTimer = null;
+      this._previewCamera = null; this._previewNode = null; this._previewLoad = null; this._previewEpoch = 0;
     }
 
     connectedCallback() {
@@ -188,6 +197,7 @@ function createUiV3({ language = 'en' } = {}) {
       window.addEventListener('offline', this._periodOffline);
       window.addEventListener('online', this._periodOnline);
       this._invalidatePeriods('idle'); this._updateUI();
+      if (!this._countdownTimer) this._countdownTimer = setInterval(() => this._tickCountdowns(), 1000);
       if (this._statePollTimer) return;
       this._statePollTimer = setInterval(() => {
         if (this.isConnected && this._hass?.user?.is_admin === true && this._hass.user.is_active !== false && this._historyBrowserOnline && !this._periodConnectionOffline && !this._permissionDenied && !this._connectPromise && !this._busy && Date.now() - this._lastStatePollAt >= 15000) this._connectIntegration();
@@ -227,6 +237,7 @@ function createUiV3({ language = 'en' } = {}) {
       this._updateUI();
     }
     disconnectedCallback() {
+      if (this._countdownTimer) clearInterval(this._countdownTimer); this._countdownTimer = null;
       this._navigationObserver?.disconnect(); this._navigationObserver = null; this._pendingControlFocus = null;
       window.removeEventListener('offline', this._periodOffline); window.removeEventListener('online', this._periodOnline);
       if (this._periodBoundConnection?.removeEventListener) {
@@ -237,6 +248,7 @@ function createUiV3({ language = 'en' } = {}) {
       this._clearPrivateState(); this._invalidatePeriods('discarded'); this._updateUI();
       if (this._statePollTimer) clearInterval(this._statePollTimer); this._statePollTimer = null; this._requestEpoch += 1; this._connectPromise = null; this._lastStatePollAt = 0; this._busy = false; this._integrationChecked = false; this._integrationAvailable = false; if (this._toastTimer) clearTimeout(this._toastTimer); }
     _clearPrivateState() {
+      this._closePreview();
       this._pendingControlFocus = null;
       this._invalidatePeriods('discarded');
       this.shadowRoot.activeElement?.blur(); this._busy = false; this._mutationOutcome = null; this._error = ''; this._editingScheduleIdx = null; this._scheduleForm = this._emptySchedule();
@@ -263,7 +275,9 @@ function createUiV3({ language = 'en' } = {}) {
       if (producerKey !== this._periodProducerKey && (this._periodInfo || this._periodWire)) this._invalidatePeriods('discarded');
       this._periodProducerKey = producerKey;
       this._recoveryReady = safe.recovery_ready !== false; this._cameras = Array.isArray(safe.cameras) ? safe.cameras : []; this._schedules = Array.isArray(safe.schedules) ? safe.schedules : []; const records = safe.paused && typeof safe.paused === 'object' && !Array.isArray(safe.paused) ? safe.paused : {}; const terminal = safe.last_operations && typeof safe.last_operations === 'object' && !Array.isArray(safe.last_operations) ? safe.last_operations : {}; this._paused = Object.fromEntries(Object.entries(records).filter(([,record]) => record && record.active !== false && record.phase !== 'active')); this._lastOperations = Object.fromEntries(Object.entries(terminal).filter(([,record]) => record && record.active === false && record.phase === 'active'));
-      const valid = new Set(this._cameras.map((camera) => camera.camera_id)); this._selectedCameras = new Set([...this._selectedCameras].filter((id) => valid.has(id))); this._updateUI();
+      const valid = new Set(this._cameras.map((camera) => camera.camera_id)); this._selectedCameras = new Set([...this._selectedCameras].filter((id) => valid.has(id)));
+      if (this._previewCamera && !this._previewAllowed(this._previewCamera)) this._closePreview();
+      this._updateUI();
     }
     _safeError(error) {
       const messages = {
@@ -381,10 +395,97 @@ function createUiV3({ language = 'en' } = {}) {
     _buildDonateFooter() { if (!this._hass?.user?.is_admin || this._config.show_support === false || haToolsPersistence.loadSync("ha-frigate-privacy-support-dismissed") === "1") return ""; const t=this._t; return `<div class="donate-section" data-source="ha-frigate-privacy"><a class="donate-btn" href="https://buymeacoffee.com/macsiem" target="_blank" rel="noopener noreferrer">${_esc(t.support)}</a><button type="button" data-action="dismiss-support" aria-label="${_esc(this._lang === 'pl' ? 'Ukryj link wsparcia' : 'Dismiss support link')}">×</button></div>`; }
     _dismissSupport() { haToolsPersistence.save("ha-frigate-privacy-support-dismissed", "1"); this._lastHtml = ""; this._updateUI(); }
     _buildGate() { const t=this._t; if(!this._integrationChecked)return `<div class="notice"><ha-icon icon="mdi:progress-clock"></ha-icon><div><h3>${_esc(t.connecting)}</h3><p>${_esc(t.subtitle)}</p></div></div>`; if(this._permissionDenied)return `<div class="notice error"><ha-icon icon="mdi:account-lock-outline"></ha-icon><div><h3>${_esc(t.adminRequired)}</h3><p>${_esc(t.adminHint)}</p><button class="btn btn-secondary" data-action="retry">${_esc(t.retry)}</button></div></div>`; if(!this._integrationAvailable)return `<div class="notice error"><ha-icon icon="mdi:lan-disconnect"></ha-icon><div><h3>${_esc(t.unavailable)}</h3><p>${_esc(t.unavailableHint)}</p><button class="btn btn-secondary" data-action="retry" style="margin-top:12px">${_esc(t.retry)}</button></div></div>`; if(!this._recoveryReady)return `<div class="notice"><ha-icon icon="mdi:shield-sync-outline"></ha-icon><div><h3>${_esc(t.recovering)}</h3><p>${_esc(t.recoveringHint)}</p></div></div>`; return ''; }
+    _cameraStrings() {
+      return this._lang === 'pl'
+        ? {remaining:'Pozostało',awaiting:'Termin minął — oczekiwanie na backend',untimed:'Bez terminu automatycznego wznowienia',invalid:'Termin niepotwierdzony',duration:'Zastosowany czas',scope:'Zastosowany zakres',pending:'Trwa stosowanie — wynik niepotwierdzony',preview:'Podgląd',hide:'Zwiń podgląd',loading:'Ładowanie podglądu HA…',failed:'Podgląd HA jest niedostępny. Zwiń i spróbuj ponownie.',hint:'Podgląd HA na żądanie. Sam obraz nie potwierdza stanu prywatności.'}
+        : {remaining:'Remaining',awaiting:'Deadline reached — awaiting backend',untimed:'No automatic resume deadline',invalid:'Deadline unconfirmed',duration:'Applied duration',scope:'Applied scope',pending:'Applying — result unconfirmed',preview:'Preview',hide:'Close preview',loading:'Loading HA preview…',failed:'HA preview is unavailable. Close and try again.',hint:'HA preview on demand. An image alone does not confirm privacy.'};
+    }
+    _countdownText(record) {
+      const t = this._cameraStrings();
+      if (record?.ends_at === null) return t.untimed;
+      const end = typeof record?.ends_at === 'string' ? Date.parse(record.ends_at) : NaN;
+      if (!Number.isFinite(end)) return t.invalid;
+      const seconds = Math.ceil((end - Date.now()) / 1000);
+      if (seconds <= 0) return t.awaiting;
+      const hh = Math.floor(seconds / 3600), mm = Math.floor(seconds % 3600 / 60), ss = seconds % 60;
+      return `${t.remaining}: ${hh ? String(hh).padStart(2,'0') + ':' : ''}${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+    }
+    _tickCountdowns() {
+      // Only text changes: never replace controls, restart preview or trigger camera actions.
+      if (!this.isConnected || !this._periodAuthority()) return;
+      this.shadowRoot.querySelectorAll('[data-camera-countdown]').forEach(node => {
+        const record = this._paused[node.dataset.cameraCountdown];
+        if (record) node.textContent = this._countdownText(record);
+      });
+    }
+    _cameraFeedback(cam) {
+      const record = this._paused[cam.camera_id] || this._lastOperations[cam.camera_id];
+      if (!record) return '';
+      const t = this._t, labels = this._cameraStrings();
+      const phase = ['pausing','paused','resuming','partial','error','active'].includes(record.phase) ? record.phase : 'unknown';
+      const scope = {all:t.allScope,main:t.main,sub:t.sub}[record.stream_type] || t.statusUnknown;
+      const start = typeof record.started_at === 'string' ? Date.parse(record.started_at) : NaN;
+      const end = typeof record.ends_at === 'string' ? Date.parse(record.ends_at) : NaN;
+      const minutes = Number.isFinite(start) && Number.isFinite(end) && end > start ? Math.round((end-start)/60000) : null;
+      const evidence = Object.entries(record.target_outcomes || {}).map(([target,value]) => `${target}: ${String(value)}${Object.hasOwn(record.last_verified_actual_state || {},target) ? ` · ${t.observed}: ${String(record.last_verified_actual_state[target])}` : ''}`);
+      return `<div class="camera-feedback" data-camera-feedback="${_esc(cam.camera_id)}"><span class="phase ${phase}" data-camera-phase="${phase}">${_esc(this._periodText(phase))}</span><div class="helper">${_esc(labels.scope)}: ${_esc(scope)}${minutes !== null ? ` · ${_esc(labels.duration)}: ${minutes} min` : ''}</div>${this._paused[cam.camera_id] ? `<div class="camera-countdown" data-camera-countdown="${_esc(cam.camera_id)}" role="timer"></div><div class="helper">${_esc(t.deadline)}: ${_esc(Number.isFinite(end) ? this._formatCameraTime(end) : '—')}</div>` : ''}${evidence.length ? `<details class="evidence"><summary>${_esc(t.evidence)}</summary><div class="evidence-list">${evidence.map(text=>`<div>${_esc(text)}</div>`).join('')}</div></details>` : ''}</div>`;
+    }
+    _formatCameraTime(value) {
+      const zone = this._hass?.config?.time_zone || 'UTC';
+      try { return new Intl.DateTimeFormat(this._lang, {dateStyle:'short',timeStyle:'medium',timeZone:zone}).format(value) + ' · ' + zone; }
+      catch (_) { return new Date(value).toISOString(); }
+    }
+    _channelBadge(channel,label,values,icon) {
+      const known = value => ({streaming:'on',recording:'on',on:'on',off:'off',idle:'idle',unavailable:'unavailable'}[value] || 'unknown');
+      const states = values.length ? [...new Set(values.map(known))] : ['unknown'];
+      const state = states.length === 1 ? states[0] : 'mixed';
+      const names = {on:this._t.statusOn,off:this._t.statusOff,idle:this._t.statusIdle,unavailable:this._t.statusUnavailable,unknown:this._t.statusUnknown};
+      return `<span class="channel-badge" data-channel="${channel}" data-channel-state="${state}"><ha-icon icon="${icon}"></ha-icon>${_esc(label)}: ${_esc(states.map(s=>names[s]).join(' / '))}</span>`;
+    }
+    _cameraTile(cam) {
+      const selected = this._selectedCameras.has(cam.camera_id), t = this._t, p = this._cameraStrings();
+      const values = suffixes => (cam.switches || []).filter(item=>suffixes.includes(item.suffix)).map(item=>item.state);
+      const expanded = this._previewCamera === cam.entity_id;
+      const validEntity = typeof cam.entity_id === 'string' && /^camera\.[a-z0-9_]+$/.test(cam.entity_id);
+      return `<div class="camera-tile"><div class="camera-card ${selected?'selected':''}" data-camera="${_esc(cam.camera_id)}" role="button" tabindex="0" aria-pressed="${selected}" aria-label="Camera: ${_esc(this._repairMojibake(cam.name))}"><ha-icon icon="mdi:cctv"></ha-icon><span class="camera-name">${_esc(this._repairMojibake(cam.name))}</span>${selected?'<ha-icon class="camera-check" icon="mdi:check-circle"></ha-icon>':''}</div><div class="channel-status">${this._channelBadge('video',t.video,[cam.camera_state],'mdi:video-outline')}${this._channelBadge('recording',t.recording,values(['_recordings']),'mdi:record-rec')}${this._channelBadge('snapshots',t.snapshots,values(['_snapshots']),'mdi:camera-outline')}${this._channelBadge('detection',t.detection,values(['_detect']),'mdi:motion-sensor')}${this._channelBadge('sound',t.soundDetection,values(['_audio_detection','_audio']),'mdi:microphone-outline')}</div>${this._cameraFeedback(cam)}${validEntity?`<button class="preview-btn" data-preview-camera="${_esc(cam.entity_id)}" aria-expanded="${expanded}" aria-controls="preview-${_esc(cam.camera_id)}">${_esc(expanded?p.hide:p.preview)}</button>${expanded?`<div id="preview-${_esc(cam.camera_id)}" class="camera-preview"><div data-preview-host="${_esc(cam.entity_id)}" role="region" aria-label="${_esc(p.preview+' · '+cam.name)}"><p class="helper">${_esc(p.loading)}</p></div><p class="helper">${_esc(p.hint)}</p></div>`:''}`:''}</div>`;
+    }
+    _previewAllowed(entity) {
+      return this._periodAuthority() && this._integrationAvailable && this._recoveryReady &&
+        typeof entity === 'string' && /^camera\.[a-z0-9_]+$/.test(entity) && this._cameras.some(cam=>cam.entity_id===entity);
+    }
+    _closePreview() {
+      this._previewEpoch += 1; this._previewCamera = null; this._previewLoad = null;
+      this._previewNode?.remove(); this._previewNode = null;
+    }
+    _togglePreview(entity) {
+      const same = this._previewCamera === entity;
+      this._closePreview();
+      if (!same && this._previewAllowed(entity)) this._previewCamera = entity;
+      this._updateUI();
+    }
+    async _syncPreview() {
+      const entity = this._previewCamera, host = this.shadowRoot.querySelector('[data-preview-host]');
+      if (!entity || !host || !this._previewAllowed(entity)) return;
+      if (this._previewNode) { if (this._previewNode.parentNode !== host) host.replaceChildren(this._previewNode); this._previewNode.hass = this._hass; return; }
+      if (this._previewLoad) return;
+      const epoch = this._previewEpoch, wire = {}; this._previewLoad = wire;
+      const current = () => epoch === this._previewEpoch && this._previewCamera === entity && this._previewAllowed(entity) && !!this.shadowRoot.querySelector('[data-preview-host]');
+      try {
+        if (typeof window.loadCardHelpers !== 'function') throw new Error('preview_unavailable');
+        const helpers = await window.loadCardHelpers();
+        if (!current()) return;
+        // Native HA card owns authentication and stream lifecycle. No external camera URLs or secrets.
+        const node = await helpers.createCardElement({type:'picture-entity',entity,camera_view:'live',show_name:false,show_state:false,tap_action:{action:'none'},hold_action:{action:'none'},double_tap_action:{action:'none'}});
+        if (!current()) { node?.remove(); return; }
+        node.hass = this._hass; this._previewNode = node;
+        this.shadowRoot.querySelector('[data-preview-host]').replaceChildren(node);
+      } catch (_) {
+        if (current()) this.shadowRoot.querySelector('[data-preview-host]').textContent = this._cameraStrings().failed;
+      } finally { if (this._previewLoad === wire) this._previewLoad = null; }
+    }
     _buildControlTab() {
-      const t=this._t; const status=(value)=>({on:t.statusOn,off:t.statusOff,idle:t.statusIdle,streaming:t.statusOn,recording:t.statusOn,unavailable:t.statusUnavailable,unknown:t.statusUnknown}[value]||t.statusUnknown);
-      const switchStatus=(cam,suffixes)=>{const states=(cam.switches||[]).filter((entry)=>suffixes.includes(entry.suffix)).map((entry)=>status(entry.state));return states.length?[...new Set(states)].join(' / '):status(null);};
-      const cameras=this._cameras.map((cam)=>{const selected=this._selectedCameras.has(cam.camera_id);const video=status(cam.camera_state);const recording=switchStatus(cam,['_recordings']);const sound=switchStatus(cam,['_audio_detection','_audio']);const detection=switchStatus(cam,['_detect']);const snapshots=switchStatus(cam,['_snapshots']);return `<div class="camera-tile"><div class="camera-card ${selected?'selected':''}" data-camera="${_esc(cam.camera_id)}" role="button" tabindex="0" aria-pressed="${selected}" aria-label="Camera: ${_esc(this._repairMojibake(cam.name))}"><ha-icon icon="mdi:cctv"></ha-icon><span class="camera-name">${_esc(this._repairMojibake(cam.name))}</span>${selected?'<ha-icon class="camera-check" icon="mdi:check-circle"></ha-icon>':''}</div><div class="channel-status"><span class="channel-badge"><ha-icon icon="mdi:video-outline"></ha-icon>${_esc(t.video)}: ${_esc(video)}</span><span class="channel-badge"><ha-icon icon="mdi:record-rec"></ha-icon>${_esc(t.recording)}: ${_esc(recording)}</span><span class="channel-badge"><ha-icon icon="mdi:camera-outline"></ha-icon>${_esc(t.snapshots)}: ${_esc(snapshots)}</span><span class="channel-badge"><ha-icon icon="mdi:motion-sensor"></ha-icon>${_esc(t.detection)}: ${_esc(detection)}</span><span class="channel-badge"><ha-icon icon="mdi:microphone-outline"></ha-icon>${_esc(t.soundDetection)}: ${_esc(sound)}</span></div>${cam.entity_id?`<button class="preview-btn" data-preview-camera="${_esc(cam.entity_id)}">${_esc(t.preview)}</button>`:''}</div>`;}).join('');
+      const t=this._t;
+      const cameras=this._cameras.map(cam=>this._cameraTile(cam)).join('');
       const allSelected=this._selectedCameras.size===0; const phases=Object.values(this._paused||{});
       return `<div class="section"><div class="section-head"><h3>${_esc(t.cameras)}</h3><span class="helper">${this._cameras.length}</span></div><div class="camera-grid"><div class="camera-card ${allSelected?'selected':''}" data-camera="__all__" role="button" tabindex="0" aria-pressed="${allSelected}"><ha-icon icon="mdi:camera-outline"></ha-icon><span class="camera-name">${_esc(t.all)}</span>${allSelected?'<ha-icon class="camera-check" icon="mdi:check-circle"></ha-icon>':''}</div>${cameras||`<div class="empty">${_esc(t.noCameras)}</div>`}</div><p class="helper channel-hint">${_esc(t.soundHint)}</p></div>
       <div class="section"><div class="section-head"><h3>${_esc(t.scope)}</h3></div><div class="seg" role="radiogroup">${[['all',t.allScope],['main',t.main],['sub',t.sub]].map(([value,label])=>`<button class="seg-item ${this._pauseStreamType===value?'selected':''}" data-scope="${value}" role="radio" aria-checked="${this._pauseStreamType===value}">${_esc(label)}</button>`).join('')}</div><div class="duration-row"><input class="input-minutes" type="number" min="1" max="1440" value="${_esc(this._customMinutes)}" aria-label="${_esc(t.duration)}"><button class="btn btn-primary" data-action="pause-custom" ${this._busy||this._mutationWire||!this._cameras.length?'disabled':''}>${_esc(t.pause)}</button></div>${phases.length?`<button class="btn btn-danger btn-full" data-action="resume" ${this._busy||this._mutationWire?'disabled':''}>${_esc(t.resume)}</button>`:''}</div>`;
@@ -656,8 +757,9 @@ function createUiV3({ language = 'en' } = {}) {
       element.focus({preventScroll:true}); return element;
     }
     _updateUI() {
+      if (this._previewCamera && !this._previewAllowed(this._previewCamera)) this._closePreview();
       const html = this._buildHTML();
-      if (html === this._lastHtml) { this._syncNavigation(); if (!this._busy) this._pendingControlFocus = null; return; }
+      if (html === this._lastHtml) { this._tickCountdowns(); this._syncPreview(); this._syncNavigation(); if (!this._busy) this._pendingControlFocus = null; return; }
       const active = this.shadowRoot.activeElement;
       const snapshot = this._pendingControlFocus && active === this._pendingControlFocus.anchor ? this._pendingControlFocus.snapshot : active ? {
         tag:active.tagName, id:active.id, classes:active.className,
@@ -665,7 +767,7 @@ function createUiV3({ language = 'en' } = {}) {
         selection:['INPUT','TEXTAREA'].includes(active.tagName) ? {value:active.tagName === 'INPUT' ? active.value : null,start:active.selectionStart,end:active.selectionEnd,direction:active.selectionDirection} : null,
       } : null;
       this._pendingControlFocus = null;
-      this._lastHtml = html; this.shadowRoot.innerHTML = html; this._attachEvents(); this._syncNavigation();
+      this._lastHtml = html; this.shadowRoot.innerHTML = html; this._attachEvents(); this._syncNavigation(); this._tickCountdowns(); this._syncPreview();
       if (!snapshot) return;
       const next = [...this.shadowRoot.querySelectorAll('button,input,select,textarea,[tabindex]')].find(element => element.tagName === snapshot.tag && (snapshot.id ? element.id === snapshot.id : snapshot.keys.length ? snapshot.keys.every(([name,value]) => element.getAttribute(name) === value) : element.className === snapshot.classes));
       const restored = this._focusControl(next);
@@ -687,7 +789,7 @@ function createUiV3({ language = 'en' } = {}) {
       root.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener('click',()=>this.setActiveTab(button.dataset.tab)));
       root.querySelector('[data-tab-picker]')?.addEventListener('change',event=>{this.setActiveTab(event.target.value);this._focusControl(root.querySelector('[data-tab-picker]'));});
       root.querySelectorAll('[data-camera]').forEach((card)=>{const toggle=()=>{const id=card.dataset.camera;if(id==='__all__')this._selectedCameras.clear();else if(this._selectedCameras.has(id))this._selectedCameras.delete(id);else this._selectedCameras.add(id);this._updateUI();};card.addEventListener('click',toggle);card.addEventListener('keydown',(event)=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();toggle();}});});
-      root.querySelectorAll('[data-preview-camera]').forEach((button)=>button.addEventListener('click',()=>this.dispatchEvent(new CustomEvent('hass-more-info',{detail:{entityId:button.dataset.previewCamera},bubbles:true,composed:true}))));
+      root.querySelectorAll('[data-preview-camera]').forEach(button=>button.addEventListener('click',()=>this._togglePreview(button.dataset.previewCamera)));
       root.querySelectorAll('[data-scope]').forEach((button)=>button.addEventListener('click',()=>{this._pauseStreamType=button.dataset.scope;haToolsPersistence.save('ha-frigate-privacy-pause-stream-type',this._pauseStreamType);this._updateUI();}));
       root.querySelector('.input-minutes')?.addEventListener('change',(event)=>{this._customMinutes=Math.max(1,Math.min(1440,Number.parseInt(event.target.value,10)||30));this._updateUI();});
       root.querySelector('[data-action="pause-custom"]')?.addEventListener('click',()=>this._pause());root.querySelector('[data-action="resume"]')?.addEventListener('click',()=>this._resume());
@@ -697,7 +799,7 @@ function createUiV3({ language = 'en' } = {}) {
       root.querySelectorAll('[data-day]').forEach((button)=>button.addEventListener('click',()=>{const day=Number(button.dataset.day);const days=this._scheduleForm.days;this._scheduleForm.days=days.includes(day)?days.filter((item)=>item!==day):[...days,day].sort();this._updateUI();}));root.querySelector('[data-action="save-schedule"]')?.addEventListener('click',()=>this._saveScheduleFromForm());root.querySelector('[data-action="cancel-edit"]')?.addEventListener('click',()=>{this._editingScheduleIdx=null;this._scheduleForm=this._emptySchedule();this._updateUI();});
     }
     _showToast(message,kind) { const toast=this.shadowRoot.querySelector('.toast');if(!toast)return;toast.textContent=String(message||'');toast.className=`toast show ${kind==='error'?'error':''}`;if(this._toastTimer)clearTimeout(this._toastTimer);this._toastTimer=setTimeout(()=>{if(toast.isConnected)toast.className='toast';},2600); }
-    setActiveTab(tabId) { if(['control','schedule','state','history','actions','info'].includes(tabId)){this._activeTab=tabId;this._updateUI();} }
+    setActiveTab(tabId) { if(['control','schedule','state','history','actions','info'].includes(tabId)){if(tabId!=='control')this._closePreview();this._activeTab=tabId;this._updateUI();} }
   }
 
   if (!customElements.get('ha-frigate-privacy')) customElements.define('ha-frigate-privacy', HaFrigatePrivacy);

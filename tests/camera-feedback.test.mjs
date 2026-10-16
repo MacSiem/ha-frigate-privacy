@@ -63,4 +63,15 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
    assert.equal(f.c.shadowRoot.querySelector('[data-preview-host]'),null);
   }finally{f.close();}
  });
+ test(path+': pending Start identifies only requested cameras without claiming applied success',async()=>{
+  const f=await fixture();try{
+   f.c._applyState({...f.state,paused:{}});f.c._selectedCameras=new Set(['front']);
+   let finish;f.c._hass.callWS=m=>m.type.endsWith('/get_state')?Promise.resolve({...f.state,paused:{}}):new Promise(r=>{finish=r;});
+   const pending=f.c._pause();
+   assert.match(f.c.shadowRoot.querySelector('[data-camera-feedback="front"]').textContent,/Applying.*unconfirmed/);
+   assert.equal(f.c.shadowRoot.querySelector('[data-camera-feedback="back"]'),null);
+   finish({ok:false,phase:'error'});await pending;
+   assert.equal(f.c.shadowRoot.querySelector('[data-camera-pending]'),null);
+  }finally{f.close();}
+ });
 }
