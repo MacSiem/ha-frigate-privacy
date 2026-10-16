@@ -190,6 +190,7 @@ function createUiV3({ language = 'en' } = {}) {
       this._periodOnline = () => { this._historyBrowserOnline = true; this._invalidatePeriods('discarded'); this._updateUI(); };
       this._editingScheduleIdx = null; this._scheduleForm = this._emptySchedule(); this._lastHtml = ''; this._toastTimer = null;
       this._previewCamera = null; this._previewNode = null; this._previewLoad = null; this._previewEpoch = 0;
+      this._cameraActions = {};
     }
 
     connectedCallback() {
@@ -249,6 +250,7 @@ function createUiV3({ language = 'en' } = {}) {
       if (this._statePollTimer) clearInterval(this._statePollTimer); this._statePollTimer = null; this._requestEpoch += 1; this._connectPromise = null; this._lastStatePollAt = 0; this._busy = false; this._integrationChecked = false; this._integrationAvailable = false; if (this._toastTimer) clearTimeout(this._toastTimer); }
     _clearPrivateState() {
       this._closePreview();
+      this._cameraActions = {};
       this._pendingControlFocus = null;
       this._invalidatePeriods('discarded');
       this.shadowRoot.activeElement?.blur(); this._busy = false; this._mutationOutcome = null; this._error = ''; this._editingScheduleIdx = null; this._scheduleForm = this._emptySchedule();
@@ -344,6 +346,7 @@ function createUiV3({ language = 'en' } = {}) {
       const epoch = this._requestEpoch; const wire = {};
       const pausedIds = Object.keys(this._paused);
       const expectedIds = [...(payload.cameras?.length ? payload.cameras : command === 'resume_camera' && pausedIds.length ? pausedIds : this._cameras.map(camera => camera.camera_id))];
+      if (command === 'pause_camera' || command === 'resume_camera') for (const id of expectedIds) this._cameraActions[id] = {pending:true,code:'not_checked'};
       this._mutationWire = wire; this._busy = true; this._error = ''; this._mutationOutcome = {code:'not_checked',reason:'not_checked'}; this._updateUI();
       let accepted = false; let outcome = 'unconfirmed';
       try {
@@ -370,7 +373,10 @@ function createUiV3({ language = 'en' } = {}) {
         this._mutationOutcome = {code,reason}; this._error = this._safeError({code:reason}); this._showToast(this._error, code); return false;
       } finally {
         if (this._mutationWire === wire) this._mutationWire = null;
-        if (epoch === this._requestEpoch) this._busy = false;
+        if (epoch === this._requestEpoch) {
+          this._busy = false;
+          if (command === 'pause_camera' || command === 'resume_camera') for (const id of expectedIds) this._cameraActions[id] = {pending:false,code:this._mutationOutcome?.code || 'unconfirmed'};
+        }
         this._updateUI();
       }
     }
@@ -420,15 +426,17 @@ function createUiV3({ language = 'en' } = {}) {
     }
     _cameraFeedback(cam) {
       const record = this._paused[cam.camera_id] || this._lastOperations[cam.camera_id];
-      if (!record) return '';
       const t = this._t, labels = this._cameraStrings();
+      const attempt = this._cameraActions[cam.camera_id];
+      const request = attempt ? `<div class="helper" ${attempt.pending ? 'data-camera-pending' : ''}>${_esc(this._lang==='pl'?'Ostatnie żądanie':'Last request')}: ${attempt.pending ? _esc(labels.pending) : createUiV3({language:this._lang}).statusHtml(attempt.code)}</div>` : '';
+      if (!record) return request ? `<div class="camera-feedback" data-camera-feedback="${_esc(cam.camera_id)}">${request}</div>` : '';
       const phase = ['pausing','paused','resuming','partial','error','active'].includes(record.phase) ? record.phase : 'unknown';
       const scope = {all:t.allScope,main:t.main,sub:t.sub}[record.stream_type] || t.statusUnknown;
       const start = typeof record.started_at === 'string' ? Date.parse(record.started_at) : NaN;
       const end = typeof record.ends_at === 'string' ? Date.parse(record.ends_at) : NaN;
       const minutes = Number.isFinite(start) && Number.isFinite(end) && end > start ? Math.round((end-start)/60000) : null;
       const evidence = Object.entries(record.target_outcomes || {}).map(([target,value]) => `${target}: ${String(value)}${Object.hasOwn(record.last_verified_actual_state || {},target) ? ` · ${t.observed}: ${String(record.last_verified_actual_state[target])}` : ''}`);
-      return `<div class="camera-feedback" data-camera-feedback="${_esc(cam.camera_id)}"><span class="phase ${phase}" data-camera-phase="${phase}">${_esc(this._periodText(phase))}</span><div class="helper">${_esc(labels.scope)}: ${_esc(scope)}${minutes !== null ? ` · ${_esc(labels.duration)}: ${minutes} min` : ''}</div>${this._paused[cam.camera_id] ? `<div class="camera-countdown" data-camera-countdown="${_esc(cam.camera_id)}" role="timer"></div><div class="helper">${_esc(t.deadline)}: ${_esc(Number.isFinite(end) ? this._formatCameraTime(end) : '—')}</div>` : ''}${evidence.length ? `<details class="evidence"><summary>${_esc(t.evidence)}</summary><div class="evidence-list">${evidence.map(text=>`<div>${_esc(text)}</div>`).join('')}</div></details>` : ''}</div>`;
+      return `<div class="camera-feedback" data-camera-feedback="${_esc(cam.camera_id)}">${request}<span class="phase ${phase}" data-camera-phase="${phase}">${_esc(this._periodText(phase))}</span><div class="helper">${_esc(labels.scope)}: ${_esc(scope)}${minutes !== null ? ` · ${_esc(labels.duration)}: ${minutes} min` : ''}</div>${this._paused[cam.camera_id] ? `<div class="camera-countdown" data-camera-countdown="${_esc(cam.camera_id)}" role="timer"></div><div class="helper">${_esc(t.deadline)}: ${_esc(Number.isFinite(end) ? this._formatCameraTime(end) : '—')}</div>` : ''}${evidence.length ? `<details class="evidence"><summary>${_esc(t.evidence)}</summary><div class="evidence-list">${evidence.map(text=>`<div>${_esc(text)}</div>`).join('')}</div></details>` : ''}</div>`;
     }
     _formatCameraTime(value) {
       const zone = this._hass?.config?.time_zone || 'UTC';
