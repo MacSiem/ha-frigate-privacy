@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.4.0 (2026-10-17)
+
+- Show a short local privacy deadline, friendly remaining time and progress, with full timing evidence retained.
+- Count partial/error cameras and jump to the affected camera without changing selection.
+- Guide notification setup, display saved settings and offer an explicit generic test of the saved destination. Defaults, trusted-action permissions and camera control remain unchanged.
+- Follow the HA profile and system time zone for readable history dates; distinguish repeated daylight-saving hours. Keep schedules in the explicitly labelled server time zone.
+- Sort camera names naturally and add advisory CI checks without making them a release gate.
+
 ## 6.3.0 (2026-10-16)
 
 - Show a separate server-derived deadline, remaining time, scope and action result under each camera. Expiry waits for the backend instead of claiming a successful resume.

@@ -20,7 +20,7 @@ customElements.define('ha-icon',class extends HTMLElement {
  }
 });
 </script>
-<script src="../../ha-frigate-privacy.js?sha256=5e493e2751a6741882cdcae94a0ca6d3e07fa04c044732bfcc2add44fbe077a2"></script>
+<script src="../../ha-frigate-privacy.js?sha256=5641ced8360e46f985cd73d642f22f949e88e4aef03aa45407aa5a22c56682bb"></script>
 <script>
 // Documentation fixture: synthetic state and actual periods.py projection only.
 // Mutations deliberately fail; integration acceptance uses a separate live HA fixture.
@@ -320,7 +320,7 @@ Object.values(paused).forEach((record,index)=>{record.started_at=new Date().toIS
 const connection=new EventTarget();connection.connected=true;
 const hass={language:'en',themes:{darkMode:theme==='dark'},config:{time_zone:'Europe/Warsaw',instance_id:'documentation-only'},connection,states:{},user:{id:'synthetic-admin',is_admin:true,is_active:true},
  callWS:async message=>{
-  if(message.type==='ha_frigate_privacy/get_state')return {cameras:structuredClone(cameras),schedules:[],paused:structuredClone(paused),last_operations:{},recovery_ready:true};
+  if(message.type==='ha_frigate_privacy/get_state')return {cameras:structuredClone(cameras),schedules:[],paused:structuredClone(paused),last_operations:{},recovery_ready:true,notifications:{destination:'',label:'Off',available:false,events:{errors:true,paused:false,resumed:false,scheduled:false}}};
   if(message.type==='ha_frigate_privacy/get_periods')return {...structuredClone(periods),days:message.days};
   throw new Error('Synthetic documentation does not control cameras');
  }};

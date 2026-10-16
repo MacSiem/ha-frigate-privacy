@@ -79,7 +79,8 @@ Green means a channel is on; it does not mean privacy is enforced. Sound detecti
 does not confirm microphone capture or listening.
 
 Each camera with an active timed operation shows its own backend deadline and
-remaining time. The timer keeps counting independently of the selected duration
+remaining time and a progress indicator. The short deadline follows your profile
+and system time zone; full dates, zone and UTC remain in the evidence. The timer keeps counting independently of the selected duration
 input; reaching zero means the card is waiting for the backend's verified resume.
 Pending, partial, failed and unconfirmed results stay separate. Expand the camera's
 per-target evidence to see pause outcomes, resume outcomes and verified states.
@@ -93,8 +94,9 @@ is active, and the preview does not change camera controls.
 ### Period history
 
 Open **Period history**, choose **7 or 30 days**, then press **Read history**.
-The timeline shows recorded start and end times in your Home Assistant time zone
-and UTC. Switch to **Data** for a table, or select a camera's period to inspect
+The timeline shows readable dates and times using your HA profile, defaulting to
+your system time zone. Repeated daylight-saving hours include their UTC offset.
+Raw UTC timestamps remain in the period details. Switch to **Data** for a table, or select a camera's period to inspect
 its channel evidence: what the pause changed, what resume restored, and the last
 observed state. Larger histories have pages of 50 periods.
 
@@ -124,6 +126,18 @@ notification destination and events: errors/partial privacy, manual selected-sco
 pause and verified restoration, plus scheduled pause start/restoration. Extra notifications default to off. Messages contain
 no camera names, addresses, images or schedule details. Notification delivery failures
 do not change camera control. Existing local fail-safe alerts remain enabled.
+
+After saving, return to **Buttons and automations** and choose **Refresh saved
+settings**. The card shows the saved destination and events, or explains that
+notifications are off or unavailable. Choose **Send test** explicitly. The test uses
+only your saved destination and a generic message. **Home Assistant accepted** means
+HA accepted the request; check the destination to verify delivery. An error or
+unconfirmed result never triggers an automatic resend. Notifications work without
+trusting an automation. If your phone is missing, configure its HA notification
+channel first.
+
+Privacy schedules continue to use the Home Assistant server time zone, shown
+above their controls. Changing the display time zone does not move a schedule.
 
 In the card's **Buttons and automations** tab, select cameras, scope and duration,
 then copy an example for a dashboard button, script or automation action. For a
