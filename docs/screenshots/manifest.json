@@ -1,36 +1,36 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-13",
+  "generated_at": "2026-10-16",
   "fixture": "privacy-safe-generic-home",
   "source": {
     "path": "ha-frigate-privacy.js",
-    "sha256": "2250640b81e84646edd24beb830e9bee486ce52debc01453b00a8d4a7c184e5e"
+    "sha256": "5e493e2751a6741882cdcae94a0ca6d3e07fa04c044732bfcc2add44fbe077a2"
   },
   "harness": {
     "path": "docs/screenshots/_harness.html",
-    "sha256": "7a12a2e1e5c8801381451b72abfdc0bfc7d6858b2510eb36cd3202e6d04c5a32"
+    "sha256": "a3c058e4af3d417e55ce3144216ded6af2963c8d67e7b0ec82e4a3b6494d8d0d"
   },
   "images": [
     {
       "path": "docs/screenshots/card-cameras-light.png",
       "theme": "light",
       "width": 1920,
-      "height": 961,
-      "sha256": "52d3c20210ccba53422ab2c23246ba47fadc78e2e057f2be51232f8ae0e56997"
+      "height": 1308,
+      "sha256": "c16c0f648b31a7abe3e3b4f1a90ee961ca67c18302c66ad542c15a0b6008bd50"
     },
     {
       "path": "docs/screenshots/card-cameras-dark.png",
       "theme": "dark",
       "width": 1920,
-      "height": 961,
-      "sha256": "3d0d5f5f9b85f07345e9ab6619f002f9df3cc7eabcb9c8eea3e8bd5eab28909a"
+      "height": 1308,
+      "sha256": "3d9a7b157690a94de46c6e33ebfde3c615601ef1355c5d4e9a9736bdda92c5af"
     },
     {
       "path": "docs/screenshots/card-history-light.png",
       "theme": "light",
       "width": 1920,
-      "height": 1825,
-      "sha256": "c836a27def3a40b21db3d52ec48176d94ffe0859ea55b0538638e2c229803f9d"
+      "height": 1987,
+      "sha256": "889e17b92553142f5081afe28011a9bc9cd68a68ec79bdfaae5dc3fff6006c31"
     }
   ],
   "privacy": {
@@ -39,12 +39,13 @@
     "external_requests": false
   },
   "capture": {
-    "method": "Chrome full-page native screenshot, JPEG decoded to PNG without resizing or content changes",
+    "method": "Native Chrome CDP full-document PNG capture; no image editing, resizing or overlays",
     "viewport_css_width": 1920,
-    "viewport_css_height": 783,
+    "viewport_css_height": 1000,
     "device_pixel_ratio": 1,
-    "source_head": "e0e5f4e08b7ecfdde40d9683e1d6fe0d805204c1",
-    "scope": "Synthetic documentation only; actual periods.py projection and offline MDI renderer. Native HA acceptance recorded separately.",
-    "review": "Visual and local Tesseract text review: generic names only; no household data, addresses, credentials or camera images."
+    "source_head": "f029e66a21db57a5be180cd9dda9232cfd131774",
+    "scope": "Synthetic documentation only: generic actual-producer-shaped camera records, relative15/30minute deadlines, existing periods.py projection, offline MDI renderer. Native HA acceptance is separate.",
+    "review": "Personally inspected generic names/timers/partial-vs-paused/coverage and dark danger text. Local OCR review follows; no household data, addresses, credentials or actual camera images.",
+    "source_qualification": "Current JS source hash above is authoritative: after f029e66, only CSS for full-width group selector and contrasting danger foreground changed; exact current source bound in final candidate commit."
   }
 }

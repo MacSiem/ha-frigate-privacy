@@ -7,6 +7,7 @@
 - Give channel indicators semantic state colors in both themes, with text labels for on, off, idle, unknown, mixed and unavailable states.
 - Expand Preview inside the camera tile using Home Assistant's native camera card, only on demand. Close it on toggle, camera change, navigation or authority loss; discard late loads and require an explicit retry after loading errors.
 - Update countdown text without replacing controls or restarting a preview every second.
+- Distinguish the original requested scope from a schedule extension. Keep confirmed evidence that an earlier pause stopped camera video, while retaining warnings when that evidence is missing.
 
 ## 6.2.0 (2026-10-13)
 

@@ -54,13 +54,13 @@ function createUiV3({ language = 'en' } = {}) {
       --fp-card: var(--card-background-color, #ffffff); --fp-bg: var(--primary-background-color, #f6f7fb);
       --fp-soft: color-mix(in srgb, var(--fp-primary) 9%, var(--fp-card));
       --fp-border: var(--divider-color, #e4e7ec); --fp-text: var(--primary-text-color, #101828);
-      --fp-muted: var(--secondary-text-color, #667085); --fp-success: #18763b; --fp-warning: #795100; --fp-danger: #b42318;
+      --fp-muted: var(--secondary-text-color, #667085); --fp-success: #18763b; --fp-warning: #795100; --fp-danger: #b42318; --fp-on-danger: #fff;
       display: block; color: var(--fp-text); font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased;
     }
     :host(.bento-dark) {
       --fp-card: var(--card-background-color, #151821); --fp-bg: var(--primary-background-color, #0e1117);
       --fp-border: var(--divider-color, #2b3140); --fp-text: var(--primary-text-color, #f4f6fb);
-      --fp-success:#81cf99; --fp-warning:#efd080; --fp-danger:#ff9999;
+      --fp-success:#81cf99; --fp-warning:#efd080; --fp-danger:#ff9999; --fp-on-danger:#101828;
       --fp-muted: var(--secondary-text-color, #aab2c0); --fp-soft: color-mix(in srgb, var(--fp-primary) 15%, var(--fp-card)); color-scheme: dark;
     }
     :host .ht-result-state { background:transparent; }
@@ -94,6 +94,7 @@ function createUiV3({ language = 'en' } = {}) {
     .helper { color: var(--fp-muted); font-size: 13.5px; line-height: 1.6; }
     .camera-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
     .camera-card { display: flex; align-items: center; gap: 11px; min-height: 58px; padding: 14px; border: 1px solid var(--fp-border); border-radius: 14px; background: var(--fp-card); cursor: pointer; transition: border-color .18s, background .18s, transform .18s; }
+    .camera-grid > .camera-card { grid-column: 1 / -1; }
     .camera-card:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--fp-primary) 45%, var(--fp-border)); } .camera-card.selected { border-color: var(--fp-primary); background: var(--fp-soft); }
     .camera-card ha-icon { flex: 0 0 auto; color: var(--fp-primary); --mdc-icon-size: 22px; } .camera-name { min-width: 0; overflow-wrap: break-word; font-size: 14px; line-height: 1.4; font-weight: 700; } .camera-check { margin-left: auto; color: var(--fp-primary); }
     .camera-tile { min-width: 0; padding: 8px; border: 1px solid var(--fp-border); border-radius: 14px; } .camera-tile .camera-card { border: 0; padding: 7px; min-height: 42px; }
@@ -114,7 +115,7 @@ function createUiV3({ language = 'en' } = {}) {
     .duration-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-top: 12px; }
     input, select { min-height: 42px; width: 100%; padding: 9px 11px; border: 1px solid var(--fp-border); border-radius: 11px; background: var(--fp-card); color: var(--fp-text); }
     .btn { min-height: 44px; padding: 10px 16px; border: 1px solid transparent; border-radius: 12px; cursor: pointer; font-size: 14px; line-height: 1.35; font-weight: 800; } .btn:disabled { cursor: not-allowed; opacity: .55; }
-    .btn-primary { color: white; background: linear-gradient(135deg, #4f46e5, #7c3aed); } .btn-secondary { color: var(--fp-text); background: var(--fp-card); border-color: var(--fp-border); } .btn-danger { color: white; background: var(--fp-danger); } .btn-full { width: 100%; margin-top: 14px; }
+    .btn-primary { color: white; background: linear-gradient(135deg, #4f46e5, #7c3aed); } .btn-secondary { color: var(--fp-text); background: var(--fp-card); border-color: var(--fp-border); } .btn-danger { color: var(--fp-on-danger); background: var(--fp-danger); } .btn-full { width: 100%; margin-top: 14px; }
     .state-grid { display: grid; gap: 12px; } .state-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 14px 16px; padding: 16px; border: 1px solid var(--fp-border); border-radius: 14px; }
     .state-name { font-size: 15px; line-height: 1.4; font-weight: 750; } .state-meta { margin-top: 7px; color: var(--fp-muted); font-size: 13px; line-height: 1.6; overflow-wrap: break-word; }
     .evidence { grid-column: 1 / -1; color: var(--fp-muted); font-size: 12.5px; line-height: 1.55; } .evidence summary { cursor: pointer; font-weight: 750; } .evidence-list { display: grid; gap: 6px; margin-top: 9px; overflow-wrap: anywhere; }
@@ -128,7 +129,7 @@ function createUiV3({ language = 'en' } = {}) {
     .form-actions { display: flex; gap: 9px; margin-top: 13px; }
     .donate-section { display: flex; align-items: center; justify-content: flex-start; gap: 8px; margin-top: 8px; padding: 4px 0; font-size: 11px; background:none; border:0; box-shadow:none; } .donate-section button { margin-left:auto; padding:2px 6px; min-height:0; line-height:1; border:0; background:transparent; color:var(--fp-muted); cursor:pointer; } .donate-section .donate-btn { min-height:0; padding:0; border:0; border-radius:0; background:none; color:var(--fp-muted); text-decoration:underline; font-size:11px; line-height:1.35; font-weight:400; } .donate-text h3 { font-size: 15px; line-height: 1.4; } .donate-text p { margin-top: 6px; color: var(--fp-muted); font-size: 13.5px; line-height: 1.55; }
     .donate-buttons { display: flex; gap: 9px; } .donate-btn { display: inline-flex; align-items: center; gap: 7px; min-height: 42px; padding: 9px 12px; border: 1px solid var(--fp-border); border-radius: 11px; background: var(--fp-card); color: var(--fp-text); text-decoration: none; font-size: 13px; line-height: 1.35; font-weight: 750; } .donate-btn ha-icon { --mdc-icon-size: 18px; color: var(--fp-primary); }
-    .toast { position: fixed; left: 50%; bottom: 24px; z-index: 10; max-width: min(90vw, 520px); transform: translate(-50%, 90px); opacity: 0; pointer-events: none; padding: 12px 17px; border-radius: 11px; background: #101828; color: #fff; transition: .22s; font-size: 14px; line-height: 1.45; } .toast.show { transform: translate(-50%, 0); opacity: 1; } .toast.error { background: var(--fp-danger); }
+    .toast { position: fixed; left: 50%; bottom: 24px; z-index: 10; max-width: min(90vw, 520px); transform: translate(-50%, 90px); opacity: 0; pointer-events: none; padding: 12px 17px; border-radius: 11px; background: #101828; color: #fff; transition: .22s; font-size: 14px; line-height: 1.45; } .toast.show { transform: translate(-50%, 0); opacity: 1; } .toast.error { color:var(--fp-on-danger); background: var(--fp-danger); }
     .empty { padding: 24px; text-align: center; color: var(--fp-muted); font-size: 14px; line-height: 1.55; }
 
     .donate-section button, .donate-section .donate-btn { min-width:44px;min-height:44px; }

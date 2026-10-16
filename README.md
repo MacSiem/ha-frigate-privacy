@@ -57,6 +57,8 @@ created.
 > can reveal household routines. All custom WebSocket commands, including reads,
 > therefore require a Home Assistant administrator account.
 
+A manual pause extended by a schedule retains its original requested scope. The camera tile identifies the extension and exposes per-target evidence; its original timer alone does not describe schedule coverage.
+
 ### Privacy scopes
 
 | Scope | Targets requested off |
@@ -209,8 +211,9 @@ type: custom:ha-frigate-privacy
 That's it. For an administrator, the card lists discovered Frigate cameras with
 pause/resume controls, backend-confirmed state, and the schedule editor. Each
 camera shows the current HA camera entity, recording switch, and sound-detection
-switch status. **Preview in HA** opens Home Assistant's native camera view only
-when selected; the card never loads a live feed on its own. An unavailable
+switch status. **Preview** expands Home Assistant's native camera card inside
+the selected camera tile. Close it with the same button; the tool fetches no
+frames before an administrator opens it. An unavailable
 sound-detection switch is shown as unavailable rather than assumed to be on.
 
 ## Entities for automations

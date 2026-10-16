@@ -20,7 +20,7 @@ customElements.define('ha-icon',class extends HTMLElement {
  }
 });
 </script>
-<script src="../../ha-frigate-privacy.js?sha256=2250640b81e84646edd24beb830e9bee486ce52debc01453b00a8d4a7c184e5e"></script>
+<script src="../../ha-frigate-privacy.js?sha256=5e493e2751a6741882cdcae94a0ca6d3e07fa04c044732bfcc2add44fbe077a2"></script>
 <script>
 // Documentation fixture: synthetic state and actual periods.py projection only.
 // Mutations deliberately fail; integration acceptance uses a separate live HA fixture.
@@ -113,15 +113,214 @@ const periods={
   "scope": "recorded_transitions",
   "days": 30
 };
-const cameras=[['front_door','Front Door','off'],['garden','Garden','on']].map(([id,name,recording])=>({
- camera_id:id,entity_id:'camera.'+id,name,camera_state:'idle',camera_can_toggle:false,
- switches:[['_detect','on'],['_recordings',recording],['_snapshots','on'],['_audio','off']].map(([suffix,state])=>({entity_id:'switch.'+id+suffix,suffix,state})),
- missing_switches:[],available_switches:['_detect','_recordings','_snapshots','_audio'].map(s=>'switch.'+id+s)
-}));
+// Synthetic records shaped from the actual isolated HA operation, identifiers replaced.
+const cameras=[
+  {
+    "camera_id": "front_door",
+    "entity_id": "camera.front_door",
+    "name": "Front Door",
+    "camera_state": "off",
+    "camera_can_toggle": true,
+    "switches": [
+      {
+        "entity_id": "switch.front_door_detect",
+        "suffix": "_detect",
+        "state": "on",
+        "name": "front_door_detect"
+      },
+      {
+        "entity_id": "switch.front_door_recordings",
+        "suffix": "_recordings",
+        "state": "off",
+        "name": "front_door_recordings"
+      },
+      {
+        "entity_id": "switch.front_door_snapshots",
+        "suffix": "_snapshots",
+        "state": "off",
+        "name": "front_door_snapshots"
+      },
+      {
+        "entity_id": "switch.front_door_audio",
+        "suffix": "_audio",
+        "state": "off",
+        "name": "front_door_audio"
+      }
+    ],
+    "available_switches": [
+      "switch.front_door_detect",
+      "switch.front_door_recordings",
+      "switch.front_door_snapshots",
+      "switch.front_door_audio"
+    ],
+    "missing_switches": [
+      "switch.front_door_enabled",
+      "switch.front_door_motion",
+      "switch.front_door_audio_detection",
+      "switch.front_door_review_alerts",
+      "switch.front_door_review_detections"
+    ]
+  },
+  {
+    "camera_id": "garden",
+    "entity_id": "camera.garden",
+    "name": "Garden",
+    "camera_state": "idle",
+    "camera_can_toggle": true,
+    "switches": [
+      {
+        "entity_id": "switch.garden_detect",
+        "suffix": "_detect",
+        "state": "off",
+        "name": "garden_detect"
+      },
+      {
+        "entity_id": "switch.garden_recordings",
+        "suffix": "_recordings",
+        "state": "off",
+        "name": "garden_recordings"
+      },
+      {
+        "entity_id": "switch.garden_snapshots",
+        "suffix": "_snapshots",
+        "state": "off",
+        "name": "garden_snapshots"
+      },
+      {
+        "entity_id": "switch.garden_audio",
+        "suffix": "_audio",
+        "state": "off",
+        "name": "garden_audio"
+      }
+    ],
+    "available_switches": [
+      "switch.garden_detect",
+      "switch.garden_recordings",
+      "switch.garden_snapshots",
+      "switch.garden_audio"
+    ],
+    "missing_switches": [
+      "switch.garden_enabled",
+      "switch.garden_motion",
+      "switch.garden_audio_detection",
+      "switch.garden_review_alerts",
+      "switch.garden_review_detections"
+    ]
+  }
+];
+const paused={
+  "front_door": {
+    "camera_entity_id": "camera.front_door",
+    "name": "Front Door",
+    "phase": "partial",
+    "desired_state": "paused",
+    "stream_type": "all",
+    "source": "manual",
+    "planned_switches": [
+      "switch.front_door_detect",
+      "switch.front_door_snapshots"
+    ],
+    "switches": [
+      "switch.front_door_snapshots"
+    ],
+    "preexisting_off": [
+      "switch.front_door_recordings",
+      "switch.front_door_audio"
+    ],
+    "skipped": [
+      "switch.front_door_enabled",
+      "switch.front_door_motion",
+      "switch.front_door_audio_detection",
+      "switch.front_door_review_alerts",
+      "switch.front_door_review_detections"
+    ],
+    "unavailable": [],
+    "failed": [
+      "switch.front_door_detect"
+    ],
+    "camera_planned": true,
+    "camera_toggled": true,
+    "camera_failed": false,
+    "target_outcomes": {
+      "switch.front_door_enabled": "missing",
+      "switch.front_door_motion": "missing",
+      "switch.front_door_audio_detection": "missing",
+      "switch.front_door_review_alerts": "missing",
+      "switch.front_door_review_detections": "missing",
+      "switch.front_door_recordings": "preexisting_off",
+      "switch.front_door_audio": "preexisting_off",
+      "switch.front_door_detect": "service_failed",
+      "switch.front_door_snapshots": "paused",
+      "camera.front_door": "paused"
+    },
+    "active": true,
+    "reason": "pause_incomplete",
+    "last_verified_actual_state": {
+      "switch.front_door_detect": "on",
+      "switch.front_door_snapshots": "off",
+      "switch.front_door_recordings": "off",
+      "switch.front_door_audio": "off",
+      "camera.front_door": "off"
+    }
+  },
+  "garden": {
+    "camera_entity_id": "camera.garden",
+    "name": "Garden",
+    "phase": "paused",
+    "desired_state": "paused",
+    "stream_type": "all",
+    "source": "manual",
+    "planned_switches": [
+      "switch.garden_recordings",
+      "switch.garden_audio"
+    ],
+    "switches": [
+      "switch.garden_recordings",
+      "switch.garden_audio"
+    ],
+    "preexisting_off": [
+      "switch.garden_detect",
+      "switch.garden_snapshots"
+    ],
+    "skipped": [
+      "switch.garden_enabled",
+      "switch.garden_motion",
+      "switch.garden_audio_detection",
+      "switch.garden_review_alerts",
+      "switch.garden_review_detections"
+    ],
+    "unavailable": [],
+    "failed": [],
+    "camera_planned": false,
+    "camera_toggled": false,
+    "camera_failed": false,
+    "target_outcomes": {
+      "switch.garden_enabled": "missing",
+      "switch.garden_motion": "missing",
+      "switch.garden_audio_detection": "missing",
+      "switch.garden_review_alerts": "missing",
+      "switch.garden_review_detections": "missing",
+      "switch.garden_detect": "preexisting_off",
+      "switch.garden_snapshots": "preexisting_off",
+      "switch.garden_recordings": "paused",
+      "switch.garden_audio": "paused"
+    },
+    "active": true,
+    "reason": null,
+    "last_verified_actual_state": {
+      "switch.garden_recordings": "off",
+      "switch.garden_audio": "off",
+      "switch.garden_detect": "off",
+      "switch.garden_snapshots": "off",
+      "camera.garden": "idle"
+    }
+  }
+};
+Object.values(paused).forEach((record,index)=>{record.started_at=new Date().toISOString();record.ends_at=new Date(Date.now()+(index+1)*15*60000).toISOString();});
 const connection=new EventTarget();connection.connected=true;
 const hass={language:'en',themes:{darkMode:theme==='dark'},config:{time_zone:'Europe/Warsaw',instance_id:'documentation-only'},connection,states:{},user:{id:'synthetic-admin',is_admin:true,is_active:true},
  callWS:async message=>{
-  if(message.type==='ha_frigate_privacy/get_state')return {cameras:structuredClone(cameras),schedules:[],paused:{},last_operations:{},recovery_ready:true};
+  if(message.type==='ha_frigate_privacy/get_state')return {cameras:structuredClone(cameras),schedules:[],paused:structuredClone(paused),last_operations:{},recovery_ready:true};
   if(message.type==='ha_frigate_privacy/get_periods')return {...structuredClone(periods),days:message.days};
   throw new Error('Synthetic documentation does not control cameras');
  }};
