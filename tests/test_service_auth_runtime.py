@@ -46,7 +46,7 @@ def _load_init():
     ha_const = sys.modules.setdefault(
         "homeassistant.const", types.ModuleType("homeassistant.const")
     )
-    ha_const.Platform = types.SimpleNamespace(BINARY_SENSOR="binary_sensor")
+    ha_const.Platform = types.SimpleNamespace(BINARY_SENSOR="binary_sensor", SWITCH="switch", BUTTON="button", SENSOR="sensor")
     core = sys.modules.setdefault(
         "homeassistant.core", types.ModuleType("homeassistant.core")
     )
@@ -87,6 +87,10 @@ def _load_init():
     async def resume(*args, **kwargs):
         calls.append(("resume", args, kwargs))
 
+    async def extend(*args, **kwargs):
+        calls.append(("extend", args, kwargs))
+
+    control.async_extend_privacy = extend
     control.async_pause_cameras = pause
     control.async_resume_cameras = resume
     sys.modules["fpr_service_auth.control"] = control
@@ -99,6 +103,7 @@ def _load_init():
     sys.modules["fpr_service_auth.storage"] = storage
     websocket = types.ModuleType("fpr_service_auth.websocket_api")
     websocket.async_register_commands = lambda *_args, **_kwargs: None
+    websocket._kick_scheduler_watch = lambda *_args, **_kwargs: None
     sys.modules["fpr_service_auth.websocket_api"] = websocket
 
     frontend_module = types.ModuleType("fpr_service_auth.frontend")
@@ -220,3 +225,61 @@ def test_authorized_service_propagates_context_and_operation_id():
     assert kwargs["context"] is call.context
     assert kwargs["operation_id"] == "pause-service-1"
     assert kwargs["source"] == "manual"
+
+
+def test_extend_service_uses_admin_recovery_and_context_guards():
+    async def scenario():
+        control_calls.clear()
+        hass = _Hass(ready=False, users={'admin':types.SimpleNamespace(is_admin=True), 'member':types.SimpleNamespace(is_admin=False)})
+        init_module._async_register_services(hass)
+        handler = hass.services.handlers[(const_module.DOMAIN, const_module.SERVICE_EXTEND_PRIVACY)]
+        for user, expected in [('member', Unauthorized), (None, Unauthorized), ('admin', HomeAssistantError)]:
+            try:
+                await handler(_call(user, camera='front', duration_minutes=15))
+            except expected:
+                pass
+            else:
+                raise AssertionError('guard bypassed')
+        assert control_calls == []
+        hass.data[const_module.DOMAIN][const_module.DATA_RECOVERY_READY] = True
+        call = _call('admin', cameras=['front'], duration_minutes=15, operation_id='extend-service')
+        await handler(call)
+        assert control_calls[-1][0] == 'extend'
+        assert control_calls[-1][1][2] == ['front']
+        assert control_calls[-1][2]['context'] is call.context
+        assert control_calls[-1][2]['operation_id'] == 'extend-service'
+    asyncio.run(scenario())
+
+
+def test_extend_service_accepts_only_configured_running_system_context():
+    async def scenario():
+        control_calls.clear()
+        hass = _Hass(ready=True, users={})
+        bucket = hass.data[const_module.DOMAIN]
+        bucket['config_entry'] = types.SimpleNamespace(options={'trusted_actions':['automation.reviewed']})
+        run_context = types.SimpleNamespace(id='active-run')
+        script = types.SimpleNamespace(is_running=True, _runs=[types.SimpleNamespace(_context=run_context)])
+        automation = types.SimpleNamespace(is_on=True, action_script=script)
+        hass.data['automation'] = types.SimpleNamespace(get_entity=lambda entity_id: automation)
+        init_module._async_register_services(hass)
+        handler = hass.services.handlers[(const_module.DOMAIN, const_module.SERVICE_EXTEND_PRIVACY)]
+        call = _call(None, camera='front', duration_minutes=15)
+        call.context.id = 'different-run'
+        try:
+            await handler(call)
+        except Unauthorized:
+            pass
+        else:
+            raise AssertionError('unregistered run context accepted')
+        assert not control_calls
+        call.context.id = 'active-run'
+        await handler(call)
+        assert control_calls[-1][2]['context'] is call.context
+        script.is_running = False
+        try:
+            await handler(call)
+        except Unauthorized:
+            pass
+        else:
+            raise AssertionError('stopped script accepted')
+    asyncio.run(scenario())

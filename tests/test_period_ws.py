@@ -44,7 +44,7 @@ def ws(monkeypatch):
         mod=types.ModuleType('period_ws_test.'+name)
         if name=='control':
             def forbidden(*a,**kw):raise AssertionError('history must not discover/control cameras')
-            mod.async_pause_cameras=mod.async_resume_cameras=mod.discover_frigate_cameras=forbidden
+            mod.async_extend_privacy=mod.async_pause_cameras=mod.async_resume_cameras=mod.discover_frigate_cameras=forbidden
         elif name=='storage':
             mod.FrigatePrivacyStorage=object
             mod.ReplayIntegrityError=type('ReplayIntegrityError',(Exception,),{})
