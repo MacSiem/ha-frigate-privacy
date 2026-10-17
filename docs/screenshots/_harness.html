@@ -20,7 +20,7 @@ customElements.define('ha-icon',class extends HTMLElement {
  }
 });
 </script>
-<script src="../../ha-frigate-privacy.js?sha256=ec68841e65e6cba631dd1dde9e1c33a81285c7232a21d8806dc7055b0bd1f503"></script>
+<script src="../../ha-frigate-privacy.js?sha256=327c1061ee25198fe429b6ebe29f7ce0fde964e21b3b89e43c30f678f0ea4291"></script>
 <script>
 // Documentation fixture: synthetic state and actual periods.py projection only.
 // Mutations deliberately fail; integration acceptance uses a separate live HA fixture.
@@ -320,6 +320,7 @@ const paused={
   }
 };
 Object.values(paused).forEach((record,index)=>{record.started_at=new Date().toISOString();record.ends_at=new Date(Date.now()+(index+1)*15*60000).toISOString();});
+const requestedWidth=Number(params.get('width'));if([320,390,1280].includes(requestedWidth)){document.querySelector('main').style.width=requestedWidth+'px';document.querySelector('main').style.maxWidth='100%';}
 const connection=new EventTarget();connection.connected=true;
 const hass={language,themes:{darkMode:theme==='dark'},config:{time_zone:'Europe/Warsaw',instance_id:'documentation-only'},connection,states:{},user:{id:'synthetic-admin',is_admin:true,is_active:true},
  callWS:async message=>{
@@ -327,5 +328,5 @@ const hass={language,themes:{darkMode:theme==='dark'},config:{time_zone:'Europe/
   if(message.type==='ha_frigate_privacy/get_periods')return {...structuredClone(periods),days:message.days};
   throw new Error('Synthetic documentation does not control cameras');
  }};
-const card=document.getElementById('card');card.setConfig({type:'custom:ha-frigate-privacy',show_support:false});card.hass=hass;
+const card=document.getElementById('card');card.setConfig({type:'custom:ha-frigate-privacy',show_support:false,compact:params.get('compact')==='1',cameras:params.get('compact')==='1'?['garden']:undefined});card.hass=hass;
 </script></body></html>
