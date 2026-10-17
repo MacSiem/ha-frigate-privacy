@@ -9,7 +9,7 @@ const rootSource=fs.readFileSync(path.join(root,files[0]),'utf8');
 for(const file of files){
   const source=fs.readFileSync(path.join(root,file),'utf8');
   assert.equal(source,rootSource,'manual and integration cards must match');
-  for(const [name,marker] of [['ha-tools-format.js','HA_FORMAT_UI'],['ha-tools-lists.js','HA_LIST_UI']]){
+  for(const [name,marker] of [['ha-tools-format.js','HA_FORMAT_UI'],['ha-tools-lists.js','HA_LIST_UI'],['ha-tools-card-ui.js','HA_CARD_UI']]){
     const canonical=fs.readFileSync(path.join(root,'shared',name),'utf8').split('// Node tests use the canonical factory;')[0].trimEnd();
     const start=`// ${marker}_START\n`,end=`\n// ${marker}_END`;
     assert.equal(source.split(start).length,2,'one closure marker required');

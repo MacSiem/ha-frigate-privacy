@@ -155,6 +155,42 @@ function createUiV3({ language = 'en' } = {}) {
     save(key, value) { try { localStorage.setItem(key, String(value)); } catch (_) { /* optional UI preference */ } },
   };
 
+// HA_CARD_UI_START
+// Shared card presentation. No data access, state mutations or permissions.
+function createCardUi() {
+  const css = `
+:host{--ht-action-bg:#2563eb;--ht-action-text:#fff;--ht-focus:#2563eb;display:block;max-width:1200px;margin-inline:auto;color-scheme:light}
+:host(.bento-dark){--ht-action-bg:#4f46e5;--ht-action-text:#fff;--ht-focus:#a5b4fc;color-scheme:dark}
+.card{width:100%;max-width:1200px;font-size:14px}
+.card p,.card input,.card select,.card textarea,.card button{font-size:14px}
+.card .helper,.card .channel-badge,.card .phase,.card .camera-countdown,.card .subtitle{font-size:12px;letter-spacing:normal}
+.card .btn-primary{background:var(--ht-action-bg);color:var(--ht-action-text);border-color:var(--ht-action-bg)}
+.card .btn-primary:hover{filter:brightness(.9)}
+.card .btn-primary:disabled{opacity:1;filter:none;background:var(--fp-soft);color:var(--fp-muted);border-color:var(--fp-border);cursor:not-allowed}
+.card .btn-danger{background:transparent;color:#b42318;border:1px solid #b42318}
+:host(.bento-dark) .card .btn-danger{background:transparent;color:#ffb4ab;border-color:#ffb4ab}
+.card :is(button,input,select,textarea,a,summary,[role="button"]):focus-visible{outline:3px solid var(--ht-focus);outline-offset:2px}
+.card .tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:4px;scrollbar-width:thin;overscroll-behavior-inline:contain;max-width:100%;padding:4px}
+.card .tab-btn{flex:0 0 auto;white-space:nowrap;overflow-wrap:normal;min-height:44px}
+.card input,.card select,.card textarea{background:var(--fp-card);color:var(--fp-text);accent-color:var(--ht-action-bg)}
+.camera-quick-actions,.duration-presets{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-block:10px}
+.camera-quick-actions .btn{padding:8px 12px;min-height:44px}
+.duration-label{display:flex;align-items:center;gap:8px;min-width:0;font-size:14px}
+.duration-label input{width:90px;min-width:64px}
+.card .duration-row{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
+.card .intro-banner{padding:8px 12px;margin-bottom:12px}
+.card .intro-banner summary,.notification-help summary{min-height:44px;cursor:pointer;display:list-item;list-style-position:inside}
+.card .camera-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}
+.card .camera-name{font-size:14px;overflow-wrap:break-word}
+.card dialog{max-width:min(480px,calc(100% - 32px));box-sizing:border-box;border:1px solid var(--fp-border);border-radius:16px;background:var(--fp-card);color:var(--fp-text);padding:20px}
+.card dialog::backdrop{background:rgba(0,0,0,.5)}
+.card.compact .header{padding:16px}.card.compact .body{padding:12px}.card.compact .subtitle{display:none}
+@container(max-width:500px){.card .brand-mark{display:none}.card .header{gap:8px}.card .body,.card .header{padding:12px}.card .status-pill{margin-left:0}.card .camera-grid{grid-template-columns:minmax(0,1fr)}}
+`;
+  return {css};
+}
+// HA_CARD_UI_END
+
   const CSS = `
     :host {
       --fp-primary: var(--primary-color, #6366f1); --fp-primary-2: #8b5cf6;
@@ -318,7 +354,8 @@ function createUiV3({ language = 'en' } = {}) {
 
     static getConfigElement() { return document.createElement('ha-frigate-privacy-editor'); }
     static getStubConfig() { return { type: 'custom:ha-frigate-privacy', title: 'Frigate Privacy' }; }
-    getCardSize() { return 7; } getGridOptions() { return { columns: 12, min_rows: 4, min_columns: 6 }; }
+    getCardSize() { return this._config.compact ? 3 : 7; }
+    getGridOptions() { return { columns:this._config.compact ? 6 : 12, min_rows:this._config.compact ? 2 : 4, min_columns:3 }; }
     _repairMojibake(str) { if (!str) return str; try { return decodeURIComponent(escape(str)); } catch (_) { return str; } }
 
     get _t() {
@@ -328,7 +365,18 @@ function createUiV3({ language = 'en' } = {}) {
       }; return strings[this._lang] || strings.en;
     }
 
-    setConfig(config) { this._config = { ...config }; this._invalidatePeriods('discarded'); this._periodContextKey = this._periodContext(this._hass); this._updateUI(); }
+    _tabChoices() { const t=this._t;return [['control',t.control],['schedule',t.schedule],['state',t.state],['history',this._periodStrings().title],['actions',t.actions],['info',t.info]]; }
+    _visibleTabs() { return this._tabChoices().filter(([id])=>!this._config.tabs||this._config.tabs.includes(id)); }
+    _visibleCameras() { return this._cameras.filter(camera=>!this._config.cameras?.length||this._config.cameras.includes(camera.camera_id)||this._config.cameras.includes(camera.entity_id)); }
+    setConfig(config) {
+      const known=['control','schedule','state','history','actions','info'];
+      if(config.tabs!==undefined&&(!Array.isArray(config.tabs)||!config.tabs.length||new Set(config.tabs).size!==config.tabs.length||config.tabs.some(tab=>!known.includes(tab))))throw new Error('tabs: choose at least one valid, unique tab');
+      if(config.default_tab!==undefined&&(!known.includes(config.default_tab)||config.tabs&&!config.tabs.includes(config.default_tab)))throw new Error('default_tab must be a visible tab');
+      if(config.cameras!==undefined&&(!Array.isArray(config.cameras)||config.cameras.some(id=>typeof id!=='string'||!id.trim())))throw new Error('cameras must contain camera IDs');
+      const previous=this._config;this._config={...config};
+      if(!this._configured||previous.default_tab!==config.default_tab||!this._visibleTabs().some(([id])=>id===this._activeTab))this._activeTab=config.default_tab||this._visibleTabs()[0][0];
+      this._configured=true;this._resumeRequest=null;this._invalidatePeriods('discarded');this._periodContextKey=this._periodContext(this._hass);this._updateUI();
+    }
     set hass(hass) {
       const identityChanged = !!this._hass && (this._connection !== (hass?.connection || null) || this._userId !== (hass?.user?.id || null) || this._declaredAdmin !== (hass?.user?.is_admin === true) || this._instanceId !== (hass?.config?.instance_id || null));
       const context = this._periodContext(hass);
@@ -360,6 +408,7 @@ function createUiV3({ language = 'en' } = {}) {
       this._clearPrivateState(); this._invalidatePeriods('discarded'); this._updateUI();
       if (this._statePollTimer) clearInterval(this._statePollTimer); this._statePollTimer = null; this._requestEpoch += 1; this._connectPromise = null; this._lastStatePollAt = 0; this._busy = false; this._integrationChecked = false; this._integrationAvailable = false; if (this._toastTimer) clearTimeout(this._toastTimer); }
     _clearPrivateState() {
+      this._resumeRequest=null;this._helpOpen=null;
       this._notifications=null;this._notificationResult=null;this._notificationEpoch+=1;
       if(this._notificationTimer)clearTimeout(this._notificationTimer);this._notificationTimer=null;
       this._closePreview();
@@ -410,6 +459,7 @@ function createUiV3({ language = 'en' } = {}) {
         not_checked:['The operation is in progress. Its result has not been checked yet.','Operacja trwa. Jej wynik nie został jeszcze sprawdzony.'],
         success:['The operation and current state were confirmed.','Potwierdzono wykonanie operacji i bieżący stan.'],
         success_pause:['The requested pause for the selected cameras and the integration state were confirmed.','Potwierdzono żądaną pauzę wybranych kamer i stan integracji.'],
+        success_extend:['The new deadline was saved and confirmed. The applied scope is unchanged.','Nowy termin zapisano i potwierdzono. Zastosowany zakres pozostaje bez zmian.'],
         success_resume:['The requested safe resume for the selected cameras and the integration state were confirmed.','Potwierdzono żądane bezpieczne wznowienie wybranych kamer i stan integracji.'],
         success_schedule_upsert:['The schedule was saved and confirmed in the current integration state.','Harmonogram zapisano i potwierdzono w bieżącym stanie integracji.'],
         success_schedule_delete:['Schedule deletion was confirmed in the current integration state.','Usunięcie harmonogramu potwierdzono w bieżącym stanie integracji.'],
@@ -421,9 +471,9 @@ function createUiV3({ language = 'en' } = {}) {
       const object = value => !!value && typeof value === 'object' && !Array.isArray(value);
       if (!object(result)) return 'unconfirmed';
       if (command === 'set_schedule') return 'unconfirmed'; // Confirmed separately against saved state.
-      if (!['pause_camera','resume_camera'].includes(command)) return 'unconfirmed';
-      const flag = command === 'pause_camera' ? 'paused' : 'resumed';
-      const phase = command === 'pause_camera' ? 'paused' : 'active';
+      if (!['pause_camera','resume_camera','extend_privacy'].includes(command)) return 'unconfirmed';
+      const flag = command === 'extend_privacy' ? 'extended' : command === 'pause_camera' ? 'paused' : 'resumed';
+      const phase = command !== 'resume_camera' ? 'paused' : 'active';
       const rows = Array.isArray(result.results) ? result.results : [];
       if (result.phase === 'partial' || rows.some(row => object(row) && row.phase === 'partial')) return 'partial';
       const validRows = rows.length > 0 && rows.every(row => object(row) && typeof row.camera_id === 'string' && row.camera_id.length > 0 && typeof row[flag] === 'boolean' && ['paused','active','partial','error','recovering','pausing','resuming'].includes(row.phase));
@@ -447,6 +497,10 @@ function createUiV3({ language = 'en' } = {}) {
         const matches = state.schedules.filter(item => item.id === result.schedule.id);
         return matches.length === 1 && equal(matches[0],result.schedule);
       }
+      if(command==='extend_privacy')return expectedIds.length>0&&expectedIds.every(id=>{
+        const rows=Array.isArray(result?.results)?result.results.filter(row=>row?.camera_id===id):[],record=state.paused[id];
+        return rows.length===1&&rows[0].extended===true&&rows[0].phase==='paused'&&typeof rows[0].ends_at==='string'&&Number.isFinite(Date.parse(rows[0].ends_at))&&record?.active===true&&record.phase==='paused'&&record.ends_at===rows[0].ends_at;
+      });
       const known = new Set(state.cameras.map(camera => camera?.camera_id));
       return expectedIds.length > 0 && expectedIds.every(id => known.has(id) && (command === 'pause_camera' ? object(state.paused[id]) && state.paused[id].phase === 'paused' && state.paused[id].active !== false : !state.paused[id] || state.paused[id].active === false || state.paused[id].phase === 'active'));
     }
@@ -457,8 +511,8 @@ function createUiV3({ language = 'en' } = {}) {
     }
     _newOperationId(action) { const random = globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`; return `${action}-${random}`.slice(0, 128); }
     _cameraMutationResults(command,result,state,expectedIds) {
-      const flag = command === 'pause_camera' ? 'paused' : 'resumed';
-      const phase = command === 'pause_camera' ? 'paused' : 'active';
+      const flag = command === 'extend_privacy' ? 'extended' : command === 'pause_camera' ? 'paused' : 'resumed';
+      const phase = command !== 'resume_camera' ? 'paused' : 'active';
       const rows = Array.isArray(result?.results) ? result.results : [];
       return Object.fromEntries(expectedIds.map(id => {
         const matches = rows.filter(row=>row && typeof row==='object' && !Array.isArray(row) && row.camera_id===id);
@@ -477,7 +531,7 @@ function createUiV3({ language = 'en' } = {}) {
       const epoch = this._requestEpoch; const wire = {};
       const pausedIds = Object.keys(this._paused);
       const expectedIds = [...(payload.cameras?.length ? payload.cameras : command === 'resume_camera' && pausedIds.length ? pausedIds : this._cameras.map(camera => camera.camera_id))];
-      if (command === 'pause_camera' || command === 'resume_camera') for (const id of expectedIds) this._cameraActions[id] = {pending:true,code:'not_checked'};
+      if (['pause_camera','resume_camera','extend_privacy'].includes(command)) for (const id of expectedIds) this._cameraActions[id] = {pending:true,code:'not_checked'};
       this._mutationWire = wire; this._busy = true; this._error = ''; this._mutationOutcome = {code:'not_checked',reason:'not_checked'}; this._updateUI();
       let accepted = false; let outcome = 'unconfirmed'; let cameraResults = null;
       try {
@@ -487,11 +541,11 @@ function createUiV3({ language = 'en' } = {}) {
         const nextState = await this._callIntegration('get_state');
         if (epoch !== this._requestEpoch) return false;
         const verified = this._mutationReadback(command, payload, result, nextState, expectedIds);
-        if (command === 'pause_camera' || command === 'resume_camera') cameraResults = this._cameraMutationResults(command,result,nextState,expectedIds);
+        if (['pause_camera','resume_camera','extend_privacy'].includes(command)) cameraResults = this._cameraMutationResults(command,result,nextState,expectedIds);
         if (command === 'set_schedule') outcome = verified ? 'success' : 'unconfirmed';
         else if (outcome === 'success' && !verified) outcome = 'unconfirmed';
         if (nextState && typeof nextState === 'object' && !Array.isArray(nextState) && Array.isArray(nextState.cameras) && Array.isArray(nextState.schedules) && nextState.paused && typeof nextState.paused === 'object' && !Array.isArray(nextState.paused)) this._applyState(nextState);
-        const successReason = command === 'pause_camera' ? 'success_pause' : command === 'resume_camera' ? 'success_resume' : payload.action === 'delete' ? 'success_schedule_delete' : 'success_schedule_upsert';
+        const successReason = command === 'extend_privacy' ? 'success_extend' : command === 'pause_camera' ? 'success_pause' : command === 'resume_camera' ? 'success_resume' : payload.action === 'delete' ? 'success_schedule_delete' : 'success_schedule_upsert';
         this._mutationOutcome = {code:outcome,reason:outcome === 'success' ? successReason : outcome === 'error' ? 'operation_failed' : outcome};
         this._error = outcome === 'success' ? '' : this._safeError({code:this._mutationOutcome.reason});
         this._showToast(outcome === 'success' ? this._t.saved : this._error, outcome);
@@ -507,15 +561,47 @@ function createUiV3({ language = 'en' } = {}) {
         if (this._mutationWire === wire) this._mutationWire = null;
         if (epoch === this._requestEpoch) {
           this._busy = false;
-          if (command === 'pause_camera' || command === 'resume_camera') for (const id of expectedIds) this._cameraActions[id] = {pending:false,code:cameraResults?.[id] || (this._mutationOutcome?.code==='error'?'error':'unconfirmed')};
+          if (['pause_camera','resume_camera','extend_privacy'].includes(command)) for (const id of expectedIds) this._cameraActions[id] = {pending:false,code:cameraResults?.[id] || (this._mutationOutcome?.code==='error'?'error':'unconfirmed')};
         }
         this._updateUI();
       }
     }
-    _selectedCameraIds() { if (!this._selectedCameras.size) return undefined; return this._cameras.filter((camera) => this._selectedCameras.has(camera.camera_id)).map((camera) => camera.camera_id); }
-    _pause() { const minutes = Math.max(1, Math.min(1440, Number.parseInt(this._customMinutes, 10) || 30)); this._customMinutes = minutes; haToolsPersistence.save('ha-frigate-privacy-pause-minutes', minutes); const cameras = this._selectedCameraIds(); return this._runMutation('pause_camera', { ...(cameras ? { cameras } : {}), duration_minutes: minutes, stream_type: this._pauseStreamType, operation_id: this._newOperationId('pause') }); }
-    _resume() { const cameras = this._selectedCameraIds(); return this._runMutation('resume_camera', { ...(cameras ? { cameras } : {}), operation_id: this._newOperationId('resume') }); }
-    _retryResume(cameraId) { return this._runMutation('resume_camera', { cameras:[cameraId], operation_id:this._newOperationId('resume-retry') }); }
+    _selectedCameraIds() { return this._visibleCameras().filter(camera=>!this._selectedCameras.size||this._selectedCameras.has(camera.camera_id)).map(camera=>camera.camera_id); }
+    _pause() {
+      const cameras=this._selectedCameraIds();if(!cameras.length)return false;
+      const minutes=Math.max(1,Math.min(1440,Number.parseInt(this._customMinutes,10)||30));this._customMinutes=minutes;haToolsPersistence.save('ha-frigate-privacy-pause-minutes',minutes);
+      return this._runMutation('pause_camera',{cameras,duration_minutes:minutes,stream_type:this._pauseStreamType,operation_id:this._newOperationId('pause')});
+    }
+    _quickPause(id,minutes) {
+      if(!this._visibleCameras().some(camera=>camera.camera_id===id)||![15,30,60].includes(minutes))return false;
+      return this._runMutation('pause_camera',{cameras:[id],duration_minutes:minutes,stream_type:this._pauseStreamType,operation_id:this._newOperationId('quick-pause')});
+    }
+    _extendPrivacy(id) {
+      if(!this._visibleCameras().some(camera=>camera.camera_id===id)||!this._paused[id]?.active||!Number.isFinite(Date.parse(this._paused[id].ends_at)))return false;
+      return this._runMutation('extend_privacy',{cameras:[id],duration_minutes:15,operation_id:this._newOperationId('extend')});
+    }
+    _resume(cameraIds) {
+      if(this._busy||this._mutationWire||!this._periodAuthority()||!this._recoveryReady)return false;
+      const visible=new Set(this._visibleCameras().map(camera=>camera.camera_id));
+      const ids=(cameraIds||this._selectedCameraIds()).filter(id=>visible.has(id)&&this._paused[id]);if(!ids.length)return false;
+      this._resumeRequest={ids,epoch:this._requestEpoch,user:this._userId,connection:this._connection,origin:this.shadowRoot.activeElement};this._updateUI();
+      const dialog=this.shadowRoot.querySelector('[data-resume-confirm]');if(dialog?.showModal)dialog.showModal();else dialog?.setAttribute('open','');dialog?.querySelector('[data-resume-cancel]')?.focus({preventScroll:true});
+    }
+    _cancelResume() {
+      const origin=this._resumeRequest?.origin;this._resumeRequest=null;this._updateUI();this._focusControl(origin?.isConnected?origin:this.shadowRoot.querySelector('[data-action="resume"]'));
+    }
+    _acceptResume() {
+      const request=this._resumeRequest;this._resumeRequest=null;this.shadowRoot.querySelector('[data-resume-confirm]')?.remove();
+      if(!request||request.epoch!==this._requestEpoch||request.user!==this._userId||request.connection!==this._connection||!this._periodAuthority())return false;
+      const visible=new Set(this._visibleCameras().map(camera=>camera.camera_id));const cameras=request.ids.filter(id=>visible.has(id)&&this._paused[id]);if(!cameras.length)return false;
+      return this._runMutation('resume_camera',{cameras,operation_id:this._newOperationId('resume')});
+    }
+    _retryResume(cameraId) { return this._resume([cameraId]); }
+    _resumeDialog() {
+      if(!this._resumeRequest||!this._periodAuthority())return '';
+      const pl=this._lang==='pl',names=this._resumeRequest.ids.map(id=>this._cameras.find(camera=>camera.camera_id===id)?.name||id);
+      return `<dialog data-resume-confirm aria-labelledby="resume-title"><h3 id="resume-title">${pl?'Zakończyć prywatność?':'End privacy?'}</h3><p>${pl?'Zakończysz prywatność tych kamer. Integracja spróbuje przywrócić ich stan sprzed pauzy.':'Privacy will end for these cameras. The integration will try to restore their state before the pause.'}</p><ul>${names.map(name=>`<li>${_esc(name)}</li>`).join('')}</ul><div class="form-actions"><button class="btn btn-secondary" data-resume-cancel>${pl?'Anuluj':'Cancel'}</button><button class="btn btn-danger" data-resume-accept>${pl?'Zakończ prywatność':'End privacy'}</button></div></dialog>`;
+    }
     async _saveScheduleFromForm() {
       const form = this._scheduleForm; const schedule = { id: form.id || this._newOperationId('schedule'), enabled:form.enabled !== false,days:[...form.days],startHour:Math.max(0,Math.min(23,Number.parseInt(form.startHour,10)||0)),startMin:Math.max(0,Math.min(59,Number.parseInt(form.startMin,10)||0)),endHour:Math.max(0,Math.min(23,Number.parseInt(form.endHour,10)||0)),endMin:Math.max(0,Math.min(59,Number.parseInt(form.endMin,10)||0)),repeat:form.repeat !== false,label:String(form.label||'').slice(0,120) };
       const saved = await this._runMutation('set_schedule', { action:'upsert', schedule, operation_id:this._newOperationId('schedule-upsert') }); if (!saved) return false; this._editingScheduleIdx = null; this._scheduleForm = this._emptySchedule(); this._updateUI(); return true;
@@ -549,9 +635,12 @@ function createUiV3({ language = 'en' } = {}) {
       const end=typeof record?.ends_at==='string'?Date.parse(record.ends_at):NaN;
       return Number.isFinite(start)&&Number.isFinite(end)&&end>start?Math.max(0,Math.min(100,(Date.now()-start)/(end-start)*100)):null;
     }
+    _helpKey() { return ['ha-frigate-help',this._instanceId||'instance',this._userId||'anonymous'].join(':'); }
     _buildIntroBanner() {
-      if (haToolsPersistence.loadSync('ha-intro-dismissed-ha-frigate-privacy') === '1') return ''; const t = this._t;
-      return `<div class="intro-banner" data-intro="ha-frigate-privacy"><button class="intro-dismiss" data-action="dismiss-intro" aria-label="${_esc(t.close)}"><ha-icon icon="mdi:close"></ha-icon></button><div class="intro-headline"><ha-icon icon="mdi:shield-lock-outline"></ha-icon>${_esc(t.introTitle)}</div><ol class="intro-steps"><li>${_esc(t.intro1)}</li><li>${_esc(t.intro2)}</li><li>${_esc(t.intro3)}</li></ol></div>`;
+      if(this._config.show_help===false)return '';
+      const t=this._t,wide=this.getBoundingClientRect().width>=500;
+      const open=wide&&(this._helpOpen??haToolsPersistence.loadSync(this._helpKey())!=='closed');
+      return `<details class="intro-banner" data-intro="ha-frigate-privacy" ${open?'open':''}><summary>${this._lang==='pl'?'Jak to działa?':'How does it work?'}</summary><ol class="intro-steps"><li>${_esc(t.intro1)}</li><li>${_esc(t.intro2)}</li><li>${_esc(t.intro3)}</li></ol></details>`;
     }
     _dismissIntro() { haToolsPersistence.save('ha-intro-dismissed-ha-frigate-privacy', '1'); this._lastHtml = ''; this._updateUI(); }
     _buildDonateFooter() { if (!this._hass?.user?.is_admin || this._config.show_support === false || haToolsPersistence.loadSync("ha-frigate-privacy-support-dismissed") === "1") return ""; const t=this._t; return `<div class="donate-section" data-source="ha-frigate-privacy"><a class="donate-btn" href="https://buymeacoffee.com/macsiem" target="_blank" rel="noopener noreferrer">${_esc(t.support)}</a><button type="button" data-action="dismiss-support" aria-label="${_esc(this._lang === 'pl' ? 'Ukryj link wsparcia' : 'Dismiss support link')}">×</button></div>`; }
@@ -641,12 +730,17 @@ function createUiV3({ language = 'en' } = {}) {
       const names = {on:this._t.statusOn,off:this._t.statusOff,idle:this._t.statusIdle,unavailable:this._t.statusUnavailable,unknown:this._t.statusUnknown};
       return `<span class="channel-badge" data-channel="${channel}" data-channel-state="${state}"><ha-icon icon="${icon}"></ha-icon>${_esc(label)}: ${_esc(states.map(s=>names[s]).join(' / '))}</span>`;
     }
+    _quickControls(cam) {
+      const pl=this._lang==='pl',record=this._paused[cam.camera_id],disabled=this._busy||this._mutationWire||!this._recoveryReady;
+      if(record)return `<div class="camera-quick-actions">${record.active&&Number.isFinite(Date.parse(record.ends_at))?`<button class="btn btn-secondary" data-extend-camera="${_esc(cam.camera_id)}" ${disabled?'disabled':''}>+15 min</button>`:''}<button class="btn btn-danger" data-resume-camera="${_esc(cam.camera_id)}" ${disabled?'disabled':''}>${pl?'Wznów':'Resume'}</button></div>`;
+      return `<div class="camera-quick-actions"><span>${pl?'Prywatność':'Privacy'}:</span>${[15,30,60].map(minutes=>`<button class="btn btn-secondary" data-quick-camera="${_esc(cam.camera_id)}" data-quick-minutes="${minutes}" aria-label="${_esc((pl?'Prywatność':'Privacy')+' · '+cam.name+' · '+minutes+' min')}" ${disabled?'disabled':''}>${minutes===60?'1 h':minutes+' min'}</button>`).join('')}<button class="btn btn-secondary" data-camera-more="${_esc(cam.camera_id)}" aria-label="${pl?'Więcej opcji':'More options'} · ${_esc(cam.name)}">⋯</button></div>`;
+    }
     _cameraTile(cam) {
       const selected = this._selectedCameras.has(cam.camera_id), t = this._t, p = this._cameraStrings();
       const values = suffixes => (cam.switches || []).filter(item=>suffixes.includes(item.suffix)).map(item=>item.state);
       const expanded = this._previewCamera === cam.entity_id;
       const validEntity = typeof cam.entity_id === 'string' && /^camera\.[a-z0-9_]+$/.test(cam.entity_id);
-      return `<div class="camera-tile"><div class="camera-card ${selected?'selected':''}" data-camera="${_esc(cam.camera_id)}" role="button" tabindex="0" aria-pressed="${selected}" aria-label="Camera: ${_esc(this._repairMojibake(cam.name))}"><ha-icon icon="mdi:cctv"></ha-icon><span class="camera-name">${_esc(this._repairMojibake(cam.name))}</span>${selected?'<ha-icon class="camera-check" icon="mdi:check-circle"></ha-icon>':''}</div><div class="channel-status">${this._channelBadge('video',t.video,[cam.camera_state],'mdi:video-outline')}${this._channelBadge('recording',t.recording,values(['_recordings']),'mdi:record-rec')}${this._channelBadge('snapshots',t.snapshots,values(['_snapshots']),'mdi:camera-outline')}${this._channelBadge('detection',t.detection,values(['_detect']),'mdi:motion-sensor')}${this._channelBadge('sound',t.soundDetection,values(['_audio_detection','_audio']),'mdi:microphone-outline')}</div>${this._cameraFeedback(cam)}${validEntity?`<button class="preview-btn" data-preview-camera="${_esc(cam.entity_id)}" aria-expanded="${expanded}" aria-controls="preview-${_esc(cam.camera_id)}">${_esc(expanded?p.hide:p.preview)}</button>${expanded?`<div id="preview-${_esc(cam.camera_id)}" class="camera-preview"><div data-preview-host="${_esc(cam.entity_id)}" role="region" aria-label="${_esc(p.preview+' · '+cam.name)}"><p class="helper">${_esc(p.loading)}</p></div><p class="helper">${_esc(p.hint)}</p></div>`:''}`:''}</div>`;
+      return `<div class="camera-tile"><div class="camera-card ${selected?'selected':''}" data-camera="${_esc(cam.camera_id)}" role="button" tabindex="0" aria-pressed="${selected}" aria-label="Camera: ${_esc(this._repairMojibake(cam.name))}"><ha-icon icon="mdi:cctv"></ha-icon><span class="camera-name">${_esc(this._repairMojibake(cam.name))}</span>${selected?'<ha-icon class="camera-check" icon="mdi:check-circle"></ha-icon>':''}</div><div class="channel-status">${this._channelBadge('video',t.video,[cam.camera_state],'mdi:video-outline')}${this._channelBadge('recording',t.recording,values(['_recordings']),'mdi:record-rec')}${this._channelBadge('snapshots',t.snapshots,values(['_snapshots']),'mdi:camera-outline')}${this._channelBadge('detection',t.detection,values(['_detect']),'mdi:motion-sensor')}${this._channelBadge('sound',t.soundDetection,values(['_audio_detection','_audio']),'mdi:microphone-outline')}</div>${this._cameraFeedback(cam)}${this._quickControls(cam)}${validEntity?`<button class="preview-btn" data-preview-camera="${_esc(cam.entity_id)}" aria-expanded="${expanded}" aria-controls="preview-${_esc(cam.camera_id)}">${_esc(expanded?p.hide:p.preview)}</button>${expanded?`<div id="preview-${_esc(cam.camera_id)}" class="camera-preview"><div data-preview-host="${_esc(cam.entity_id)}" role="region" aria-label="${_esc(p.preview+' · '+cam.name)}"><p class="helper">${_esc(p.loading)}</p></div><p class="helper">${_esc(p.hint)}</p></div>`:''}`:''}</div>`;
     }
     _previewAllowed(entity) {
       return this._periodAuthority() && this._integrationAvailable && this._recoveryReady &&
@@ -721,10 +815,10 @@ function createUiV3({ language = 'en' } = {}) {
     }
     _buildControlTab() {
       const t=this._t;
-      const lists=createListUi(this._hass?.language||this._lang);const cameras=[...this._cameras].sort((a,b)=>lists.compare(a.name,b.name)||lists.compare(a.camera_id,b.camera_id)).map(cam=>this._cameraTile(cam)).join('');
+      const lists=createListUi(this._hass?.language||this._lang);const cameras=[...this._visibleCameras()].sort((a,b)=>lists.compare(a.name,b.name)||lists.compare(a.camera_id,b.camera_id)).map(cam=>this._cameraTile(cam)).join('');
       const allSelected=this._selectedCameras.size===0; const phases=Object.values(this._paused||{});
       return `<div class="section"><div class="section-head"><h3>${_esc(t.cameras)}</h3><span class="helper">${this._cameras.length}</span></div><div class="camera-grid"><div class="camera-card ${allSelected?'selected':''}" data-camera="__all__" role="button" tabindex="0" aria-pressed="${allSelected}"><ha-icon icon="mdi:camera-outline"></ha-icon><span class="camera-name">${_esc(t.all)}</span>${allSelected?'<ha-icon class="camera-check" icon="mdi:check-circle"></ha-icon>':''}</div>${cameras||`<div class="empty">${_esc(t.noCameras)}</div>`}</div><p class="helper channel-hint">${_esc(t.soundHint)}</p></div>
-      <div class="section"><div class="section-head"><h3>${_esc(t.scope)}</h3></div><div class="seg" role="radiogroup">${[['all',t.allScope],['main',t.main],['sub',t.sub]].map(([value,label])=>`<button class="seg-item ${this._pauseStreamType===value?'selected':''}" data-scope="${value}" role="radio" aria-checked="${this._pauseStreamType===value}">${_esc(label)}</button>`).join('')}</div><div class="duration-row"><input class="input-minutes" type="number" min="1" max="1440" value="${_esc(this._customMinutes)}" aria-label="${_esc(t.duration)}"><button class="btn btn-primary" data-action="pause-custom" ${this._busy||this._mutationWire||!this._cameras.length?'disabled':''}>${_esc(t.pause)}</button></div>${phases.length?`<button class="btn btn-danger btn-full" data-action="resume" ${this._busy||this._mutationWire?'disabled':''}>${_esc(t.resume)}</button>`:''}</div>`;
+      <div class="section"><div class="section-head"><h3>${_esc(t.scope)}</h3></div><div class="seg" role="radiogroup">${[['all',t.allScope],['main',t.main],['sub',t.sub]].map(([value,label])=>`<button class="seg-item ${this._pauseStreamType===value?'selected':''}" data-scope="${value}" role="radio" aria-checked="${this._pauseStreamType===value}">${_esc(label)}</button>`).join('')}</div><div class="duration-row"><label class="duration-label">${this._lang==='pl'?'Czas':'Duration'}<input class="input-minutes" type="number" min="1" max="1440" value="${_esc(this._customMinutes)}" aria-label="${_esc(t.duration)}"><span>min</span></label><div class="duration-presets">${[15,30,60].map(minutes=>`<button class="btn btn-secondary" data-duration="${minutes}">${minutes} min</button>`).join('')}</div><button class="btn btn-primary" data-action="pause-custom" ${this._busy||this._mutationWire||!this._visibleCameras().length?'disabled':''}>${_esc(t.pause)}</button></div>${phases.length?`<button class="btn btn-danger" data-action="resume" ${this._busy||this._mutationWire?'disabled':''}>${_esc(t.resume)}</button>`:''}</div>`;
     }
     _buildScheduleTab() {
       const t=this._t; const list=this._schedules.map((schedule,index)=>{const days=[...(schedule.days||[])].sort().map((day)=>t.days[day-1]).filter(Boolean).join(', ');const time=`${String(schedule.startHour).padStart(2,'0')}:${String(schedule.startMin).padStart(2,'0')} – ${String(schedule.endHour).padStart(2,'0')}:${String(schedule.endMin).padStart(2,'0')}`;return `<div class="schedule-item"><div><div class="schedule-title">${_esc(schedule.label||t.schedule)}</div><div class="schedule-meta">${_esc(days)} · ${_esc(time)} · ${_esc(schedule.enabled?t.enabled:t.cancel)}</div></div><div class="schedule-actions"><button class="icon-btn" ${this._busy||this._mutationWire?'disabled':''} data-schedule-toggle="${index}" data-schedule-id="${_esc(schedule.id)}" aria-label="${_esc(t.enabled)}"><ha-icon icon="mdi:${schedule.enabled?'toggle-switch':'toggle-switch-off-outline'}"></ha-icon></button><button class="icon-btn" data-schedule-edit="${index}" data-schedule-id="${_esc(schedule.id)}" aria-label="${_esc(t.edit)}"><ha-icon icon="mdi:pencil-outline"></ha-icon></button><button class="icon-btn" ${this._busy||this._mutationWire?'disabled':''} data-schedule-delete="${index}" data-schedule-id="${_esc(schedule.id)}" aria-label="${_esc(t.remove)}"><ha-icon icon="mdi:delete-outline"></ha-icon></button></div></div>`;}).join(''); const form=this._scheduleForm;
@@ -975,7 +1069,7 @@ function createUiV3({ language = 'en' } = {}) {
       const destinationName=n?.destination==='persistent_notification.create'?t.homeAssistant:n?.label;
       const status=!n?t.unknown:!n.destination?t.off:!n.available?t.unavailable:`${t.destination}: ${destinationName}`;
       const result=this._notificationResult&&Object.hasOwn(t,this._notificationResult)?t[this._notificationResult]:'';
-      return `<section class="section" data-notification-setup><div class="section-head"><h3>${_esc(t.title)}</h3></div><p role="status" data-notification-saved>${_esc(status)}</p>${n?.destination?`<p>${_esc(t.events)}: ${_esc(labels.join(', ')||t.none)}</p>`:''}<ol class="notification-steps">${t.steps.map(step=>`<li>${_esc(step)}</li>`).join('')}</ol><p class="helper">${_esc(t.path)}</p><div class="notification-actions"><a class="btn btn-primary" href="/config/integrations/integration/ha_frigate_privacy">${_esc(t.setup)}</a><button type="button" class="btn btn-secondary" data-notification-refresh ${this._connectPromise?'disabled':''}>${_esc(t.refresh)}</button><button type="button" class="btn btn-secondary" data-notification-test ${!n?.destination||!n.available||this._notificationWire?'disabled':''}>${_esc(this._notificationWire?t.sending:t.test)}</button></div><p class="helper">${_esc(t.independent)}</p><p role="status" data-notification-result>${_esc(result)}</p></section>`;
+      return `<section class="section" data-notification-setup><div class="section-head"><h3>${_esc(t.title)}</h3></div><p role="status" data-notification-saved>${_esc(status)}</p>${n?.destination?`<p>${_esc(t.events)}: ${_esc(labels.join(', ')||t.none)}</p>`:''}<details class="notification-help"><summary>${this._lang==='pl'?'Jak włączyć powiadomienia?':'How to enable notifications?'}</summary><ol class="notification-steps">${t.steps.map(step=>`<li>${_esc(step)}</li>`).join('')}</ol></details><p class="helper">${_esc(t.path)}</p><div class="notification-actions"><a class="btn btn-primary" href="/config/integrations/integration/ha_frigate_privacy">${_esc(t.setup)}</a><button type="button" class="btn btn-secondary" data-notification-refresh ${this._connectPromise?'disabled':''}>${_esc(t.refresh)}</button><button type="button" class="btn btn-secondary" data-notification-test ${!n?.destination||!n.available||this._notificationWire?'disabled':''}>${_esc(this._notificationWire?t.sending:t.test)}</button></div><p class="helper">${_esc(t.independent)}</p><p role="status" data-notification-result>${_esc(result)}</p></section>`;
     }
     async _testNotification() {
       if(this._notificationWire||!this._periodAuthority()||!this._notifications?.destination||!this._notifications.available)return;
@@ -1000,7 +1094,7 @@ function createUiV3({ language = 'en' } = {}) {
         if(current())this._updateUI();
       }
     }
-    _buildHTML() { const t=this._t;const gate=this._buildGate();const summary=this._phaseSummary();const title=this._config.title||'Frigate Privacy';const main=gate||`<select class="tab-picker" data-tab-picker aria-label="${_esc(this._lang==='pl'?'Sekcje karty':'Card sections')}" hidden>${[['control',t.control],['schedule',t.schedule],['state',t.state],['history',this._periodStrings().title],['actions',t.actions],['info',t.info]].map(([id,label])=>`<option value="${id}" ${this._activeTab===id?'selected':''}>${_esc(label)}</option>`).join('')}</select><div class="tabs" role="tablist" aria-label="${_esc(this._lang==='pl'?'Sekcje karty':'Card sections')}">${[['control',t.control],['schedule',t.schedule],['state',t.state],['history',this._periodStrings().title],['actions',t.actions],['info',t.info]].map(([id,label])=>`<button class="tab-btn ${this._activeTab===id?'active':''}" data-tab="${id}" role="tab" aria-selected="${this._activeTab===id}">${_esc(label)}</button>`).join('')}</div>${this._activeTab==='control'?this._buildControlTab():this._activeTab==='schedule'?this._buildScheduleTab():this._activeTab==='state'?this._buildStateTab():this._activeTab==='history'?this._buildHistoryTab():this._activeTab==='actions'?this._buildActionsTab():this._buildInfoTab()}`;return `<style>${CSS}${createUiV3({language:this._lang}).css}</style><div class="card"><div class="header"><div class="brand"><div class="brand-mark"><ha-icon icon="mdi:shield-lock-outline"></ha-icon></div><div><h2>${_esc(title)}</h2><p class="subtitle">${_esc(t.subtitle)}</p></div></div>${summary.camera?`<button type="button" class="status-pill ${_esc(summary.phase)}" data-camera-summary="${_esc(summary.camera)}"><span class="status-dot" aria-hidden="true"></span>${_esc(summary.label)}</button>`:`<div class="status-pill ${_esc(summary.phase)}"><span class="status-dot"></span>${_esc(this._integrationChecked?summary.label:t.connecting)}</div>`}</div><div class="body">${this._buildIntroBanner()}${this._buildMutationResult()}${this._error&&!this._mutationOutcome?`<div class="notice error" style="margin-bottom:16px"><ha-icon icon="mdi:alert-circle-outline"></ha-icon><div><h3>${_esc(t.failed)}</h3><p>${_esc(this._error)}</p></div></div>`:''}${main}${this._buildDonateFooter()}</div><div class="toast"></div></div>`; }
+    _buildHTML() { const t=this._t;const gate=this._buildGate();const summary=this._phaseSummary();const title=this._config.title||'Frigate Privacy';const main=gate||`<select class="tab-picker" data-tab-picker aria-label="${_esc(this._lang==='pl'?'Sekcje karty':'Card sections')}" hidden>${this._visibleTabs().map(([id,label])=>`<option value="${id}" ${this._activeTab===id?'selected':''}>${_esc(label)}</option>`).join('')}</select><div class="tabs" role="tablist" aria-label="${_esc(this._lang==='pl'?'Sekcje karty':'Card sections')}">${this._visibleTabs().map(([id,label])=>`<button class="tab-btn ${this._activeTab===id?'active':''}" data-tab="${id}" role="tab" tabindex="${this._activeTab===id?0:-1}" aria-selected="${this._activeTab===id}">${_esc(label)}</button>`).join('')}</div>${this._activeTab==='control'?this._buildControlTab():this._activeTab==='schedule'?this._buildScheduleTab():this._activeTab==='state'?this._buildStateTab():this._activeTab==='history'?this._buildHistoryTab():this._activeTab==='actions'?this._buildActionsTab():this._buildInfoTab()}`;return `<style>${CSS}${createUiV3({language:this._lang}).css}${createCardUi().css}</style><div class="card ${this._config.compact?'compact':''}"><div class="header"><div class="brand"><div class="brand-mark"><ha-icon icon="mdi:shield-lock-outline"></ha-icon></div><div><h2>${_esc(title)}</h2><p class="subtitle">${_esc(t.subtitle)}</p></div></div>${summary.camera?`<button type="button" class="status-pill ${_esc(summary.phase)}" data-camera-summary="${_esc(summary.camera)}"><span class="status-dot" aria-hidden="true"></span>${_esc(summary.label)}</button>`:`<div class="status-pill ${_esc(summary.phase)}"><span class="status-dot"></span>${_esc(this._integrationChecked?summary.label:t.connecting)}</div>`}</div><div class="body">${this._buildIntroBanner()}${this._buildMutationResult()}${this._error&&!this._mutationOutcome?`<div class="notice error" style="margin-bottom:16px"><ha-icon icon="mdi:alert-circle-outline"></ha-icon><div><h3>${_esc(t.failed)}</h3><p>${_esc(this._error)}</p></div></div>`:''}${main}${this._buildDonateFooter()}${this._resumeDialog()}</div><div class="toast"></div></div>`; }
     _syncNavigation() {
       if (!this._navigationObserver && this.isConnected && typeof ResizeObserver === 'function') {
         this._navigationObserver = new ResizeObserver(() => this._syncNavigation()); this._navigationObserver.observe(this);
@@ -1072,6 +1166,21 @@ function createUiV3({ language = 'en' } = {}) {
 
     _attachEvents() {
       this._attachPeriodEvents();
+      const r=this.shadowRoot;
+      r.querySelectorAll('[data-quick-camera]').forEach(button=>button.addEventListener('click',()=>this._quickPause(button.dataset.quickCamera,Number(button.dataset.quickMinutes))));
+      r.querySelectorAll('[data-extend-camera]').forEach(button=>button.addEventListener('click',()=>this._extendPrivacy(button.dataset.extendCamera)));
+      r.querySelectorAll('[data-resume-camera]').forEach(button=>button.addEventListener('click',()=>this._resume([button.dataset.resumeCamera])));
+      r.querySelectorAll('[data-camera-more]').forEach(button=>button.addEventListener('click',()=>{this._selectedCameras=new Set([button.dataset.cameraMore]);this._syncControlDraft();this._focusControl(r.querySelector('.input-minutes'));}));
+      r.querySelectorAll('[data-duration]').forEach(button=>button.addEventListener('click',()=>{this._customMinutes=Number(button.dataset.duration);this._syncControlDraft();}));
+      r.querySelector('[data-resume-cancel]')?.addEventListener('click',()=>this._cancelResume());
+      r.querySelector('[data-resume-accept]')?.addEventListener('click',()=>this._acceptResume());
+      r.querySelector('[data-resume-confirm]')?.addEventListener('cancel',event=>{event.preventDefault();this._cancelResume();});
+      r.querySelector('[data-intro]')?.addEventListener('toggle',event=>{this._helpOpen=event.currentTarget.open;if(!this._helpOpen)haToolsPersistence.save(this._helpKey(),'closed');});
+      r.querySelector('.tabs')?.addEventListener('keydown',event=>{
+        if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||!event.target.matches('[data-tab]'))return;
+        const buttons=[...r.querySelectorAll('[data-tab]')],index=buttons.indexOf(event.target),next=event.key==='Home'?0:event.key==='End'?buttons.length-1:(index+(event.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length;
+        event.preventDefault();const id=buttons[next].dataset.tab;this.setActiveTab(id);this._focusControl(r.querySelector(`[data-tab="${id}"]`));
+      });
       this.shadowRoot.querySelector('[data-camera-summary]')?.addEventListener('click',event=>{
         const id=event.currentTarget.dataset.cameraSummary;this.setActiveTab('control');
         const camera=[...this.shadowRoot.querySelectorAll('[data-camera]')].find(node=>node.dataset.camera===id);
@@ -1095,7 +1204,7 @@ function createUiV3({ language = 'en' } = {}) {
       root.querySelectorAll('[data-day]').forEach((button)=>button.addEventListener('click',()=>{const day=Number(button.dataset.day);const days=this._scheduleForm.days;this._scheduleForm.days=days.includes(day)?days.filter((item)=>item!==day):[...days,day].sort();this._updateUI();}));root.querySelector('[data-action="save-schedule"]')?.addEventListener('click',()=>this._saveScheduleFromForm());root.querySelector('[data-action="cancel-edit"]')?.addEventListener('click',()=>{this._editingScheduleIdx=null;this._scheduleForm=this._emptySchedule();this._updateUI();});
     }
     _showToast(message,kind) { const toast=this.shadowRoot.querySelector('.toast');if(!toast)return;toast.textContent=String(message||'');toast.className=`toast show ${kind==='error'?'error':''}`;if(this._toastTimer)clearTimeout(this._toastTimer);this._toastTimer=setTimeout(()=>{if(toast.isConnected)toast.className='toast';},2600); }
-    setActiveTab(tabId) { if(['control','schedule','state','history','actions','info'].includes(tabId)){if(tabId!=='control')this._closePreview();this._activeTab=tabId;this._updateUI();} }
+    setActiveTab(tabId) { if(this._visibleTabs().some(([id])=>id===tabId)){if(tabId!=='control')this._closePreview();this._activeTab=tabId;this._updateUI();} }
   }
 
   if (!customElements.get('ha-frigate-privacy')) customElements.define('ha-frigate-privacy', HaFrigatePrivacy);
@@ -1111,8 +1220,38 @@ function createUiV3({ language = 'en' } = {}) {
         input=this.shadowRoot.querySelector('#cf_title');
         input.addEventListener('input',event=>{this._config={...this._config,title:event.target.value};this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:this._config},bubbles:true,composed:true}));});
       }
-      this.shadowRoot.querySelector('label').textContent=String(this._hass?.language||navigator.language||'').startsWith('pl')?'Tytuł':'Title';
+      const pl=String(this._hass?.language||navigator.language||'').startsWith('pl');
+      this.shadowRoot.querySelector('label').textContent=pl?'Tytuł':'Title';
       const value=String(this._config.title??'Frigate Privacy');if(input.value!==value)input.value=value;
+      this._renderOptions(pl);
+    }
+    _renderOptions(pl) {
+      const tabs=['control','schedule','state','history','actions','info'];
+      const labels=pl?['Sterowanie','Harmonogram','Stan','Historia','Powiadomienia i akcje','Informacje']:['Control','Schedule','State','History','Notifications and actions','Information'];
+      if(!this.shadowRoot.querySelector('[data-config="default_tab"]')) {
+        const fields=document.createElement('div');
+        fields.innerHTML=`<style>select,input[type=text]{width:100%;min-height:44px;box-sizing:border-box;background:var(--card-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color);border-radius:8px;padding:8px}fieldset{border:1px solid var(--divider-color);margin-block:12px}fieldset label,.toggle-option{display:flex;align-items:center;gap:8px;min-height:44px}input[type=checkbox]{width:24px;min-height:24px;accent-color:var(--primary-color)}.toggle-option input{width:24px}p[role=alert]{color:var(--error-color,#b42318)}</style><label data-label="default_tab"></label><select data-config="default_tab">${tabs.map(id=>`<option value="${id}"></option>`).join('')}</select><fieldset><legend data-label="tabs"></legend>${tabs.map(id=>`<label><input type="checkbox" data-tab-option="${id}"><span data-tab-label="${id}"></span></label>`).join('')}</fieldset><label data-label="cameras"></label><input type="text" data-config="cameras">${['compact','show_help','show_support'].map(key=>`<label class="toggle-option"><input type="checkbox" data-config="${key}"><span data-label="${key}"></span></label>`).join('')}<p role="alert" data-config-error></p>`;
+        this.shadowRoot.append(fields);
+        fields.querySelectorAll('[data-config],[data-tab-option]').forEach(field=>field.addEventListener('change',()=>{
+          const candidate={...this._config};
+          if(field.dataset.tabOption)candidate.tabs=[...fields.querySelectorAll('[data-tab-option]:checked')].map(node=>node.dataset.tabOption);
+          else {const key=field.dataset.config;candidate[key]=field.type==='checkbox'?field.checked:key==='cameras'?field.value.split(',').map(id=>id.trim()).filter(Boolean):field.value;}
+          const error=fields.querySelector('[data-config-error]');
+          if(candidate.tabs&&(!candidate.tabs.length||!candidate.tabs.includes(candidate.default_tab||'control'))){error.textContent=String(this._hass?.language||'').startsWith('pl')?'Domyślna zakładka musi być widoczna.':'The default tab must remain visible.';this._renderOptions(String(this._hass?.language||'').startsWith('pl'));return;}
+          error.textContent='';this._config=candidate;this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:{...candidate}},bubbles:true,composed:true}));
+        }));
+      }
+      const text=pl?{default_tab:'Domyślna zakładka',tabs:'Widoczne zakładki',cameras:'Kamery (ID oddzielone przecinkami; puste = wszystkie)',compact:'Widok kompaktowy',show_help:'Pokaż pomoc',show_support:'Pokaż wsparcie projektu'}:{default_tab:'Default tab',tabs:'Visible tabs',cameras:'Cameras (comma-separated IDs; empty = all)',compact:'Compact view',show_help:'Show help',show_support:'Show project support'};
+      this.shadowRoot.querySelectorAll('[data-label]').forEach(node=>{node.textContent=text[node.dataset.label];});
+      tabs.forEach((id,index)=>{
+        const option=this.shadowRoot.querySelector(`[data-config="default_tab"] option[value="${id}"]`);option.textContent=labels[index];option.disabled=!!this._config.tabs&&!this._config.tabs.includes(id);
+        this.shadowRoot.querySelector(`[data-tab-label="${id}"]`).textContent=labels[index];this.shadowRoot.querySelector(`[data-tab-option="${id}"]`).checked=!this._config.tabs||this._config.tabs.includes(id);
+      });
+      for(const field of this.shadowRoot.querySelectorAll('[data-config]')){
+        const key=field.dataset.config,value=this._config[key];
+        if(field.type==='checkbox')field.checked=key==='compact'?value===true:value!==false;
+        else if(field!==this.shadowRoot.activeElement)field.value=key==='cameras'?(value||[]).join(', '):value||'control';
+      }
     }
   }
   if (!customElements.get('ha-frigate-privacy-editor')) customElements.define('ha-frigate-privacy-editor', HaFrigatePrivacyEditor);
