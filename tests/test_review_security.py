@@ -109,7 +109,11 @@ def test_service_path_uses_same_idempotent_manual_coordinator() -> None:
     tree=ast.parse(source)
     for handler in ("_handle_pause", "_handle_resume", "_handle_extend"):
         calls=[node for node in ast.walk(_function(tree, handler)) if isinstance(node, ast.Call)]
-        assert any(any(keyword.arg=="operation_id" and ast.unparse(keyword.value)=='call.data.get("operation_id")' for keyword in call.keywords) for call in calls)
+        assert any(any(keyword.arg=="operation_id" and isinstance(keyword.value, ast.Call)
+                       and isinstance(keyword.value.func, ast.Attribute) and keyword.value.func.attr=="get"
+                       and keyword.value.args and isinstance(keyword.value.args[0], ast.Constant)
+                       and keyword.value.args[0].value=="operation_id"
+                       for keyword in call.keywords) for call in calls)
 
 
 
