@@ -51,3 +51,11 @@ test('visual editor saves all applicable options, preserves unknown keys, reject
   assert.ok(e.shadowRoot.querySelector('[data-config="default_tab"]'));assert.ok(e.shadowRoot.querySelector('[data-config="show_help"]'));assert.ok(e.shadowRoot.querySelector('[data-config="show_support"]'));
  }finally{f.close();}
 });
+
+test('compact card is one camera tile with quick actions and an explicit path to full controls',async()=>{
+ const f=await fixture({compact:true,show_help:false});try{
+  assert.equal(f.r.querySelectorAll('.camera-tile').length,1,'compact shows one camera at a time');
+  assert.equal(f.r.querySelector('[data-action="pause-custom"]'),null,'bulk controls belong to the expanded view');
+  const open=f.r.querySelector('[data-open-full]');assert.ok(open);open.click();assert.ok(f.r.querySelector('[data-action="pause-custom"]'));assert.ok(f.r.querySelector('[data-close-full]'));
+ }finally{f.close();}
+});
