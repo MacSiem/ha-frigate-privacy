@@ -174,3 +174,20 @@ test('saved Home Assistant destination follows the user language, independent of
     assert.doesNotMatch(saved.textContent,/Notifications in Home Assistant/);
   }finally{f.close();}
 });
+
+for(const [language,system,systemMonth,languageMonth] of [['pl','en-US',/Oct/,/paź/],['en','pl-PL',/paź/,/Oct/]])
+test(`full dates honor system date format with HA ${language} and system ${system}`,async()=>{
+  const f=await fixture({language});try {
+    Object.defineProperty(f.w.navigator,'language',{value:system,configurable:true});
+    const calls=f.calls.length;
+    f.hass.locale.date_format='system';f.hass.locale.time_format='24';f.c.hass=f.hass;
+    for(const label of [f.c._periodTime('2026-10-16T12:00:00Z'),f.c._formatCameraTime('2026-10-16T12:00:00Z')]) {
+      assert.match(label,systemMonth);assert.doesNotMatch(label,languageMonth);
+      assert.match(label,/08:00/);assert.doesNotMatch(label,/AM|PM/);
+    }
+    f.hass.locale.date_format='language';f.c.hass=f.hass;
+    assert.match(f.c._periodTime('2026-10-16T12:00:00Z'),languageMonth);
+    assert.equal(f.calls.length,calls,'date formatting does not refetch state');
+    assert.equal(f.c._paused.front.ends_at,'2026-10-16T12:15:00Z');
+  }finally{f.close();}
+});
