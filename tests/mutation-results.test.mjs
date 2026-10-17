@@ -45,12 +45,14 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
    }finally{f.close();}
   });
  }
- test(path+': resume requires valid per-camera proof and matching readback',async()=>{
+ test(path+': resume requires confirmation, valid per-camera proof and matching readback',async()=>{
   const f=await fixture();try{
-   const result={ok:true,phase:'active',results:[{camera_id:'front',resumed:true,phase:'active'}]};f.c._applyState(pausedState());f.wire(result);assert.equal(await f.c._resume(),true);
-   f.wire(result);assert.equal(await f.c._resume(),true); // Backend falls back to discovered cameras when no pause is stored.
-   f.wire(result,pausedState());assert.equal(await f.c._resume(),false);assert.equal(f.c._mutationOutcome.code,'unconfirmed');
-   f.wire({...result,ok:false,phase:'error',results:[result.results[0],{camera_id:'back',resumed:false,phase:'error'}]});await f.c._resume();assert.equal(f.c._mutationOutcome.code,'partial');
+   const result={ok:true,phase:'active',results:[{camera_id:'front',resumed:true,phase:'active'}]};
+   const resume=async()=>{f.c._resume();return f.c._acceptResume();};
+   f.c._applyState(pausedState());f.wire(result);assert.equal(await resume(),true);
+   f.c._resume();assert.equal(f.c._resumeRequest,null,'inactive cameras cannot be implicitly resumed');
+   f.c._applyState(pausedState());f.wire(result,pausedState());assert.equal(await resume(),false);assert.equal(f.c._mutationOutcome.code,'unconfirmed');
+   f.c._applyState(pausedState());f.wire({...result,ok:false,phase:'error',results:[result.results[0],{camera_id:'back',resumed:false,phase:'error'}]});await resume();assert.equal(f.c._mutationOutcome.code,'partial');
   }finally{f.close();}
  });
  test(path+': wire remains blocked across role change; old result cannot restore outcome',async()=>{

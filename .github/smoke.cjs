@@ -131,19 +131,17 @@ const delay = (ms) => new Promise(r => setTimeout(r, ms));
       if (!problem && el.shadowRoot.querySelectorAll('.intro-banner[data-intro="ha-frigate-privacy"]').length !== 1) problem = 'local first-run intro missing or duplicated';
       else if (!problem && el.shadowRoot.querySelectorAll('.donate-section').length !== 1) problem = 'local support footer missing or duplicated';
       else if (!problem) {
-        const dismiss = el.shadowRoot.querySelector('.intro-banner[data-intro="ha-frigate-privacy"] .intro-dismiss');
-        if (!dismiss) problem = 'local intro dismiss control missing';
+        const help=el.shadowRoot.querySelector('details[data-intro]');
+        if(!help?.querySelector('summary'))problem='collapsible help missing';
         else {
-          dismiss.click();
+          help.open=true;help.dispatchEvent(new window.Event('toggle'));
+          help.open=false;help.dispatchEvent(new window.Event('toggle'));
           await delay(20);
-          if (window.localStorage.getItem('ha-intro-dismissed-ha-frigate-privacy') !== '1') problem = 'intro dismissal was not persisted';
-          else if (el.shadowRoot.querySelector('.intro-banner[data-intro="ha-frigate-privacy"]')) problem = 'dismissed intro remained visible';
+          if(window.localStorage.getItem(el._helpKey())!=='closed')problem='user-scoped help preference was not persisted';
           else {
-            el._lastHtml = '';
-            if (typeof el._updateUI === 'function') el._updateUI();
-            await delay(20);
-            if (el.shadowRoot.querySelector('.intro-banner[data-intro="ha-frigate-privacy"]')) problem = 'dismissed intro returned after rerender';
-            else if (el.shadowRoot.querySelectorAll('.donate-section').length !== 1) problem = 'support footer did not survive rerender';
+            el._lastHtml='';el._updateUI();await delay(20);
+            if(el.shadowRoot.querySelector('details[data-intro]')?.open)problem='collapsed help reopened after rerender';
+            else if(el.shadowRoot.querySelectorAll('.donate-section').length!==1)problem='support footer did not survive rerender';
           }
         }
       }

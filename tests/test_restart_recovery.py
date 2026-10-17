@@ -21,6 +21,8 @@ def _load_control():
         "homeassistant.core", types.ModuleType("homeassistant.core")
     )
     core.HomeAssistant = getattr(core, "HomeAssistant", object)
+    core.Event = getattr(core, "Event", object)
+    core.callback = getattr(core, "callback", lambda function: function)
     helpers = sys.modules.setdefault(
         "homeassistant.helpers", types.ModuleType("homeassistant.helpers")
     )
