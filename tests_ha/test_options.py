@@ -13,7 +13,7 @@ async def test_native_options_save_notification_preferences(hass: HomeAssistant)
     flow = await hass.config_entries.options.async_init(entry.entry_id)
     assert flow['type'] == 'form'
     result = await hass.config_entries.options.async_configure(flow['flow_id'], {
-        'notify_destination': 'persistent_notification.create',
+        'notify_destination': 'home_assistant',
         'notify_errors': True, 'notify_paused': False, 'notify_resumed': True,
         'trusted_actions': [],
     })
