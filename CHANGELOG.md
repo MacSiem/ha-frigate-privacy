@@ -1,5 +1,14 @@
 # Changelog
 
+## 6.5.0 (2026-10-18)
+
+- Keep camera selection, scope and duration drafts mounted so they do not disconnect active previews or replace focused controls.
+- Add per-camera 15/30/60-minute actions and additive +15-minute extension that preserves the original scope and restoration evidence.
+- Confirm card resume actions with camera names and the effect of ending privacy.
+- Expose guarded privacy switches, timer buttons, deadline timestamps and a truthful last-outcome sensor through the existing integration.
+- Add camera filters, visible/default tabs, help/support options and a compact camera tile in the visual card editor.
+- Improve action contrast, native dark fields, one-line keyboard tab navigation, text sizes and collapsed user-specific help.
+
 ## 6.4.0 (2026-10-17)
 
 - Show a short local privacy deadline, friendly remaining time and progress, with full timing evidence retained.

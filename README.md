@@ -44,6 +44,21 @@ created.
    record. Check its `phase` attribute before using it as a pause indicator;
    `on` alone does not confirm that every target is off.
 
+### Quick timers and extension
+
+Choose **15 min**, **30 min** or **1 h** directly under a camera. The action applies
+only to that camera and uses the current scope selection; the tile shows its
+confirmed result and backend deadline. **⋯** opens the full duration controls.
+During a finite manual pause, **+15 min** adds time without changing its scope,
+original channel states or restoration evidence. It does not retry failed targets.
+Schedule-owned windows and indefinite pauses cannot be extended with this action.
+**Resume** opens a confirmation naming the affected cameras and explaining that
+privacy will end. The card then checks the backend result and fresh state.
+
+**Po polsku:** wybierz 15 min, 30 min albo 1 h przy kamerze. „+15 min” wydłuża
+jej bieżącą pauzę bez zmiany zakresu. „Wznów” wymaga potwierdzenia nazw kamer
+i zakończenia prywatności. Termin i wynik pozostają widoczne pod kamerą.
+
 ### What is automatic vs. manual
 
 | Automatic | Manual (optional) |
@@ -234,11 +249,58 @@ the selected camera tile. Close it with the same button; the tool fetches no
 frames before an administrator opens it. An unavailable
 sound-detection switch is shown as unavailable rather than assumed to be on.
 
+## Card options
+
+Use the visual editor to set the title, default tab, visible tabs, camera filter,
+compact view, help and project-support link. The default tab must stay visible.
+Unrecognized configuration keys survive edits. Camera IDs or `camera.*` entity
+IDs restrict the cameras shown in the control list and its bulk actions; an empty
+list means all discovered cameras. These are presentation options and do not
+change administrator permissions, schedules or stored camera state.
+
+```yaml
+type: custom:ha-frigate-privacy
+cameras:
+  - front_door
+compact: true
+default_tab: control
+tabs: [control, state, actions]
+show_help: false
+show_support: false
+```
+
+Compact view shows one camera at a time, its timer actions and an explicit route
+to full controls and notification settings. With several configured cameras,
+choose the camera from its selector. Help starts collapsed below 500 px; closing
+it is remembered for the signed-in user and HA instance in this browser.
+Full and compact cards support Sections (including 3 columns), Masonry and Panel.
+
+### Add time from an automation
+
+```yaml
+action: ha_frigate_privacy.extend_privacy
+data:
+  camera: front_door
+  duration_minutes: 15
+```
+
+This adds to the stored finite deadline. `camera`, `camera_entity_id` and `cameras`
+accept the same references as pause/resume. An optional `operation_id` makes a
+retry idempotent; reuse it only for that exact request. Native entity actions and
+services retain the existing administrator or explicitly trusted running
+automation/script requirement. Entity IDs shown here are examples: HA assigns
+names using the installation's language and existing registry entries. Existing
+`privacy_active` IDs remain unchanged.
+
 ## Entities for automations
 
 | Entity | Meaning |
 |---|---|
 | `binary_sensor.<camera>_privacy_active` | `on` while a privacy transition record is active, including `pausing`, `paused`, `resuming`, `partial` and `error` |
+| `switch.<camera>_privacy` | Turn privacy on/off through the same guarded services; a partial or transitional pause is unknown, rather than a false confirmed ON. Turning on without a duration is indefinite. |
+| `button.<camera>_privacy_15_minutes` / `_30_minutes` / `_60_minutes` | Start the corresponding timer with Everything scope for this camera. |
+| `sensor.<camera>_privacy_until` | Backend deadline as an aware timestamp; unknown for inactive or indefinite privacy. |
+| `sensor.frigate_privacy_last_outcome` | Confirmed, partial or error for the latest completed control outcome; unknown before evidence exists. |
 
 The `phase` attribute distinguishes a confirmed selected-scope pause from a
 pending or failed transition. Even `paused` does not guarantee that an unsupported
