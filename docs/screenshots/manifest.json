@@ -4,30 +4,33 @@
   "fixture": "privacy-safe-generic-home",
   "source": {
     "path": "ha-frigate-privacy.js",
-    "sha256": "5641ced8360e46f985cd73d642f22f949e88e4aef03aa45407aa5a22c56682bb"
+    "sha256": "3dd2c586c525c2d250ff41b443b760c2c0f7e6c56106bfede1b90f34c7c8b2ab"
   },
   "harness": {
     "path": "docs/screenshots/_harness.html",
-    "sha256": "d6327a3fc7a328c8759473ab21165cd64ef0262371c29c79db5376cdd8b15347"
+    "sha256": "9a705112dc2e7adc6a0e617dfe548c31d206bbd94fec3e466f39918bbfa2b824"
   },
   "images": [
     {
       "path": "docs/screenshots/card-cameras-light.jpg",
       "theme": "light",
+      "language": "en",
       "width": 1920,
       "height": 1306,
-      "sha256": "5b2362b2a1d39ecd25439bfdfa5a1fd5ba6cbeb667c3590095ec18563adac780"
+      "sha256": "e497650d80dae2365d1065938ef2218721380f5ac79ba41690782c2fb3c095d2"
     },
     {
       "path": "docs/screenshots/card-cameras-dark.jpg",
       "theme": "dark",
+      "language": "en",
       "width": 1920,
       "height": 1306,
-      "sha256": "291d6d2e5d93399312932a73bdfb3031bff3f2b74e2e217ab9bbdbdf1d6ed053"
+      "sha256": "8763506e1986234d3be636d17bc297df113cc3b30207a1a189f0ab410b1f5da5"
     },
     {
       "path": "docs/screenshots/card-history-light.jpg",
       "theme": "light",
+      "language": "en",
       "width": 1920,
       "height": 1987,
       "sha256": "a6716303bbe19ec52138512090a538b86ac7553fe30bc2d1de11ee1201d8e7df"
@@ -35,14 +38,23 @@
     {
       "path": "docs/screenshots/card-notifications-light.jpg",
       "theme": "light",
+      "language": "en",
       "width": 1920,
       "height": 1563,
       "sha256": "3378fc0ada64bf7bbca5f1af7747dd590db9261e6e7cc42b24080c7a7a54439a"
+    },
+    {
+      "path": "docs/screenshots/card-notifications-pl.jpg",
+      "theme": "light",
+      "language": "pl",
+      "width": 1920,
+      "height": 1586,
+      "sha256": "db22ad1c8f008e8e47b025098fad16ec76ea0a2728c76999c5dfb0ccb15f079b"
     }
   ],
   "privacy": {
     "synthetic_only": true,
-    "ocr_reviewed": true,
+    "ocr_reviewed": false,
     "external_requests": false
   },
   "capture": {
@@ -50,9 +62,9 @@
     "viewport_css_width": 1920,
     "viewport_css_height": 1000,
     "device_pixel_ratio": 1,
-    "source_head": "d64cc17119d6dd3396c1374c361a7ee5fd3f2428",
+    "source_head": "ca9a88758a8f24d67e0e964dcc76136ae7e97689",
     "scope": "Synthetic documentation only: generic producer-shaped records, relative deadlines, periods.py projection and explicit OFF notification snapshot. Actual HA/HACS acceptance is separate.",
-    "review": "Owner personally inspected light/dark controls, local history timestamps and notification instructions. OCR of all four captures reviewed: generic camera labels, no household data, addresses or credentials. Exact original JPEG bytes retained.",
+    "review": "Five fresh current-source native Chrome JPEG captures personally inspected, including Polish saved-channel setup. OCR pending.",
     "source_qualification": "Exact JS and harness hashes above bind these captures to the current implementation."
   }
 }

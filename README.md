@@ -193,6 +193,10 @@ or household data.*
 
 ![Recorded privacy periods and restoration status](docs/screenshots/card-history-light.jpg)
 
+![Notification setup with saved settings](docs/screenshots/card-notifications-light.jpg)
+
+[Polski: ustawienia powiadomień](docs/screenshots/card-notifications-pl.jpg)
+
 *The history example uses synthetic transition evidence, including one verified
 restoration and one incomplete pause. Live HA installation and control tests are
 recorded separately from these documentation fixtures.*
