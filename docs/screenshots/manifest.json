@@ -4,11 +4,11 @@
   "fixture": "privacy-safe-generic-home",
   "source": {
     "path": "ha-frigate-privacy.js",
-    "sha256": "3dd2c586c525c2d250ff41b443b760c2c0f7e6c56106bfede1b90f34c7c8b2ab"
+    "sha256": "ec68841e65e6cba631dd1dde9e1c33a81285c7232a21d8806dc7055b0bd1f503"
   },
   "harness": {
     "path": "docs/screenshots/_harness.html",
-    "sha256": "9a705112dc2e7adc6a0e617dfe548c31d206bbd94fec3e466f39918bbfa2b824"
+    "sha256": "0fd9a1eda982400c949b0be5d21ef3f615aab0196b2d6f62596f13c621829897"
   },
   "images": [
     {
@@ -64,7 +64,9 @@
     "device_pixel_ratio": 1,
     "source_head": "ca9a88758a8f24d67e0e964dcc76136ae7e97689",
     "scope": "Synthetic documentation only: generic producer-shaped records, relative deadlines, periods.py projection, OFF and built-in HA notification snapshots. Actual HA/HACS acceptance remains separate.",
-    "review": "All five current-source original Chrome JPEG captures personally inspected. OCR reviewed, including Polish saved-channel instructions. Only generic camera names and synthetic records; no household data, addresses, credentials or actual images.",
-    "source_qualification": "Exact JS and harness hashes above bind these captures to the current implementation."
+    "review": "Five original native Chrome JPEG captures personally inspected and OCR reviewed, including Polish saved-channel instructions. Exact image bytes retained after the qualified formatter-only change; no image edits. Generic records only, no household data or camera images.",
+    "source_qualification": "Five original captures at source_head are retained with their captured source/harness hashes. The later formatter-only fix passes dateLanguage to pointLabel for date_format=system. The EN/PL documentation fixtures do not set date_format=system, so every captured date and label is unchanged. Only the harness script hash query was rebound. Native system-date verification is separate.",
+    "captured_source_sha256": "3dd2c586c525c2d250ff41b443b760c2c0f7e6c56106bfede1b90f34c7c8b2ab",
+    "captured_harness_sha256": "9a705112dc2e7adc6a0e617dfe548c31d206bbd94fec3e466f39918bbfa2b824"
   }
 }
