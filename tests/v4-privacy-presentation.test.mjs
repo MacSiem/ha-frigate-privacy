@@ -165,3 +165,12 @@ test('history distinguishes repeated local DST times and profile formatting does
     assert.equal(f.c.shadowRoot.querySelector('.input-start').value,'18:00','display zone does not reinterpret operational schedule hours');
   }finally{f.close();}
 });
+
+test('saved Home Assistant destination follows the user language, independent of server snapshot labels',async()=>{
+  const f=await fixture({language:'pl',notifications:{destination:'persistent_notification.create',label:'Notifications in Home Assistant',available:true,events:{errors:true,paused:false,resumed:false,scheduled:false}}});try {
+    f.c.setActiveTab('actions');
+    const saved=f.c.shadowRoot.querySelector('[data-notification-saved]');
+    assert.match(saved.textContent,/Powiadomienia w Home Assistant/);
+    assert.doesNotMatch(saved.textContent,/Notifications in Home Assistant/);
+  }finally{f.close();}
+});
