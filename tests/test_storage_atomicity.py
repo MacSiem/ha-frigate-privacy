@@ -138,6 +138,8 @@ def test_failed_transition_restores_previous_in_memory_snapshot():
         return before, after
 
     before, after = asyncio.run(scenario())
+    assert before.pop("last_outcome") is None
+    assert after.pop("last_outcome") == "error", "runtime outcome must expose failed durable writes"
     assert after == before
     assert after["paused"]["front"]["phase"] == "paused"
 
@@ -286,6 +288,8 @@ def test_cancelled_save_restores_previous_in_memory_snapshot():
         return before, await storage.async_get_state()
 
     before, after = asyncio.run(scenario())
+    assert before.pop("last_outcome") is None
+    assert after.pop("last_outcome") == "error", "runtime outcome must expose failed durable writes"
     assert after == before
 
 

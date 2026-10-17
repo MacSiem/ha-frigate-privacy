@@ -106,7 +106,11 @@ def test_service_path_uses_same_idempotent_manual_coordinator() -> None:
 
     assert 'source="service"' not in source
     assert 'source="manual"' in source
-    assert source.count('operation_id=call.data.get("operation_id")') == 2
+    tree=ast.parse(source)
+    for handler in ("_handle_pause", "_handle_resume", "_handle_extend"):
+        calls=[node for node in ast.walk(_function(tree, handler)) if isinstance(node, ast.Call)]
+        assert any(any(keyword.arg=="operation_id" and ast.unparse(keyword.value)=='call.data.get("operation_id")' for keyword in call.keywords) for call in calls)
+
 
 
 def test_declared_floor_and_legacy_card_match_shipped_build() -> None:
