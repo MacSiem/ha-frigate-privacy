@@ -21,11 +21,12 @@ from .const import (
     DATA_WS_REGISTERED,
     DOMAIN,
     SERVICE_PAUSE_CAMERA,
+    SERVICE_EXTEND_PRIVACY,
     SERVICE_RESUME_CAMERA,
     STREAM_TYPES,
     VERSION,
 )
-from .control import async_pause_cameras, async_resume_cameras
+from .control import async_extend_privacy, async_pause_cameras, async_resume_cameras
 from .frontend import (
     async_register_card, async_register_panel, async_register_static,
     async_unregister_card, async_unregister_panel,
@@ -36,7 +37,7 @@ from .websocket_api import async_register_commands
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.BINARY_SENSOR]
+PLATFORMS = [Platform.BINARY_SENSOR, Platform.SWITCH, Platform.BUTTON, Platform.SENSOR]
 
 _CAMERA_REF = vol.All(str, vol.Length(min=1, max=255))
 _CAMERA_FIELD = vol.Any(
@@ -45,6 +46,7 @@ _CAMERA_FIELD = vol.Any(
 )
 _SERVICE_PAUSE_SCHEMA = vol.Schema(
     {
+        vol.Optional("cameras"): vol.All([_CAMERA_REF], vol.Length(min=1, max=64)),
         vol.Optional("camera"): _CAMERA_FIELD,
         vol.Optional("camera_entity_id"): _CAMERA_FIELD,
         vol.Optional("duration_minutes"): vol.All(
@@ -58,6 +60,7 @@ _SERVICE_PAUSE_SCHEMA = vol.Schema(
 )
 _SERVICE_RESUME_SCHEMA = vol.Schema(
     {
+        vol.Optional("cameras"): vol.All([_CAMERA_REF], vol.Length(min=1, max=64)),
         vol.Optional("camera"): _CAMERA_FIELD,
         vol.Optional("camera_entity_id"): _CAMERA_FIELD,
         vol.Optional("operation_id"): vol.All(
@@ -66,6 +69,14 @@ _SERVICE_RESUME_SCHEMA = vol.Schema(
     }
 )
 
+
+_SERVICE_EXTEND_SCHEMA = vol.Schema({
+    vol.Optional("camera"): _CAMERA_FIELD,
+    vol.Optional("camera_entity_id"): _CAMERA_FIELD,
+    vol.Optional("cameras"): vol.All([_CAMERA_REF], vol.Length(min=1, max=64)),
+    vol.Required("duration_minutes"): vol.All(int, vol.Range(min=1, max=1440)),
+    vol.Optional("operation_id"): vol.All(str, vol.Length(min=1, max=128)),
+})
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Frigate Privacy from a config entry."""
@@ -131,6 +142,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if bucket.pop(DATA_SERVICES_REGISTERED, None):
         hass.services.async_remove(DOMAIN, SERVICE_PAUSE_CAMERA)
         hass.services.async_remove(DOMAIN, SERVICE_RESUME_CAMERA)
+        hass.services.async_remove(DOMAIN, SERVICE_EXTEND_PRIVACY)
     _LOGGER.debug("Frigate Privacy unloaded (entry_id=%s)", entry.entry_id)
     return unload_ok
 
@@ -154,6 +166,8 @@ def _async_register_services(hass: HomeAssistant) -> None:
             context=call.context,
             operation_id=call.data.get("operation_id"),
         )
+        from .websocket_api import _kick_scheduler_watch
+        _kick_scheduler_watch(hass)
 
     async def _handle_resume(call: ServiceCall) -> None:
         await _async_require_admin(hass, call)
@@ -165,7 +179,23 @@ def _async_register_services(hass: HomeAssistant) -> None:
             context=call.context,
             operation_id=call.data.get("operation_id"),
         )
+        from .websocket_api import _kick_scheduler_watch
+        _kick_scheduler_watch(hass)
 
+    async def _handle_extend(call: ServiceCall) -> None:
+        await _async_require_admin(hass, call)
+        _require_recovery_ready(hass)
+        await async_extend_privacy(
+            hass, hass.data[DOMAIN][DATA_STORAGE], _service_camera_refs(call),
+            duration_minutes=call.data["duration_minutes"], context=call.context,
+            operation_id=call.data.get("operation_id"),
+        )
+        from .websocket_api import _kick_scheduler_watch
+        _kick_scheduler_watch(hass)
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_EXTEND_PRIVACY, _handle_extend, schema=_SERVICE_EXTEND_SCHEMA
+    )
     hass.services.async_register(
         DOMAIN, SERVICE_PAUSE_CAMERA, _handle_pause, schema=_SERVICE_PAUSE_SCHEMA
     )
@@ -217,7 +247,7 @@ def _require_recovery_ready(hass: HomeAssistant) -> None:
 
 def _service_camera_refs(call: ServiceCall) -> list[str] | None:
     refs: list[str] = []
-    for key in ("camera", "camera_entity_id"):
+    for key in ("cameras", "camera", "camera_entity_id"):
         value = call.data.get(key)
         if isinstance(value, list):
             refs.extend(str(item) for item in value if item)

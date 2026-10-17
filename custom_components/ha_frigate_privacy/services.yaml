@@ -68,3 +68,38 @@ resume_camera:
       example: resume-front-door-20260831T123000Z
       selector:
         text:
+
+extend_privacy:
+  name: Extend privacy
+  description: Add minutes to an existing finite manual privacy deadline, preserving its original scope and restoration snapshot.
+  fields:
+    camera:
+      name: Camera
+      description: Camera entity ID, Frigate camera ID, or a list of IDs; omit to select all discovered cameras.
+      selector:
+        text:
+    camera_entity_id:
+      name: Camera entity ID
+      description: Alias for camera.
+      selector:
+        text:
+    cameras:
+      name: Cameras
+      description: List of Frigate camera IDs or camera entity IDs.
+      example: [front_door, camera.garden]
+      selector:
+        object:
+    duration_minutes:
+      name: Additional minutes
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 1440
+          mode: box
+          unit_of_measurement: min
+    operation_id:
+      name: Operation ID
+      description: Optional idempotency key for safe retries (maximum 128 characters).
+      selector:
+        text:

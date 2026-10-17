@@ -15,6 +15,35 @@
       "privacy_active": {
         "name": "Privacy active"
       }
+    },
+    "switch": {
+      "privacy": {
+        "name": "Privacy"
+      }
+    },
+    "button": {
+      "privacy_15_minutes": {
+        "name": "Privacy 15 min"
+      },
+      "privacy_30_minutes": {
+        "name": "Privacy 30 min"
+      },
+      "privacy_60_minutes": {
+        "name": "Privacy 60 min"
+      }
+    },
+    "sensor": {
+      "privacy_until": {
+        "name": "Privacy until"
+      },
+      "last_outcome": {
+        "name": "Last outcome",
+        "state": {
+          "confirmed": "Confirmed",
+          "partial": "Partial",
+          "error": "Error"
+        }
+      }
     }
   },
   "options": {

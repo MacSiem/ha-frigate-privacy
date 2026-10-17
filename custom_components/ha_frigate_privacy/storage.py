@@ -127,7 +127,20 @@ class FrigatePrivacyStorage:
             "schedules": data["schedules"],
             "paused": active,
             "last_operations": terminal,
+            "last_outcome": "error" if self._period_durability == "save_failed" else data.get("last_outcome"),
         }
+
+    async def async_record_outcome(self, outcome: str) -> None:
+        """Persist the completed aggregate result, retaining unknown on fresh installs."""
+        if outcome not in {"confirmed", "partial", "error"}:
+            raise ValueError("invalid control outcome")
+        async with self._lock:
+            data = await self._ensure_loaded_locked()
+            if data.get("last_outcome") == outcome:
+                return
+            previous = deepcopy(data)
+            data["last_outcome"] = outcome
+            await self._save_locked(data, previous)
 
     async def async_get_periods(self, *, days: int = 30) -> dict[str, Any]:
         """Project already loaded state without save, load, probe or migration."""
@@ -318,7 +331,7 @@ class FrigatePrivacyStorage:
         history: list[dict[str, Any]] | None = None,
     ) -> bool:
         """Persist a monotonic camera-operation tombstone before side effects."""
-        if not camera_id or not operation_id or action not in {"pause", "resume"}:
+        if not camera_id or not operation_id or action not in {"pause", "resume", "extend"}:
             raise ValueError("invalid camera operation")
         async with self._lock:
             data = await self._ensure_loaded_locked()
@@ -553,6 +566,16 @@ class FrigatePrivacyStorage:
                         old.get("period_started_at", utc(old.get("started_at"), datetime.now(timezone.utc)))
                         if old and old.get("started_at") == record.get("started_at")
                         else utc(record.get("started_at"), datetime.now(timezone.utc))
+                    )
+            # Publish only completed, durably saved control outcomes. Reads and
+            # intent reservations must never manufacture a successful result.
+            for camera, record in data.get("paused", {}).items():
+                old = previous.get("paused", {}).get(camera, {})
+                phase = record.get("phase")
+                if record != old and phase in {"paused", "active", "partial", "error"}:
+                    data["last_outcome"] = (
+                        "confirmed" if phase in {"paused", "active"}
+                        else "partial" if phase == "partial" else "error"
                     )
             capture_succeeded = False
             if data.get("paused") != previous.get("paused"):

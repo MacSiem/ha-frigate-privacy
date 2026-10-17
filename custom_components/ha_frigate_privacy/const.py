@@ -22,6 +22,8 @@ DATA_SERVICES_REGISTERED = "_services_registered"
 DATA_STORAGE = "storage"
 DATA_WS_REGISTERED = "_ws_registered"
 
+SERVICE_EXTEND_PRIVACY = "extend_privacy"
+
 SERVICE_PAUSE_CAMERA = "pause_camera"
 SERVICE_RESUME_CAMERA = "resume_camera"
 

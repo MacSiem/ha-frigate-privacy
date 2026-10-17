@@ -19,6 +19,7 @@ from .const import (
     STREAM_TYPES,
 )
 from .control import (
+    async_extend_privacy,
     async_pause_cameras,
     async_resume_cameras,
     discover_frigate_cameras,
@@ -227,6 +228,69 @@ async def _ws_pause_camera(
 
 @websocket_api.websocket_command(
     {
+        vol.Required("type"): f"{DOMAIN}/extend_privacy",
+        vol.Optional("camera"): _CAMERA_FIELD,
+        vol.Optional("camera_entity_id"): _CAMERA_FIELD,
+        vol.Optional("cameras"): _CAMERA_REFS,
+        vol.Required("duration_minutes"): vol.All(
+            int, vol.Range(min=1, max=1440)
+        ),
+        vol.Optional("operation_id"): _OPERATION_ID,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def _ws_extend_privacy(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Extend finite privacy without changing the original targets."""
+    if _send_recovery_pending(hass, connection, msg):
+        return
+    try:
+        result = await async_extend_privacy(
+            hass,
+            _storage(hass),
+            _camera_refs(msg),
+            duration_minutes=msg.get("duration_minutes"),
+            context=connection.context(msg),
+            operation_id=msg.get("operation_id"),
+        )
+    except ReplayFilterSaturatedError:
+        connection.send_error(
+            msg["id"],
+            "replay_saturated",
+            "Replay protection is full; no camera change was applied",
+        )
+        return
+    except ReplayIntegrityError:
+        connection.send_error(
+            msg["id"],
+            "replay_integrity",
+            "Replay protection could not be verified; camera changes are blocked",
+        )
+        return
+    except StorageWriteError:
+        connection.send_error(
+            msg["id"],
+            "storage_failed",
+            "The privacy intent was not durably saved",
+        )
+        return
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.error("extend_privacy failed (%s)", type(err).__name__)
+        connection.send_error(
+            msg["id"], "extend_failed", "Could not extend the privacy deadline"
+        )
+        return
+    _kick_scheduler_watch(hass)
+    result["state"] = await _storage(hass).async_get_state()
+    connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
         vol.Required("type"): f"{DOMAIN}/resume_camera",
         vol.Optional("camera"): _CAMERA_FIELD,
         vol.Optional("camera_entity_id"): _CAMERA_FIELD,
@@ -413,6 +477,7 @@ def async_register_commands(hass: HomeAssistant) -> None:
         _ws_set_schedule,
         _ws_pause_camera,
         _ws_resume_camera,
+        _ws_extend_privacy,
         _ws_get_state,
         _ws_get_periods,
         _ws_test_notification,

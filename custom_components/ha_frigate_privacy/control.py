@@ -226,7 +226,7 @@ def _find_operation(
             return item
     # Backward-compatible migration path for records written before the
     # bounded operation ledger existed.
-    if record:
+    if record and action in {"pause", "resume"}:
         legacy_id = (
             record.get("operation_id")
             if action == "pause"
@@ -470,6 +470,19 @@ def discover_frigate_cameras(hass: HomeAssistant) -> list[dict[str, Any]]:
     return cameras
 
 
+async def _publish_outcome(hass, storage, result):
+    """Persist aggregate action results before notifying entities."""
+    recorder = getattr(storage, "async_record_outcome", None)
+    if recorder is not None:
+        values = result.get("results") or []
+        successes = sum(bool(item.get("extended") or item.get("paused") or item.get("resumed"))
+                        and item.get("phase") not in {"partial", "error"} for item in values)
+        outcome = "confirmed" if result.get("ok") and all(item.get("phase") != "partial" for item in values) else "partial" if successes or any(item.get("phase") == "partial" for item in values) else "error"
+        await recorder(outcome)
+        hass.bus.async_fire(EVENT_STATE_CHANGED, {})
+    return result
+
+
 async def async_pause_cameras(
     hass: HomeAssistant,
     storage: FrigatePrivacyStorage,
@@ -500,11 +513,96 @@ async def async_pause_cameras(
             )
         )
     ok = bool(results) and all(item["paused"] for item in results)
-    return {
+    return await _publish_outcome(hass, storage, {
         "results": results,
         "ok": ok,
         "phase": "paused" if ok else "partial" if results else "error",
-    }
+    })
+
+
+async def async_extend_privacy(
+    hass: HomeAssistant,
+    storage: FrigatePrivacyStorage,
+    camera_refs: list[str] | None,
+    *,
+    duration_minutes: int,
+    context: Any | None = None,
+    operation_id: str | None = None,
+) -> dict[str, Any]:
+    """Add time to finite manual privacy without touching any device target."""
+    if isinstance(duration_minutes, bool) or not isinstance(duration_minutes, int) or not 1 <= duration_minutes <= 1440:
+        raise ValueError("duration_minutes must be an integer from 1 to 1440")
+    if operation_id is not None and (not isinstance(operation_id, str) or not 1 <= len(operation_id) <= 128):
+        raise ValueError("invalid operation_id")
+    refs = camera_refs or [item["camera_id"] for item in discover_frigate_cameras(hass)]
+    # Aliases in the same request must not add time twice.
+    bases = list(dict.fromkeys(camera_base(ref) for ref in refs))
+    results = []
+    for base in bases:
+        async with _camera_lock(storage, base):
+            results.append(await _async_extend_privacy_locked(
+                hass, storage, base, duration_minutes,
+                _scoped_operation_id(operation_id, base),
+            ))
+    ok = bool(results) and all(item.get("extended") and item.get("phase") == "paused" for item in results)
+    return await _publish_outcome(hass, storage, {"results": results, "ok": ok,
+            "phase": "paused" if ok else "partial" if any(item.get("extended") for item in results) else "error"})
+
+
+async def _async_extend_privacy_locked(
+    hass: HomeAssistant,
+    storage: FrigatePrivacyStorage,
+    base: str,
+    duration_minutes: int,
+    operation_id: str | None,
+) -> dict[str, Any]:
+    record = await _latest_record(storage, base)
+    generation = int((record or {}).get("generation") or 0)
+    fingerprint = _request_fingerprint({"camera_id": base, "duration_minutes": duration_minutes})
+    result = {"camera_id": base, "extended": False, "phase": "error", "operation_id": operation_id}
+    prior = _find_operation(record, operation_id, "extend")
+    if prior:
+        if prior.get("request_fingerprint") != fingerprint:
+            return {**result, "reason": "operation_payload_mismatch"}
+        if int(prior.get("generation") or 0) != generation:
+            return {**result, "reason": "stale_operation"}
+        return _replayed_result(prior)
+    if base not in _discovered_camera_ids(hass):
+        return {**result, "reason": "camera_not_discovered"}
+    operation_id = operation_id or _new_operation_id("extend", base)
+    result["operation_id"] = operation_id
+    history = _operation_history(record)
+    # Consume admitted requests even when their current state cannot be extended.
+    # A delayed retry must not start applying after a later privacy window begins.
+    if not await _reserve_camera_operation(storage, base, "extend", operation_id, history):
+        return {**result, "reason": "operation_history_expired"}
+    if not record or not record.get("active", True):
+        return {**result, "reason": "privacy_inactive"}
+    if record.get("phase") not in {"paused", "partial"} or record.get("resume_blocked"):
+        return {**result, "reason": "privacy_not_extendable"}
+    # Schedule windows are owned by the schedule reconciler, not this timer.
+    if record.get("source") == "schedule" or record.get("active_schedule_ids"):
+        return {**result, "reason": "schedule_owned"}
+    try:
+        deadline = datetime.fromisoformat(record.get("ends_at") or "")
+        if deadline.tzinfo is None:
+            raise ValueError("naive deadline")
+        if deadline <= datetime.now(timezone.utc):
+            return {**result, "reason": "deadline_elapsed"}
+        ends_at = (deadline + timedelta(minutes=duration_minutes)).isoformat()
+    except (ValueError, TypeError, OverflowError):
+        return {**result, "reason": "finite_deadline_required"}
+    generation += 1
+    result.update(extended=True, paused=record.get("phase") == "paused",
+                  phase=record["phase"], ends_at=ends_at, reason=None)
+    history = _upsert_operation(history, operation_id=operation_id, action="extend",
+                                generation=generation, result=result, request_fingerprint=fingerprint)
+    # One durable record update preserves all original target/snapshot/scope fields.
+    await _transition(storage, base, record["phase"], ends_at=ends_at,
+                      generation=generation, operation_history=history,
+                      updated_at=datetime.now(timezone.utc).isoformat())
+    hass.bus.async_fire(EVENT_STATE_CHANGED, {"camera_id": base})
+    return result
 
 
 async def async_pause_camera(
@@ -1059,12 +1157,12 @@ async def async_resume_cameras(
                 operation_id=_scoped_operation_id(operation_id, ref),
             )
         )
-    ok = all(item["resumed"] for item in results)
-    return {
+    ok = bool(results) and all(item["resumed"] for item in results)
+    return await _publish_outcome(hass, storage, {
         "results": results,
         "ok": ok,
         "phase": "active" if ok else "error",
-    }
+    })
 
 
 async def async_resume_camera(
@@ -1107,6 +1205,18 @@ async def _async_resume_camera_locked(
     automatic = authority is not ResumeAuthority.ADMIN
     record = await _latest_record(storage, base)
     current_generation = int((record or {}).get("generation") or 0)
+    # A deadline callback may have read an older record before an extension
+    # acquired this lock. Revalidate the durable deadline before any reservation
+    # or device action, including after restart.
+    if authority is ResumeAuthority.DEADLINE and record:
+        try:
+            deadline = datetime.fromisoformat(record.get("ends_at") or "")
+            due = deadline.tzinfo is not None and deadline <= datetime.now(timezone.utc)
+        except (ValueError, TypeError):
+            due = False
+        if not due:
+            return {"camera_id": base, "resumed": False, "phase": record.get("phase"),
+                    "reason": "deadline_not_due", "automatic": True, "fail_safe": True}
     recovery_continuation = bool(
         authority is ResumeAuthority.RECOVERY
         and record
