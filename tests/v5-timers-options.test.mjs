@@ -59,3 +59,12 @@ test('compact card is one camera tile with quick actions and an explicit path to
   const open=f.r.querySelector('[data-open-full]');assert.ok(open);open.click();assert.ok(f.r.querySelector('[data-action="pause-custom"]'));assert.ok(f.r.querySelector('[data-close-full]'));
  }finally{f.close();}
 });
+
+test('ordinary state refresh keeps the same-account resume confirmation usable',async()=>{
+ const f=await fixture();try{
+  f.state.paused.front={active:true,phase:'paused',ends_at:'2026-10-18T10:15:00Z',stream_type:'main'};f.c._applyState(f.state);
+  f.r.querySelector('[data-resume-camera="front"]').click();await f.c._connectIntegration();
+  f.r.querySelector('[data-resume-accept]').click();await tick();
+  assert.equal(f.calls.filter(m=>m.type.endsWith('/resume_camera')).length,1,'ordinary reads must not revoke a same-account confirmation');
+ }finally{f.close();}
+});
