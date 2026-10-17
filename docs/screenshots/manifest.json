@@ -54,7 +54,7 @@
   ],
   "privacy": {
     "synthetic_only": true,
-    "ocr_reviewed": false,
+    "ocr_reviewed": true,
     "external_requests": false
   },
   "capture": {
@@ -63,8 +63,8 @@
     "viewport_css_height": 1000,
     "device_pixel_ratio": 1,
     "source_head": "ca9a88758a8f24d67e0e964dcc76136ae7e97689",
-    "scope": "Synthetic documentation only: generic producer-shaped records, relative deadlines, periods.py projection and explicit OFF notification snapshot. Actual HA/HACS acceptance is separate.",
-    "review": "Five fresh current-source native Chrome JPEG captures personally inspected, including Polish saved-channel setup. OCR pending.",
+    "scope": "Synthetic documentation only: generic producer-shaped records, relative deadlines, periods.py projection, OFF and built-in HA notification snapshots. Actual HA/HACS acceptance remains separate.",
+    "review": "All five current-source original Chrome JPEG captures personally inspected. OCR reviewed, including Polish saved-channel instructions. Only generic camera names and synthetic records; no household data, addresses, credentials or actual images.",
     "source_qualification": "Exact JS and harness hashes above bind these captures to the current implementation."
   }
 }
