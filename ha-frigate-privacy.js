@@ -1027,6 +1027,24 @@ function createUiV3({ language = 'en' } = {}) {
       if (!element || element.disabled || element.closest('[hidden]')) return null;
       element.focus({preventScroll:true}); return element;
     }
+    _syncControlDraft() {
+      // Draft selection is presentation only. Keep active media and controls mounted.
+      const root = this.shadowRoot;
+      for (const tile of root.querySelectorAll('[data-camera]')) {
+        const id = tile.dataset.camera;
+        const selected = id === '__all__' ? this._selectedCameras.size === 0 : this._selectedCameras.has(id);
+        tile.classList.toggle('selected', selected); tile.setAttribute('aria-pressed', String(selected));
+        let check = tile.querySelector('.camera-check');
+        if (selected && !check) { check = document.createElement('ha-icon'); check.className = 'camera-check'; check.setAttribute('icon','mdi:check-circle'); tile.append(check); }
+        if (!selected && check) check.remove();
+      }
+      for (const button of root.querySelectorAll('[data-scope]')) {
+        const selected = button.dataset.scope === this._pauseStreamType;
+        button.classList.toggle('selected', selected); button.setAttribute('aria-checked', String(selected));
+      }
+      const input = root.querySelector('.input-minutes'); if (input) input.value = String(this._customMinutes);
+      this._lastHtml = this._buildHTML();
+    }
     _updateUI() {
       if (this._previewCamera && !this._previewAllowed(this._previewCamera)) this._closePreview();
       const html = this._buildHTML();
@@ -1066,10 +1084,10 @@ function createUiV3({ language = 'en' } = {}) {
       root.querySelector('[data-action="copy-example"]')?.addEventListener('click',async()=>{const field=root.querySelector('.action-example');try{await navigator.clipboard.writeText(field.value);this._showToast(this._t.copied,'success');}catch(_){field.focus();field.select();}});
       root.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener('click',()=>this.setActiveTab(button.dataset.tab)));
       root.querySelector('[data-tab-picker]')?.addEventListener('change',event=>{this.setActiveTab(event.target.value);this._focusControl(root.querySelector('[data-tab-picker]'));});
-      root.querySelectorAll('[data-camera]').forEach((card)=>{const toggle=()=>{const id=card.dataset.camera;if(id==='__all__')this._selectedCameras.clear();else if(this._selectedCameras.has(id))this._selectedCameras.delete(id);else this._selectedCameras.add(id);this._updateUI();};card.addEventListener('click',toggle);card.addEventListener('keydown',(event)=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();toggle();}});});
+      root.querySelectorAll('[data-camera]').forEach((card)=>{const toggle=()=>{const id=card.dataset.camera;if(id==='__all__')this._selectedCameras.clear();else if(this._selectedCameras.has(id))this._selectedCameras.delete(id);else this._selectedCameras.add(id);this._syncControlDraft();};card.addEventListener('click',toggle);card.addEventListener('keydown',(event)=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();toggle();}});});
       root.querySelectorAll('[data-preview-camera]').forEach(button=>button.addEventListener('click',()=>this._togglePreview(button.dataset.previewCamera)));
-      root.querySelectorAll('[data-scope]').forEach((button)=>button.addEventListener('click',()=>{this._pauseStreamType=button.dataset.scope;haToolsPersistence.save('ha-frigate-privacy-pause-stream-type',this._pauseStreamType);this._updateUI();}));
-      root.querySelector('.input-minutes')?.addEventListener('change',(event)=>{this._customMinutes=Math.max(1,Math.min(1440,Number.parseInt(event.target.value,10)||30));this._updateUI();});
+      root.querySelectorAll('[data-scope]').forEach((button)=>button.addEventListener('click',()=>{this._pauseStreamType=button.dataset.scope;haToolsPersistence.save('ha-frigate-privacy-pause-stream-type',this._pauseStreamType);this._syncControlDraft();}));
+      root.querySelector('.input-minutes')?.addEventListener('change',(event)=>{this._customMinutes=Math.max(1,Math.min(1440,Number.parseInt(event.target.value,10)||30));this._syncControlDraft();});
       root.querySelector('[data-action="pause-custom"]')?.addEventListener('click',()=>this._pause());root.querySelector('[data-action="resume"]')?.addEventListener('click',()=>this._resume());
       root.querySelectorAll('[data-retry-camera]').forEach((button)=>button.addEventListener('click',()=>this._retryResume(button.dataset.retryCamera)));
       root.querySelectorAll('[data-schedule-edit]').forEach((button)=>button.addEventListener('click',()=>this._editSchedule(Number(button.dataset.scheduleEdit))));root.querySelectorAll('[data-schedule-delete]').forEach((button)=>button.addEventListener('click',()=>this._deleteSchedule(Number(button.dataset.scheduleDelete))));root.querySelectorAll('[data-schedule-toggle]').forEach((button)=>button.addEventListener('click',()=>this._toggleSchedule(Number(button.dataset.scheduleToggle))));
