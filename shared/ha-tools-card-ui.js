@@ -5,7 +5,8 @@ function createCardUi() {
 :host(.bento-dark){--ht-action-bg:#4f46e5;--ht-action-text:#fff;--ht-focus:#a5b4fc;color-scheme:dark}
 .card{width:100%;max-width:1200px;font-size:14px}
 .card p,.card input,.card select,.card textarea,.card button{font-size:14px}
-.card .helper,.card .channel-badge,.card .phase,.card .camera-countdown,.card .subtitle{font-size:12px;letter-spacing:normal}
+.card .helper{font-size:14px}
+.card .channel-badge,.card .phase,.card .camera-countdown,.card .subtitle{font-size:12px;letter-spacing:normal}
 .card .btn-primary{background:var(--ht-action-bg);color:var(--ht-action-text);border-color:var(--ht-action-bg)}
 .card .btn-primary:hover{filter:brightness(.9)}
 .card .btn-primary:disabled{opacity:1;filter:none;background:var(--fp-soft);color:var(--fp-muted);border-color:var(--fp-border);cursor:not-allowed}
@@ -15,6 +16,7 @@ function createCardUi() {
 .card .tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:4px;scrollbar-width:thin;overscroll-behavior-inline:contain;max-width:100%;padding:4px}
 .card .tab-btn{flex:0 0 auto;white-space:nowrap;overflow-wrap:normal;min-height:44px}
 .card input,.card select,.card textarea{background:var(--fp-card);color:var(--fp-text);accent-color:var(--ht-action-bg)}
+.card .seg-item{flex:1 1 auto;padding:10px 8px;white-space:nowrap;overflow-wrap:normal}
 .camera-quick-actions,.duration-presets{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-block:10px}
 .camera-quick-actions .btn{padding:8px 12px;min-height:44px}
 .duration-label{display:flex;align-items:center;gap:8px;min-width:0;font-size:14px}
