@@ -35,7 +35,7 @@ for(const source of ['ha-frigate-privacy.js','custom_components/ha_frigate_priva
  });
  test(source+': deliberate closure remains closed after resize and remount for the same user',async()=>{
   const f=await fixture();try{
-   f.r.querySelector('[data-intro] summary').click();await tick();assert.equal(f.r.querySelector('[data-intro]').open,false);
+   f.r.querySelector('[data-intro] summary').click();assert.equal(f.r.querySelector('[data-intro]').open,false);
    await f.resize(390);await f.resize(900);assert.equal(f.r.querySelector('[data-intro]').open,false);
    f.c.remove();f.w.document.body.append(f.c);await tick();assert.equal(f.r.querySelector('[data-intro]').open,false);
   }finally{f.close();}

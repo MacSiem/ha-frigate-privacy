@@ -337,7 +337,7 @@ function createCardUi() {
 
   class HaFrigatePrivacy extends HTMLElement {
     constructor() {
-      super(); this.attachShadow({ mode: 'open' }); this._config = {}; this._hass = null;
+      super(); this.attachShadow({ mode: 'open' }); this._config = {}; this._hass = null; this._helpOpen = null;
       this._lang = (navigator.language || '').startsWith('pl') ? 'pl' : 'en'; this._activeTab = 'control';
       this._integrationChecked = false; this._integrationAvailable = false; this._recoveryReady = true; this._permissionDenied = false; this._declaredAdmin = false; this._busy = false; this._mutationWire = null; this._mutationOutcome = null; this._error = '';
       this._requestEpoch = 0; this._connectPromise = null; this._lastStatePollAt = 0; this._connection = null; this._userId = null; this._instanceId = null; this._declaredActive = true; this._cameras = []; this._schedules = []; this._paused = {}; this._lastOperations = {}; this._selectedCameras = new Set();
@@ -1246,7 +1246,13 @@ function createCardUi() {
       r.querySelector('[data-resume-cancel]')?.addEventListener('click',()=>this._cancelResume());
       r.querySelector('[data-resume-accept]')?.addEventListener('click',()=>this._acceptResume());
       r.querySelector('[data-resume-confirm]')?.addEventListener('cancel',event=>{event.preventDefault();this._cancelResume();});
-      const helpKey=this._helpKey();r.querySelector('[data-intro]')?.addEventListener('toggle',event=>{if(!event.currentTarget.isConnected||helpKey!==this._helpKey()||event.currentTarget.open===this._introShouldOpen())return;this._helpOpen=event.currentTarget.open;if(!this._helpOpen)haToolsPersistence.save(helpKey,'closed');this._lastHtml=this._buildHTML();});
+      const helpKey=this._helpKey(),intro=r.querySelector('[data-intro]');
+      intro?.querySelector('summary')?.addEventListener('click',()=>{
+        this._helpOpen=!intro.open;
+        if(!this._helpOpen)haToolsPersistence.save(helpKey,'closed');
+        this._lastHtml=this._buildHTML();
+      });
+      intro?.addEventListener('toggle',event=>{if(!event.currentTarget.isConnected||helpKey!==this._helpKey()||event.currentTarget.open===this._introShouldOpen())return;this._helpOpen=event.currentTarget.open;if(!this._helpOpen)haToolsPersistence.save(helpKey,'closed');this._lastHtml=this._buildHTML();});
       r.querySelector('.tabs')?.addEventListener('keydown',event=>{
         if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||!event.target.matches('[data-tab]'))return;
         const buttons=[...r.querySelectorAll('[data-tab]')],index=buttons.indexOf(event.target),next=event.key==='Home'?0:event.key==='End'?buttons.length-1:(index+(event.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length;
