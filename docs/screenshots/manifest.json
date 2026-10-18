@@ -4,11 +4,11 @@
   "fixture": "privacy-safe-generic-home",
   "source": {
     "path": "ha-frigate-privacy.js",
-    "sha256": "0b2f0bc9d16b7c811ec9187424737f27c5c0cc40563cf974e8f997f6955a77d7"
+    "sha256": "73e46bbbfe6325937004758332f992164d19660f85dbead4d5de5c075184d519"
   },
   "harness": {
     "path": "docs/screenshots/_harness.html",
-    "sha256": "d00bcda6edea3867d62eef2011be1962d4f61598ccafc22f1ecd0e65b845312e"
+    "sha256": "1428ddd2e26f129e28dc440263f11d3149f519e81dad17426ab08c401f030ce0"
   },
   "images": [
     {
@@ -94,6 +94,6 @@
       "path": "docs/screenshots/_harness.html",
       "sha256": "5ee2ff0cad7c83ab4a19c50529e8c8b38427bfc0917ef3373fb04acd50192c00"
     },
-    "qualified_reuse": "From captured6ba46f0/rootd9: efb91cc changes only container widths <=280px (captured hosts366/980px) and explicit More options navigation (unused in these eight captures). Existing image bytes and their reviewed rendering remain applicable; current source/harness hashes verified separately."
+    "qualified_reuse": "From captured6ba46f0/rootd9: efb91cc changes only container widths <=280px (captured hosts366/980px) and explicit More options navigation (unused in these eight captures). Existing image bytes and their reviewed rendering remain applicable; current source/harness hashes verified separately. 42c2a91 only renews the integration read on reconnect without changing rendered successful content; synthetic documentation is captured already connected. Captured source/harness hashes remain the original values."
   }
 }
