@@ -4,11 +4,11 @@
   "fixture": "privacy-safe-generic-home",
   "source": {
     "path": "ha-frigate-privacy.js",
-    "sha256": "a78b2e1b639476c3aa87753b2e99e8451d2dec7d1a6e7939688b6104d5609c70"
+    "sha256": "0b2f0bc9d16b7c811ec9187424737f27c5c0cc40563cf974e8f997f6955a77d7"
   },
   "harness": {
     "path": "docs/screenshots/_harness.html",
-    "sha256": "5ee2ff0cad7c83ab4a19c50529e8c8b38427bfc0917ef3373fb04acd50192c00"
+    "sha256": "d00bcda6edea3867d62eef2011be1962d4f61598ccafc22f1ecd0e65b845312e"
   },
   "images": [
     {
@@ -85,6 +85,15 @@
     "method": "Original Chrome full-document JPEG bytes through browser CDP with the document focused; no image editing, resizing or added overlays",
     "source_head": "6ba46f021a0792c056938809c811d5455cbd3663",
     "scope": "Synthetic documentation only: desktop CSS viewport1280x800 and mobile390x800; native HA/HACS and W22 qualification remain separate.",
-    "review": "All eight newly captured images personally read and visually reviewed, including PL saved destination and four-step setup. Generic Front Door/Garden only, no household data or camera images. Original pointer highlights retained. No repeated-head stitching artifact in accepted images."
+    "review": "All eight newly captured images personally read and visually reviewed, including PL saved destination and four-step setup. Generic Front Door/Garden only, no household data or camera images. Original pointer highlights retained. No repeated-head stitching artifact in accepted images.",
+    "captured_source": {
+      "path": "ha-frigate-privacy.js",
+      "sha256": "a78b2e1b639476c3aa87753b2e99e8451d2dec7d1a6e7939688b6104d5609c70"
+    },
+    "captured_harness": {
+      "path": "docs/screenshots/_harness.html",
+      "sha256": "5ee2ff0cad7c83ab4a19c50529e8c8b38427bfc0917ef3373fb04acd50192c00"
+    },
+    "qualified_reuse": "From captured6ba46f0/rootd9: efb91cc changes only container widths <=280px (captured hosts366/980px) and explicit More options navigation (unused in these eight captures). Existing image bytes and their reviewed rendering remain applicable; current source/harness hashes verified separately."
   }
 }
