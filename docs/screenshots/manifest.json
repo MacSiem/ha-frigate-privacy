@@ -1,55 +1,79 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-17",
+  "generated_at": "2026-10-18",
   "fixture": "privacy-safe-generic-home",
   "source": {
     "path": "ha-frigate-privacy.js",
-    "sha256": "ec68841e65e6cba631dd1dde9e1c33a81285c7232a21d8806dc7055b0bd1f503"
+    "sha256": "8f6ee840452c58f436536e8960b871c51c3157f9c1b64a9a3a627837248ff120"
   },
   "harness": {
     "path": "docs/screenshots/_harness.html",
-    "sha256": "0fd9a1eda982400c949b0be5d21ef3f615aab0196b2d6f62596f13c621829897"
+    "sha256": "336d144089fbb12be079491e442b5d9c3efd9506c4a6a84178397526bca40495"
   },
   "images": [
     {
       "path": "docs/screenshots/card-cameras-light.jpg",
       "theme": "light",
       "language": "en",
-      "width": 1920,
-      "height": 1306,
-      "sha256": "e497650d80dae2365d1065938ef2218721380f5ac79ba41690782c2fb3c095d2"
+      "width": 1280,
+      "height": 750,
+      "sha256": "fa0d7978405adb63fb48b9949de1d87c894af58d3e6768d1c61e48505cc51db0"
     },
     {
       "path": "docs/screenshots/card-cameras-dark.jpg",
       "theme": "dark",
       "language": "en",
-      "width": 1920,
-      "height": 1306,
-      "sha256": "8763506e1986234d3be636d17bc297df113cc3b30207a1a189f0ab410b1f5da5"
+      "width": 1280,
+      "height": 1443,
+      "sha256": "ba58be3876b6a4306e39195dd77c86c4153004f712f713ec6cfc6034bf2cf5f3"
     },
     {
       "path": "docs/screenshots/card-history-light.jpg",
       "theme": "light",
       "language": "en",
-      "width": 1920,
-      "height": 1987,
-      "sha256": "a6716303bbe19ec52138512090a538b86ac7553fe30bc2d1de11ee1201d8e7df"
+      "width": 1280,
+      "height": 1981,
+      "sha256": "24e65ea9af2b0a6789c7c1c82be5e26b0ce9489a71a8f7dabf7312d500bf4732"
     },
     {
       "path": "docs/screenshots/card-notifications-light.jpg",
       "theme": "light",
       "language": "en",
-      "width": 1920,
-      "height": 1563,
-      "sha256": "3378fc0ada64bf7bbca5f1af7747dd590db9261e6e7cc42b24080c7a7a54439a"
+      "width": 1280,
+      "height": 1593,
+      "sha256": "a1774959eae2160bc3e8d3fbd799016772be99de8ff0b81c4e0c3059bcbdbb46"
     },
     {
       "path": "docs/screenshots/card-notifications-pl.jpg",
       "theme": "light",
       "language": "pl",
-      "width": 1920,
-      "height": 1586,
-      "sha256": "db22ad1c8f008e8e47b025098fad16ec76ea0a2728c76999c5dfb0ccb15f079b"
+      "width": 1280,
+      "height": 1614,
+      "sha256": "a7043308815b5b04a774c8ce0e2e95c101eb14e3bd101c4b4f8ae350fe79a7cb"
+    },
+    {
+      "path": "docs/screenshots/card-mobile-light.jpg",
+      "theme": "light",
+      "language": "en",
+      "width": 390,
+      "height": 750,
+      "sha256": "314b22248aabfc7ec731dadd210dc78e3e2991f151d2a5614e06839968732eee"
+    },
+    {
+      "path": "docs/screenshots/card-mobile-dark.jpg",
+      "theme": "dark",
+      "language": "pl",
+      "width": 390,
+      "height": 750,
+      "sha256": "1fc10eb647098fda26858ad1cba43fb4de5f4094cd201b20b348309b73102ada"
+    },
+    {
+      "path": "docs/screenshots/card-compact-dark.jpg",
+      "theme": "dark",
+      "language": "pl",
+      "width": 390,
+      "height": 750,
+      "sha256": "74c7b34d0f5431cde8e207c14a95470f8579b88729f80fa8d9673225623b6d04"
     }
   ],
   "privacy": {
@@ -58,15 +82,9 @@
     "external_requests": false
   },
   "capture": {
-    "method": "Native Chrome full-document JPEG capture; original returned bytes, no image editing, resizing or overlays",
-    "viewport_css_width": 1920,
-    "viewport_css_height": 1000,
-    "device_pixel_ratio": 1,
-    "source_head": "ca9a88758a8f24d67e0e964dcc76136ae7e97689",
-    "scope": "Synthetic documentation only: generic producer-shaped records, relative deadlines, periods.py projection, OFF and built-in HA notification snapshots. Actual HA/HACS acceptance remains separate.",
-    "review": "Five original native Chrome JPEG captures personally inspected and OCR reviewed, including Polish saved-channel instructions. Exact image bytes retained after the qualified formatter-only change; no image edits. Generic records only, no household data or camera images.",
-    "source_qualification": "Five original captures at source_head are retained with their captured source/harness hashes. The later formatter-only fix passes dateLanguage to pointLabel for date_format=system. The EN/PL documentation fixtures do not set date_format=system, so every captured date and label is unchanged. Only the harness script hash query was rebound. Native system-date verification is separate.",
-    "captured_source_sha256": "3dd2c586c525c2d250ff41b443b760c2c0f7e6c56106bfede1b90f34c7c8b2ab",
-    "captured_harness_sha256": "9a705112dc2e7adc6a0e617dfe548c31d206bbd94fec3e466f39918bbfa2b824"
+    "method": "Original Chrome JPEG bytes through browser CDP; desktop full-document and first-screen captures, mobile first-screen captures; no image editing, resizing or overlays added",
+    "source_head": "5bf1e2a931954a3262d37e09026bcd9660cc402b",
+    "scope": "Synthetic documentation only. Live HA/HACS acceptance remains separate. Desktop CSS width 1280; mobile CSS width 390. First-screen images intentionally show only the visible portion.",
+    "review": "All eight original images personally read and visually reviewed. Generic Front Door/Garden fixtures only; no household data or camera images. A pointer highlight present in some native captures is part of the original browser capture."
   }
 }

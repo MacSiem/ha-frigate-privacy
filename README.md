@@ -212,6 +212,11 @@ or household data.*
 
 [Polski: ustawienia powiadomień](docs/screenshots/card-notifications-pl.jpg)
 
+Mobile first screens: [light](docs/screenshots/card-mobile-light.jpg),
+[dark, Polish](docs/screenshots/card-mobile-dark.jpg).
+
+![Compact single-camera card, dark theme](docs/screenshots/card-compact-dark.jpg)
+
 *The history example uses synthetic transition evidence, including one verified
 restoration and one incomplete pause. Live HA installation and control tests are
 recorded separately from these documentation fixtures.*
