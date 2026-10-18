@@ -129,3 +129,13 @@ test('visual editor gives the default-tab and camera fields localized accessible
   assert.match(name(e.shadowRoot.querySelector('[data-config="cameras"]')),/Kamery/);
  }finally{f.close();}
 });
+
+test('reconnected saved state card refreshes immediately without waiting for the periodic poll',async()=>{
+ const f=await fixture({compact:true,cameras:['garden'],default_tab:'state',tabs:['control','state'],show_help:false});try{
+  assert.match(f.r.textContent,/Integration ready/);
+  const reads=f.calls.length;f.c.remove();f.w.document.body.append(f.c);await tick();
+  assert.ok(f.calls.length>reads,'HA can move a saved card after its hass setter; reconnect must renew its read immediately');
+  assert.match(f.r.textContent,/Integration ready/);
+  assert.ok(f.r.querySelector('[data-tab="state"][aria-selected="true"]'));
+ }finally{f.close();}
+});
