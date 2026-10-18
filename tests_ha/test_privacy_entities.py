@@ -9,7 +9,10 @@ from custom_components.ha_frigate_privacy.const import DOMAIN
 from tests_ha.test_frontend import _setup
 
 
-async def test_late_camera_adds_native_entities_with_unknown_deadline_and_guarded_actions(hass: HomeAssistant):
+async def test_late_camera_adds_native_entities_with_unknown_deadline_and_guarded_actions(hass: HomeAssistant, hass_admin_user):
+    # HA assigns owner rights to the first user of an empty auth store.
+    # Seed the normal administrator before creating the household member.
+    assert hass_admin_user.is_admin
     entry=await _setup(hass)
     source=MockConfigEntry(domain="frigate",data={},unique_id="synthetic-frigate")
     source.add_to_hass(hass)
