@@ -259,9 +259,11 @@ sound-detection switch is shown as unavailable rather than assumed to be on.
 Use the visual editor to set the title, default tab, visible tabs, camera filter,
 compact view, help and project-support link. The default tab must stay visible.
 Unrecognized configuration keys survive edits. Camera IDs or `camera.*` entity
-IDs restrict the cameras shown in the control list and its bulk actions; an empty
-list means all discovered cameras. These are presentation options and do not
-change administrator permissions, schedules or stored camera state.
+IDs restrict the control list, bulk actions, state evidence, header summary and
+period history; an empty list means all discovered cameras. Schedules still apply
+to all discovered cameras, including cameras hidden by the filter; the schedule
+form makes that scope explicit. These presentation options do not change
+administrator permissions or stored camera state.
 
 ```yaml
 type: custom:ha-frigate-privacy

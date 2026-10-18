@@ -1,8 +1,8 @@
 // Shared card presentation. No data access, state mutations or permissions.
 function createCardUi() {
   const css = `
-:host{--ht-action-bg:#2563eb;--ht-action-text:#fff;--ht-focus:#2563eb;display:block;max-width:1200px;margin-inline:auto;color-scheme:light}
-:host(.bento-dark){--ht-action-bg:#4f46e5;--ht-action-text:#fff;--ht-focus:#a5b4fc;color-scheme:dark}
+:host{--ht-action-bg:#2563eb;--ht-action-text:#fff;--ht-focus:#2563eb;--fp-primary:#1d4ed8;display:block;max-width:1200px;margin-inline:auto;color-scheme:light}
+:host(.bento-dark){--ht-action-bg:#4f46e5;--ht-action-text:#fff;--ht-focus:#a5b4fc;--fp-primary:#a5b4fc;color-scheme:dark}
 .card{width:100%;max-width:1200px;font-size:14px}
 .card p,.card input,.card select,.card textarea,.card button{font-size:14px}
 .card .helper{font-size:14px}
@@ -25,11 +25,16 @@ function createCardUi() {
 .card .intro-banner{padding:8px 12px;margin-bottom:12px}
 .card .intro-banner summary,.notification-help summary{min-height:44px;cursor:pointer;display:list-item;list-style-position:inside}
 .card .camera-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}
+.card [data-camera="__all__"]{margin-bottom:12px}
+.card .channel-badge{max-width:100%;box-sizing:border-box;flex-wrap:wrap}
+.card.compact .btn{max-width:100%;box-sizing:border-box;white-space:normal;overflow-wrap:anywhere}
+.card.compact .toast{max-width:calc(100% - 16px);box-sizing:border-box;overflow-wrap:anywhere}
 .card .camera-name{font-size:14px;overflow-wrap:break-word}
 .card dialog{max-width:min(480px,calc(100% - 32px));box-sizing:border-box;border:1px solid var(--fp-border);border-radius:16px;background:var(--fp-card);color:var(--fp-text);padding:20px}
 .card dialog::backdrop{background:rgba(0,0,0,.5)}
 .card.compact .header{padding:16px}.card.compact .body{padding:12px}.card.compact .subtitle{display:none}
 @container(max-width:500px){.card .brand-mark{display:none}.card .header{gap:8px}.card .body,.card .header{padding:12px}.card .status-pill{margin-left:0}.card .camera-grid{grid-template-columns:minmax(0,1fr)}}
+@container(max-width:220px){.card.compact .channel-badge{display:block;overflow-wrap:anywhere}}
 `;
   return {css};
 }
