@@ -4,11 +4,11 @@
   "fixture": "privacy-safe-generic-home",
   "source": {
     "path": "ha-frigate-privacy.js",
-    "sha256": "73e46bbbfe6325937004758332f992164d19660f85dbead4d5de5c075184d519"
+    "sha256": "2850493fe52b71c86dbaaf5f56fc09c14062fba613af5c1dcbb20585b888fd23"
   },
   "harness": {
     "path": "docs/screenshots/_harness.html",
-    "sha256": "1428ddd2e26f129e28dc440263f11d3149f519e81dad17426ab08c401f030ce0"
+    "sha256": "76d7d1056ddd309956bc04b5278d6c5ab98d2966a5fcb982ca321445bd30dea1"
   },
   "images": [
     {
@@ -94,6 +94,6 @@
       "path": "docs/screenshots/_harness.html",
       "sha256": "5ee2ff0cad7c83ab4a19c50529e8c8b38427bfc0917ef3373fb04acd50192c00"
     },
-    "qualified_reuse": "From captured6ba46f0/rootd9: efb91cc changes only container widths <=280px (captured hosts366/980px) and explicit More options navigation (unused in these eight captures). Existing image bytes and their reviewed rendering remain applicable; current source/harness hashes verified separately. 42c2a91 only renews the integration read on reconnect without changing rendered successful content; synthetic documentation is captured already connected. Captured source/harness hashes remain the original values."
+    "qualified_reuse": "From captured6ba46f0/rootd9: efb91cc changes only container widths <=280px (captured hosts366/980px) and explicit More options navigation (unused in these eight captures). Existing image bytes and their reviewed rendering remain applicable; current source/harness hashes verified separately. 42c2a91 only renews the integration read on reconnect without changing rendered successful content; synthetic documentation is captured already connected. Captured source/harness hashes remain the original values. Help-resize correction changes only default disclosure when actual card width crosses500px, preserving explicit gestures. These fixed-width captures show the same default wide-open/narrow-closed state; no resizing or deliberate help gestures occurred in accepted captures. Original captured hashes and HEAD stay unchanged; separate affected native resize proof required."
   }
 }

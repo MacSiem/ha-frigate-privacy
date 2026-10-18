@@ -1248,6 +1248,7 @@ function createCardUi() {
       r.querySelector('[data-resume-confirm]')?.addEventListener('cancel',event=>{event.preventDefault();this._cancelResume();});
       const helpKey=this._helpKey(),intro=r.querySelector('[data-intro]');
       intro?.querySelector('summary')?.addEventListener('click',()=>{
+        if(!intro.isConnected||helpKey!==this._helpKey())return;
         this._helpOpen=!intro.open;
         if(!this._helpOpen)haToolsPersistence.save(helpKey,'closed');
         this._lastHtml=this._buildHTML();
