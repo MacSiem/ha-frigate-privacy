@@ -113,7 +113,7 @@ test('camera-filtered history retains only matching validated producer rows and 
   await f.c._refreshPeriods();
   const wanted=history.periods.filter(row=>row.camera_id==='garden').map(row=>row.id);
   assert.ok(wanted.length);assert.deepEqual(Array.from(f.r.querySelectorAll('[data-period-select]'),b=>b.dataset.periodSelect),wanted);
-  assert.doesNotMatch(f.r.querySelector('[data-period-list]').textContent,/Front Door|front_door/);
+  assert.doesNotMatch(f.r.querySelector('.period-timeline').textContent,/Front Door|front_door/);
  }finally{f.close();}
 });
 test('visual editor gives the default-tab and camera fields localized accessible names',async()=>{
