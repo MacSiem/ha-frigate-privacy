@@ -666,10 +666,19 @@ function createCardUi() {
       return Number.isFinite(start)&&Number.isFinite(end)&&end>start?Math.max(0,Math.min(100,(Date.now()-start)/(end-start)*100)):null;
     }
     _helpKey() { return ['ha-frigate-help',this._instanceId||'instance',this._userId||'anonymous'].join(':'); }
+    _introShouldOpen() {
+      if(this._helpOpen!==null)return this._helpOpen;
+      return !this._config.compact&&this.getBoundingClientRect().width>=500&&haToolsPersistence.loadSync(this._helpKey())!=='closed';
+    }
+    _syncIntro() {
+      const intro=this.shadowRoot.querySelector('[data-intro]');
+      if(!intro)return;
+      const open=this._introShouldOpen();
+      if(intro.open!==open){intro.open=open;this._lastHtml=this._buildHTML();}
+    }
     _buildIntroBanner() {
       if(this._config.show_help===false)return '';
-      const t=this._t,wide=!this._config.compact&&this.getBoundingClientRect().width>=500;
-      const open=wide&&(this._helpOpen??haToolsPersistence.loadSync(this._helpKey())!=='closed');
+      const t=this._t,open=this._introShouldOpen();
       return `<details class="intro-banner" data-intro="ha-frigate-privacy" ${open?'open':''}><summary>${this._lang==='pl'?'Jak to działa?':'How does it work?'}</summary><ol class="intro-steps"><li>${_esc(t.intro1)}</li><li>${_esc(t.intro2)}</li><li>${_esc(t.intro3)}</li></ol></details>`;
     }
     _dismissIntro() { haToolsPersistence.save('ha-intro-dismissed-ha-frigate-privacy', '1'); this._lastHtml = ''; this._updateUI(); }
@@ -1142,6 +1151,7 @@ function createCardUi() {
       if (!this._navigationObserver && this.isConnected && typeof ResizeObserver === 'function') {
         this._navigationObserver = new ResizeObserver(() => this._syncNavigation()); this._navigationObserver.observe(this);
       }
+      this._syncIntro();
       const root = this.shadowRoot, group = root.querySelector('.tabs'), picker = root.querySelector('[data-tab-picker]');
       if (!group || !picker) return;
       const width = this.getBoundingClientRect().width, compact = width > 0 && width < 280;
@@ -1236,7 +1246,7 @@ function createCardUi() {
       r.querySelector('[data-resume-cancel]')?.addEventListener('click',()=>this._cancelResume());
       r.querySelector('[data-resume-accept]')?.addEventListener('click',()=>this._acceptResume());
       r.querySelector('[data-resume-confirm]')?.addEventListener('cancel',event=>{event.preventDefault();this._cancelResume();});
-      const helpKey=this._helpKey();r.querySelector('[data-intro]')?.addEventListener('toggle',event=>{if(!event.currentTarget.isConnected||helpKey!==this._helpKey())return;this._helpOpen=event.currentTarget.open;if(!this._helpOpen)haToolsPersistence.save(helpKey,'closed');});
+      const helpKey=this._helpKey();r.querySelector('[data-intro]')?.addEventListener('toggle',event=>{if(!event.currentTarget.isConnected||helpKey!==this._helpKey()||event.currentTarget.open===this._introShouldOpen())return;this._helpOpen=event.currentTarget.open;if(!this._helpOpen)haToolsPersistence.save(helpKey,'closed');this._lastHtml=this._buildHTML();});
       r.querySelector('.tabs')?.addEventListener('keydown',event=>{
         if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||!event.target.matches('[data-tab]'))return;
         const buttons=[...r.querySelectorAll('[data-tab]')],index=buttons.indexOf(event.target),next=event.key==='Home'?0:event.key==='End'?buttons.length-1:(index+(event.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length;

@@ -14,7 +14,7 @@ for(const source of ['ha-frigate-privacy.js','custom_components/ha_frigate_priva
   const calls=[],state={cameras:[{camera_id:'front',entity_id:'camera.front',name:'Front',switches:[]}],paused:{},last_operations:{},schedules:[],recovery_ready:true};
   const hass={language:'en',user:{id:'owner',is_admin:true},connection:{connected:true},config:{time_zone:'UTC'},states:{},callWS:async msg=>{calls.push(msg);if(!msg.type.endsWith('/get_state'))throw Error('Unexpected mutation');return state;}};
   c.hass=hass;await tick();await tick();
-  return{w,c,r:c.shadowRoot,hass,calls,async resize(n){width=n;observers.filter(o=>!o.closed).forEach(o=>o.fn());await tick();},async preview(){c.shadowRoot.querySelector('[data-preview-camera]').click();await tick();return c.shadowRoot.querySelector('hui-picture-entity-card');},close(){c.remove();w.close();}};
+  return{w,c,r:c.shadowRoot,hass,calls,state,async resize(n){width=n;observers.filter(o=>!o.closed).forEach(o=>o.fn());await tick();},async preview(){c.shadowRoot.querySelector('[data-preview-camera]').click();await tick();return c.shadowRoot.querySelector('hui-picture-entity-card');},close(){c.remove();w.close();}};
  }
  test(source+': default help reacts to wide/narrow card resize without replacing focused draft or media',async()=>{
   const f=await fixture();try{
@@ -29,7 +29,7 @@ for(const source of ['ha-frigate-privacy.js','custom_components/ha_frigate_priva
  test(source+': fresh narrow help stays closed but explicit opening survives normal refresh and resize',async()=>{
   const f=await fixture(390);try{
    const help=f.r.querySelector('[data-intro]');assert.equal(help.open,false);help.querySelector('summary').click();await tick();assert.equal(help.open,true);
-   f.c.hass=f.hass;await tick();assert.equal(f.r.querySelector('[data-intro]').open,true,'a deliberate open must not be undone by state refresh');
+   f.state.cameras[0].name='Front refreshed';f.c._applyState(f.state);await tick();assert.equal(f.r.querySelector('[data-intro]').open,true,'a deliberate open must not be undone by a changed state refresh');
    await f.resize(900);await f.resize(390);assert.equal(f.r.querySelector('[data-intro]').open,true);
   }finally{f.close();}
  });
