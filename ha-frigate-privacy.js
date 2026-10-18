@@ -363,6 +363,8 @@ function createCardUi() {
       window.addEventListener('offline', this._periodOffline);
       window.addEventListener('online', this._periodOnline);
       this._invalidatePeriods('idle'); this._updateUI();
+      // Lovelace can reconnect a saved card without assigning hass again.
+      if (this._hass?.user?.is_admin === true && this._hass.user.is_active !== false && this._historyBrowserOnline && !this._periodConnectionOffline && !this._permissionDenied && !this._integrationChecked && !this._connectPromise && !this._busy) this._connectIntegration();
       if (!this._countdownTimer) this._countdownTimer = setInterval(() => this._tickCountdowns(), 1000);
       if (this._statePollTimer) return;
       this._statePollTimer = setInterval(() => {
