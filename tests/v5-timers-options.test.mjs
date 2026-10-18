@@ -88,9 +88,11 @@ for (const [name,config,selector] of [
 
 test('compact more options opens full controls with the same explicit camera and no mutation',async()=>{
  const f=await fixture({compact:true,cameras:['front']});try{
+  let revealed=null;f.w.HTMLElement.prototype.scrollIntoView=function(){revealed=this;};f.w.requestAnimationFrame=callback=>{callback();return 1;};
   f.r.querySelector('[data-camera-more="front"]').click();
   const input=f.r.querySelector('.input-minutes');assert.ok(input,'more options must expose duration and scope');
   assert.ok(f.r.querySelector('[data-close-full]'));assert.equal(f.r.activeElement,input);
+  assert.equal(revealed,input,'the opened duration field must be brought into view, not only focused outside the viewport');
   assert.deepEqual(Array.from(f.c._selectedCameraIds()),['front']);
   assert.equal(f.calls.filter(m=>!m.type.endsWith('/get_state')).length,0);
  }finally{f.close();}
