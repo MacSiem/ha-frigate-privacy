@@ -4,11 +4,11 @@
   "fixture": "privacy-safe-generic-home",
   "source": {
     "path": "ha-frigate-privacy.js",
-    "sha256": "8f6ee840452c58f436536e8960b871c51c3157f9c1b64a9a3a627837248ff120"
+    "sha256": "6247b7075adcdce547ad65b52394f327a1b0ef35266349168a0ed5dfc21c4a21"
   },
   "harness": {
     "path": "docs/screenshots/_harness.html",
-    "sha256": "336d144089fbb12be079491e442b5d9c3efd9506c4a6a84178397526bca40495"
+    "sha256": "aa91c2b2dc3377a480ce838ecbdd923d510250d875e842dd73269ccbce398fd2"
   },
   "images": [
     {
@@ -85,6 +85,9 @@
     "method": "Original Chrome JPEG bytes through browser CDP; desktop full-document and first-screen captures, mobile first-screen captures; no image editing, resizing or overlays added",
     "source_head": "5bf1e2a931954a3262d37e09026bcd9660cc402b",
     "scope": "Synthetic documentation only. Live HA/HACS acceptance remains separate. Desktop CSS width 1280; mobile CSS width 390. First-screen images intentionally show only the visible portion.",
-    "review": "All eight original images personally read and visually reviewed. Generic Front Door/Garden fixtures only; no household data or camera images. A pointer highlight present in some native captures is part of the original browser capture."
+    "review": "All eight original images personally read and visually reviewed. Generic Front Door/Garden fixtures only; no household data or camera images. A pointer highlight present in some native captures is part of the original browser capture.",
+    "captured_source_sha256": "8f6ee840452c58f436536e8960b871c51c3157f9c1b64a9a3a627837248ff120",
+    "captured_harness_sha256": "336d144089fbb12be079491e442b5d9c3efd9506c4a6a84178397526bca40495",
+    "source_qualification": "Original eight reviewed images at captured source/head retained: only Cancel dialog keyboard focus restoration changed. These fixtures never open/cancel the Resume dialog. Every captured label, layout and pixel-bearing DOM/style branch is unchanged; harness script query rebound only. The new focus behavior has separate browser and regression evidence."
   }
 }

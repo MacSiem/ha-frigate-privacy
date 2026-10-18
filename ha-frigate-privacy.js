@@ -594,7 +594,11 @@ function createCardUi() {
       if(dialog&&!dialog.open){if(dialog.showModal)dialog.showModal();else dialog.setAttribute('open','');}
     }
     _cancelResume() {
-      const origin=this._resumeRequest?.origin;this._resumeRequest=null;this._updateUI();this._focusControl(origin?.isConnected?origin:this.shadowRoot.querySelector('[data-action="resume"]'));
+      const origin=this._resumeRequest?.origin;
+      const keys=['data-resume-camera','data-retry-camera','data-action'].filter(name=>origin?.hasAttribute(name)).map(name=>[name,origin.getAttribute(name)]);
+      this._resumeRequest=null;this._updateUI();
+      const replacement=keys.length?[...this.shadowRoot.querySelectorAll('button')].find(button=>keys.every(([name,value])=>button.getAttribute(name)===value)):null;
+      this._focusControl(origin?.isConnected?origin:replacement||this.shadowRoot.querySelector('[data-action="resume"]')||this.shadowRoot.querySelector('[data-open-full]'));
     }
     _acceptResume() {
       const request=this._resumeRequest;this._resumeRequest=null;this.shadowRoot.querySelector('[data-resume-confirm]')?.remove();
