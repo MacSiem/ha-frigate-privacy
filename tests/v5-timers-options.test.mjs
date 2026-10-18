@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {JSDOM} from 'jsdom';
 const tick=()=>new Promise(r=>setTimeout(r,0));
-async function fixture(config={}){
+async function fixture(config={},history=null){
  const dom=new JSDOM('<html><body></body></html>',{runScripts:'dangerously',pretendToBeVisual:true,url:'http://localhost/'}),w=dom.window;
  w.eval(readFileSync(new URL('../ha-frigate-privacy.js',import.meta.url),'utf8'));
  const c=w.document.createElement('ha-frigate-privacy');c.setConfig({show_support:false,...config});w.document.body.append(c);
  const calls=[],state={cameras:[{camera_id:'front',entity_id:'camera.front',name:'Front',switches:[]},{camera_id:'garden',entity_id:'camera.garden',name:'Garden',switches:[]}],schedules:[],paused:{},last_operations:{},recovery_ready:true};
- const hass={language:'en',user:{id:'owner',is_admin:true},connection:{connected:true},config:{time_zone:'UTC'},states:{},callWS:async m=>{calls.push(m);if(m.type.endsWith('/get_state'))return state;
+ const hass={language:'en',user:{id:'owner',is_admin:true},connection:{connected:true},config:{time_zone:'UTC'},states:{},callWS:async m=>{calls.push(m);if(m.type.endsWith('/get_state'))return state;if(m.type.endsWith('/get_periods'))return history;
   const action=m.type.split('/').at(-1),id=m.cameras[0];
   if(action==='pause_camera'){state.paused[id]={active:true,phase:'paused',stream_type:m.stream_type,started_at:'2026-10-18T10:00:00Z',ends_at:'2026-10-18T10:15:00Z'};return {ok:true,phase:'paused',results:[{camera_id:id,paused:true,phase:'paused'}]};}
   if(action==='extend_privacy'){state.paused[id].ends_at='2026-10-18T10:30:00Z';return {ok:true,phase:'paused',results:[{camera_id:id,extended:true,phase:'paused',ends_at:'2026-10-18T10:30:00Z'}]};}
@@ -83,5 +83,47 @@ for (const [name,config,selector] of [
   f.r.querySelector('[data-resume-cancel]').click();
   assert.equal(f.r.activeElement,f.r.querySelector(selector),'the initiating control remains the keyboard return point after dialog cancellation');
   assert.equal(f.calls.filter(m=>m.type.endsWith('/resume_camera')).length,0);
+ }finally{f.close();}
+});
+
+test('compact more options opens full controls with the same explicit camera and no mutation',async()=>{
+ const f=await fixture({compact:true,cameras:['front']});try{
+  f.r.querySelector('[data-camera-more="front"]').click();
+  const input=f.r.querySelector('.input-minutes');assert.ok(input,'more options must expose duration and scope');
+  assert.ok(f.r.querySelector('[data-close-full]'));assert.equal(f.r.activeElement,input);
+  assert.deepEqual(Array.from(f.c._selectedCameraIds()),['front']);
+  assert.equal(f.calls.filter(m=>!m.type.endsWith('/get_state')).length,0);
+ }finally{f.close();}
+});
+test('camera filter scopes state evidence, header and visible camera count',async()=>{
+ const f=await fixture({cameras:['garden'],default_tab:'state'});try{
+  f.state.paused.front={active:true,phase:'partial',name:'Front hidden'};
+  f.state.last_operations={front:{active:false,phase:'active',name:'Front hidden previous'},garden:{active:false,phase:'active',name:'Garden selected'}};
+  f.c._applyState(f.state);
+  assert.doesNotMatch(f.r.textContent,/Front hidden/);assert.match(f.r.textContent,/Garden selected/);
+  assert.doesNotMatch(f.r.querySelector('.status-pill').textContent,/partial/i,'hidden camera must not determine the scoped header');
+  f.c.setActiveTab('control');assert.equal(f.r.querySelector('.section-head .helper').textContent,'1');
+  assert.equal(f.r.querySelector('[data-action="resume"]'),null,'hidden active records do not expose a bulk resume');
+ }finally{f.close();}
+});
+test('camera-filtered history retains only matching validated producer rows and original IDs',async()=>{
+ const html=readFileSync(new URL('../docs/screenshots/_harness.html',import.meta.url),'utf8');
+ const history=JSON.parse(html.match(/const periods=(\{[\s\S]*?\n\});/)[1]);
+ const f=await fixture({cameras:['garden'],default_tab:'history'},history);try{
+  await f.c._refreshPeriods();
+  const wanted=history.periods.filter(row=>row.camera_id==='garden').map(row=>row.id);
+  assert.ok(wanted.length);assert.deepEqual(Array.from(f.r.querySelectorAll('[data-period-select]'),b=>b.dataset.periodSelect),wanted);
+  assert.doesNotMatch(f.r.querySelector('[data-period-list]').textContent,/Front Door|front_door/);
+ }finally{f.close();}
+});
+test('visual editor gives the default-tab and camera fields localized accessible names',async()=>{
+ const f=await fixture();try{
+  const e=f.w.document.createElement('ha-frigate-privacy-editor');e.hass=f.hass;e.setConfig({future:{keep:true}});f.w.document.body.append(e);
+  const name=field=>field.getAttribute('aria-label')||Array.from(field.labels||[],l=>l.textContent).join(' ');
+  assert.match(name(e.shadowRoot.querySelector('[data-config="default_tab"]')),/Default tab/);
+  assert.match(name(e.shadowRoot.querySelector('[data-config="cameras"]')),/Cameras/);
+  e.hass={...f.hass,language:'pl'};
+  assert.match(name(e.shadowRoot.querySelector('[data-config="default_tab"]')),/Domyślna zakładka/);
+  assert.match(name(e.shadowRoot.querySelector('[data-config="cameras"]')),/Kamery/);
  }finally{f.close();}
 });
