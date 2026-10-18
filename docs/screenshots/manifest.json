@@ -4,11 +4,11 @@
   "fixture": "privacy-safe-generic-home",
   "source": {
     "path": "ha-frigate-privacy.js",
-    "sha256": "6247b7075adcdce547ad65b52394f327a1b0ef35266349168a0ed5dfc21c4a21"
+    "sha256": "a78b2e1b639476c3aa87753b2e99e8451d2dec7d1a6e7939688b6104d5609c70"
   },
   "harness": {
     "path": "docs/screenshots/_harness.html",
-    "sha256": "aa91c2b2dc3377a480ce838ecbdd923d510250d875e842dd73269ccbce398fd2"
+    "sha256": "5ee2ff0cad7c83ab4a19c50529e8c8b38427bfc0917ef3373fb04acd50192c00"
   },
   "images": [
     {
@@ -16,16 +16,16 @@
       "theme": "light",
       "language": "en",
       "width": 1280,
-      "height": 750,
-      "sha256": "fa0d7978405adb63fb48b9949de1d87c894af58d3e6768d1c61e48505cc51db0"
+      "height": 1366,
+      "sha256": "cfebf0c41983265f1dbfab6bf8dea43d91a9ed6c6c0b60bb6f9f454a891592e1"
     },
     {
       "path": "docs/screenshots/card-cameras-dark.jpg",
       "theme": "dark",
       "language": "en",
       "width": 1280,
-      "height": 1443,
-      "sha256": "ba58be3876b6a4306e39195dd77c86c4153004f712f713ec6cfc6034bf2cf5f3"
+      "height": 1366,
+      "sha256": "156ebce6711b9939da43f31289ebe7aebdd6e2a0f39e60001fe6f619723e35b7"
     },
     {
       "path": "docs/screenshots/card-history-light.jpg",
@@ -33,7 +33,7 @@
       "language": "en",
       "width": 1280,
       "height": 1981,
-      "sha256": "24e65ea9af2b0a6789c7c1c82be5e26b0ce9489a71a8f7dabf7312d500bf4732"
+      "sha256": "c70291936c386366727cf4e7e5c4f52f554d7be19dfeae9ef42d16202b8397a2"
     },
     {
       "path": "docs/screenshots/card-notifications-light.jpg",
@@ -41,7 +41,7 @@
       "language": "en",
       "width": 1280,
       "height": 1593,
-      "sha256": "a1774959eae2160bc3e8d3fbd799016772be99de8ff0b81c4e0c3059bcbdbb46"
+      "sha256": "89646cccdbfb2f3bced640ce6c8d2d0a46363ce31db62b7176f342554b349b29"
     },
     {
       "path": "docs/screenshots/card-notifications-pl.jpg",
@@ -49,31 +49,31 @@
       "language": "pl",
       "width": 1280,
       "height": 1614,
-      "sha256": "a7043308815b5b04a774c8ce0e2e95c101eb14e3bd101c4b4f8ae350fe79a7cb"
+      "sha256": "ffbda7dedfa4bb1a8eb085dd20f1ddbe1553b180331a03ec1fd5990cd4845957"
     },
     {
       "path": "docs/screenshots/card-mobile-light.jpg",
       "theme": "light",
       "language": "en",
       "width": 390,
-      "height": 750,
-      "sha256": "314b22248aabfc7ec731dadd210dc78e3e2991f151d2a5614e06839968732eee"
+      "height": 1777,
+      "sha256": "a1044e40ee9f3b861986bd29bc4bc1244fa2bb1c24d0e6533b9643914d633b90"
     },
     {
       "path": "docs/screenshots/card-mobile-dark.jpg",
       "theme": "dark",
       "language": "pl",
       "width": 390,
-      "height": 750,
-      "sha256": "1fc10eb647098fda26858ad1cba43fb4de5f4094cd201b20b348309b73102ada"
+      "height": 1799,
+      "sha256": "d89434922ff4c5def8e354da182c9175bd9f2ab4b4071e66c85383f48a43a08c"
     },
     {
       "path": "docs/screenshots/card-compact-dark.jpg",
       "theme": "dark",
       "language": "pl",
       "width": 390,
-      "height": 750,
-      "sha256": "74c7b34d0f5431cde8e207c14a95470f8579b88729f80fa8d9673225623b6d04"
+      "height": 800,
+      "sha256": "60e86f0089c68767c7834ce28bdcb2d14e82e3024c8e3088865000311fc7ebd5"
     }
   ],
   "privacy": {
@@ -82,12 +82,9 @@
     "external_requests": false
   },
   "capture": {
-    "method": "Original Chrome JPEG bytes through browser CDP; desktop full-document and first-screen captures, mobile first-screen captures; no image editing, resizing or overlays added",
-    "source_head": "5bf1e2a931954a3262d37e09026bcd9660cc402b",
-    "scope": "Synthetic documentation only. Live HA/HACS acceptance remains separate. Desktop CSS width 1280; mobile CSS width 390. First-screen images intentionally show only the visible portion.",
-    "review": "All eight original images personally read and visually reviewed. Generic Front Door/Garden fixtures only; no household data or camera images. A pointer highlight present in some native captures is part of the original browser capture.",
-    "captured_source_sha256": "8f6ee840452c58f436536e8960b871c51c3157f9c1b64a9a3a627837248ff120",
-    "captured_harness_sha256": "336d144089fbb12be079491e442b5d9c3efd9506c4a6a84178397526bca40495",
-    "source_qualification": "Original eight reviewed images at captured source/head retained: only Cancel dialog keyboard focus restoration changed. These fixtures never open/cancel the Resume dialog. Every captured label, layout and pixel-bearing DOM/style branch is unchanged; harness script query rebound only. The new focus behavior has separate browser and regression evidence."
+    "method": "Original Chrome full-document JPEG bytes through browser CDP with the document focused; no image editing, resizing or added overlays",
+    "source_head": "6ba46f021a0792c056938809c811d5455cbd3663",
+    "scope": "Synthetic documentation only: desktop CSS viewport1280x800 and mobile390x800; native HA/HACS and W22 qualification remain separate.",
+    "review": "All eight newly captured images personally read and visually reviewed, including PL saved destination and four-step setup. Generic Front Door/Garden only, no household data or camera images. Original pointer highlights retained. No repeated-head stitching artifact in accepted images."
   }
 }
