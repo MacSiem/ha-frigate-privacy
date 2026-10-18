@@ -34,7 +34,18 @@ function createCardUi() {
 .card dialog::backdrop{background:rgba(0,0,0,.5)}
 .card.compact .header{padding:16px}.card.compact .body{padding:12px}.card.compact .subtitle{display:none}
 @container(max-width:500px){.card .brand-mark{display:none}.card .header{gap:8px}.card .body,.card .header{padding:12px}.card .status-pill{margin-left:0}.card .camera-grid{grid-template-columns:minmax(0,1fr)}}
-@container(max-width:220px){.card.compact .channel-badge{display:block;overflow-wrap:anywhere}}
+@container(max-width:280px){
+.card .section{padding:8px}.card .section-head{flex-wrap:wrap;gap:4px}
+.card .seg,.card .duration-row,.card .duration-label{display:flex;flex-direction:column;align-items:stretch}
+.card .seg-item{white-space:normal;overflow-wrap:anywhere;min-height:44px;max-width:100%}
+.card .duration-label input{width:100%;max-width:100%;min-width:0}
+.card .btn{max-width:100%;box-sizing:border-box;white-space:normal;overflow-wrap:anywhere}
+.card .helper,.card .section-head h3{overflow-wrap:anywhere}
+.card .channel-badge{display:block;overflow-wrap:anywhere}
+.card .camera-card{gap:4px;padding:8px}.card .camera-card>ha-icon:first-child{display:none}
+.card .camera-check{--mdc-icon-size:18px}
+.card .toast{max-width:calc(100% - 16px);box-sizing:border-box;overflow-wrap:anywhere}
+}
 `;
   return {css};
 }
