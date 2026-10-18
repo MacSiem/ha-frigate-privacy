@@ -68,3 +68,20 @@ test('ordinary state refresh keeps the same-account resume confirmation usable',
   assert.equal(f.calls.filter(m=>m.type.endsWith('/resume_camera')).length,1,'ordinary reads must not revoke a same-account confirmation');
  }finally{f.close();}
 });
+
+for (const [name,config,selector] of [
+ ['compact camera',{compact:true,cameras:['front']},'[data-resume-camera="front"]'],
+ ['full camera',{},'[data-resume-camera="front"]'],
+ ['bulk',{},'[data-action="resume"]'],
+ ['state retry',{},'[data-retry-camera="front"]'],
+]) test(`cancel resume returns keyboard focus to its ${name} trigger without mutations`,async()=>{
+ const f=await fixture(config);try{
+  f.state.paused.front={active:true,phase:name==='state retry'?'partial':'paused',ends_at:'2026-10-18T10:15:00Z',stream_type:'main'};f.c._applyState(f.state);
+  if(name==='state retry')f.c.setActiveTab('state');
+  const origin=f.r.querySelector(selector);assert.ok(origin);origin.focus();origin.click();
+  assert.ok(f.r.querySelector('[data-resume-confirm]'));
+  f.r.querySelector('[data-resume-cancel]').click();
+  assert.equal(f.r.activeElement,f.r.querySelector(selector),'the initiating control remains the keyboard return point after dialog cancellation');
+  assert.equal(f.calls.filter(m=>m.type.endsWith('/resume_camera')).length,0);
+ }finally{f.close();}
+});
