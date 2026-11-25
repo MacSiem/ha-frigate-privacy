@@ -196,3 +196,27 @@ def test_replacement_does_not_inherit_previous_camera_record():
         assert storage.paused['front']['target_identities'] == snapshot
         assert ('switch', 'turn_on', 'switch.front_detect') not in hass.services.calls
     asyncio.run(run())
+
+
+def test_uppercase_home_assistant_entry_ids_get_safe_qualified_ids():
+    hass = _Hass()
+    entries = ('01HFIRSTENTRY', '01HSECONDENTRY')
+    identities = {}
+    for entity in list(hass.states.values):
+        domain, slug = entity.split('.')
+        identities[entity] = (entries[0], f'{entries[0]}:{domain}:{slug}', 'device-one')
+    for entity, domain in [('camera.other', 'camera'), ('switch.other_detect', 'switch')]:
+        hass.states.values[entity] = _State('streaming' if domain == 'camera' else 'on')
+        hass.entity_registry.platforms[entity] = 'frigate'
+        suffix = '_detect' if domain == 'switch' else ''
+        identities[entity] = (entries[1], f'{entries[1]}:{domain}:front{suffix}', 'device-two')
+    original = hass.entity_registry.async_get
+    def registry(entity):
+        entry = original(entity)
+        if entry and entity in identities:
+            entry.config_entry_id, entry.unique_id, entry.device_id = identities[entity]
+        return entry
+    hass.entity_registry.async_get = registry
+    cameras = control.discover_frigate_cameras(hass)
+    assert {c['camera_id'] for c in cameras} == {control._identity_qualifier(entry) + ':front' for entry in entries}
+    assert all(len(c['camera_id']) <= 255 for c in cameras)

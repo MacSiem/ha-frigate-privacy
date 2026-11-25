@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
 import uuid
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
@@ -463,6 +464,13 @@ def _base_ownership_valid(hass: HomeAssistant, base: str) -> bool:
     return len(owners) == 1 and len(devices) <= 1
 
 
+def _identity_qualifier(entry_id: str) -> str:
+    """Encode non-slug HA entry IDs without losing or exposing their identity."""
+    if re.fullmatch(r"[a-z0-9_]+", entry_id):
+        return entry_id
+    return "entry_" + hashlib.sha256(entry_id.encode()).hexdigest()
+
+
 def _identity_groups(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
     """Group registered targets by upstream entry and logical camera identity."""
     groups: dict[tuple[str, str], dict[str, Any]] = {}
@@ -486,7 +494,7 @@ def _identity_groups(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
                 logical = logical[:-len(suffix)]
                 if suffix == "_audio":
                     suffix = "_audio_detection"
-            if not logical:
+            if not logical or not re.fullmatch(r"[a-z0-9_]{1,255}", logical):
                 continue
             key = (entry_id, logical)
             group = groups.setdefault(key, {"entry": entry_id, "logical": logical, "camera": None, "switches": {}, "devices": set(), "invalid": False})
@@ -508,13 +516,19 @@ def _identity_groups(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
     for entry_id, logical in groups:
         counts[logical] = counts.get(logical, 0) + 1
     result = {}
+    collisions = set()
     for key, group in groups.items():
         if group["invalid"] or len(group["devices"]) > 1 or not any(s in group["switches"] for s in DISCOVERY_SUFFIXES):
             continue
         if any(len(slug_owners.get(camera_base(e), set())) > 1 for e in [*group["switches"].values(), *([group["camera"]] if group["camera"] else [])]):
             continue
-        identity = group["logical"] if counts[group["logical"]] == 1 else f'{group["entry"]}:{group["logical"]}'
-        result[identity] = group
+        identity = group["logical"] if counts[group["logical"]] == 1 else f'{_identity_qualifier(group["entry"])}:{group["logical"]}'
+        if len(identity) <= 255 and identity not in collisions:
+            if identity in result:
+                result.pop(identity)
+                collisions.add(identity)
+            else:
+                result[identity] = group
     return result
 
 
@@ -2255,7 +2269,7 @@ def _persisted_targets_are_valid(
     if not isinstance(switches, list) or not all(isinstance(entity, str) for entity in switches):
         return False
     groups = _identity_groups(hass)
-    matching = [group for key, group in groups.items() if (key == camera_id or group["logical"] == camera_id or f'{group["entry"]}:{group["logical"]}' == camera_id) and set(switches or []).issubset(set(group["switches"].values())) and (not camera_entity or camera_entity == group["camera"])]
+    matching = [group for key, group in groups.items() if (key == camera_id or group["logical"] == camera_id or f'{_identity_qualifier(group["entry"])}:{group["logical"]}' == camera_id) and set(switches or []).issubset(set(group["switches"].values())) and (not camera_entity or camera_entity == group["camera"])]
     if len(matching) == 1:
         return bool(isinstance(switches, list) and len(set(switches)) == len(switches) and all(_is_frigate_entity(hass, entity) for entity in switches) and (not camera_toggled or camera_entity and _is_frigate_entity(hass, camera_entity)))
     if not _base_ownership_valid(hass, camera_id):

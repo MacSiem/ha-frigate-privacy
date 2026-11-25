@@ -13,7 +13,7 @@ MAX_PERIODS = 200
 MAX_DAYS = 30
 MAX_BYTES = 1024 * 1024
 ID = re.compile(r'^[a-f0-9]{64}$')
-CAMERA = re.compile(r'^[a-z0-9_]{1,255}$')
+CAMERA = re.compile(r'^(?=.{1,255}$)[a-z0-9_]+(?::[a-z0-9_]+)?$')
 TARGET = re.compile(r'^(switch|camera)\.[a-z0-9_]{1,255}$')
 PHASES = {'pausing', 'paused', 'resuming', 'partial', 'error', 'active'}
 SOURCES = {'manual', 'schedule', 'unknown'}
