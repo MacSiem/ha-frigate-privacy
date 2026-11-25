@@ -30,4 +30,5 @@ SERVICE_RESUME_CAMERA = "resume_camera"
 STORAGE_KEY = DOMAIN
 STORAGE_VERSION = 1
 
-STREAM_TYPES = ("all", "main", "sub")
+FEATURE_SCOPES = ("recordings", "snapshots", "detect", "motion", "audio_detection", "review_alerts", "review_detections", "camera")
+STREAM_TYPES = ("all", "main", "sub", *FEATURE_SCOPES)
