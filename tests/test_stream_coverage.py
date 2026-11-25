@@ -110,3 +110,37 @@ def test_audio_detection_registry_identity_matches_upstream_audio():
         assert fixture.control._persisted_targets_are_valid(hass, 'front', ['switch.front_audio_detection'], 'camera.front', True)
     identity['suffix'] = 'other_audio'
     assert fixture.control.discover_frigate_cameras(hass) == []
+
+
+def test_custom_listener_roles_and_external_rtsp():
+    config = {'cameras': {'front': {'ffmpeg': {'inputs': [
+        {'path': 'rtsp://go2rtc.local:9554/own', 'roles': ['detect', 'record', 'audio']},
+        {'path': 'rtsp://external.local:9554/foreign', 'roles': ['record']},
+    ]}}}, 'go2rtc': {'rtsp': {'listen': 'go2rtc.local:9554'}, 'streams': {'own': 'private', 'foreign': 'private'}}}
+    assert m.stream_coverage(config, 'front') == {'status': 'best_effort', 'count': 1}
+    config['go2rtc']['rtsp']['listen'] = 'bad'
+    assert m.stream_coverage(config, 'front') == {'status': 'unknown'}
+
+
+def test_nested_aliases_and_shared_sources():
+    config = {'cameras': {'front': {'live': {'streams': {'Main': 'outer'}}}, 'back': {'live': {'streams': {'Main': 'other'}}}},
+              'go2rtc': {'streams': {'outer': 'rtsp://127.0.0.1:8554/inner', 'inner': 'private', 'other': 'shared', 'outer_shared': 'shared', 'shared': 'private'}}}
+    assert m.stream_coverage(config, 'front') == {'status': 'best_effort', 'count': 2}
+    assert m.stream_coverage(config, 'back') == {'status': 'best_effort', 'count': 1}
+
+
+def test_missing_and_partial_config_are_unknown():
+    assert m.stream_coverage({'cameras': {'front': {}}}, 'front') == {'status': 'unknown'}
+    config = {'cameras': {'front': {'ffmpeg': {'inputs': [{'roles': ['detect']}]}}}, 'go2rtc': {'streams': {}}}
+    assert m.stream_coverage(config, 'front') == {'status': 'unknown'}
+    config['cameras']['front']['ffmpeg']['inputs'] = [{'path': 'rtsp://localhost:8554/a', 'roles': 'detect'}]
+    assert m.stream_coverage(config, 'front') == {'status': 'unknown'}
+
+
+def test_one_three_three_and_ambiguous_nested_prefix():
+    config = {'cameras': {'one': {}, 'three': {}, 'third': {}}, 'go2rtc': {'streams': {
+        'one': 'private', 'three': 'private', 'three_sub': 'private', 'three_low': 'private',
+        'third': 'private', 'third_sub': 'private', 'third_low': 'private'}}}
+    assert [m.stream_coverage(config, name)['count'] for name in ('one', 'three', 'third')] == [1, 3, 3]
+    config['go2rtc']['streams'].update({'a': 'one_shared', 'b': 'one_shared', 'one_shared': 'private'})
+    assert m.stream_coverage(config, 'one')['count'] == 1
