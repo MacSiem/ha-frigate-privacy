@@ -1,5 +1,12 @@
 # Changelog
 
+## 6.6.0 (2026-11-25)
+
+- Add individually selectable recording, snapshot, object detection, motion, sound detection, review alert, review detection and camera-operation scopes while preserving the existing grouped scopes.
+- Report unavailable or missing targets without claiming a confirmed pause; preserve a selected scope when camera capabilities change and block unsupported card actions.
+- Show motion and review states per camera and distinguish sound detection from unknown go2rtc listening and recording audio.
+- Clarify that Frigate camera OFF leaves go2rtc restreaming active, including video and audio for existing clients.
+
 ## 6.5.1 (2026-11-25)
 
 - Show a best-effort count of related go2rtc streams and clearly distinguish HA camera state from external video and physical camera power.
