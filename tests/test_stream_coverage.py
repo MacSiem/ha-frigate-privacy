@@ -74,6 +74,7 @@ def test_conflicting_instances_and_suffixed_entities_fail_closed():
     assert fixture.control.discover_frigate_cameras(hass) == []
     assert not asyncio.run(fixture.control.async_pause_camera(hass, fixture._Storage(), 'front'))['paused']
     assert hass.services.calls == []
+    assert not fixture.control._persisted_targets_are_valid(hass, 'front', ['switch.front_recordings', 'switch.front_detect'], 'camera.front', True)
     identities['switch.front_detect'] = ('one', 'device-one', 'one:switch:front_detect')
     assert fixture.control.discover_frigate_cameras(hass)[0]['stream_coverage']['count'] == 1
     identities['switch.front_detect'] = ('one', 'device-one', 'one:switch:front_2_detect')

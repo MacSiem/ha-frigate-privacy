@@ -1990,6 +1990,8 @@ def _persisted_targets_are_valid(
     camera_toggled: bool,
 ) -> bool:
     """Fail closed when persisted control evidence contains unrelated targets."""
+    if not _base_ownership_valid(hass, camera_id):
+        return False
     if not isinstance(switches, list) or not all(
         isinstance(entity_id, str) for entity_id in switches
     ):
