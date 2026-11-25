@@ -79,3 +79,34 @@ def test_conflicting_instances_and_suffixed_entities_fail_closed():
     assert fixture.control.discover_frigate_cameras(hass)[0]['stream_coverage']['count'] == 1
     identities['switch.front_detect'] = ('one', 'device-one', 'one:switch:front_2_detect')
     assert fixture.control.discover_frigate_cameras(hass) == []
+
+
+def test_audio_detection_registry_identity_matches_upstream_audio():
+    spec = importlib.util.spec_from_file_location('recovery_fixture', Path('tests/test_restart_recovery.py'))
+    fixture = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fixture)
+    hass = fixture._Hass()
+    hass.states.values['camera.front'].attributes['camera_name'] = 'front'
+    hass.states.values['switch.front_audio_detection'] = fixture._State('on')
+    hass.entity_registry.platforms['switch.front_audio_detection'] = 'frigate'
+    original = hass.entity_registry.async_get
+    identity = {'suffix': 'audio'}
+    def registry(entity_id):
+        entry = original(entity_id)
+        if entry:
+            domain, slug = entity_id.split('.', 1)
+            if entity_id == 'switch.front_audio_detection':
+                slug = 'front_' + identity['suffix']
+            entry.config_entry_id = 'own'
+            entry.device_id = 'device-own'
+            entry.unique_id = f'own:{domain}:{slug}'
+        return entry
+    hass.entity_registry.async_get = registry
+    for suffix in ('audio', 'audio_detection'):
+        identity['suffix'] = suffix
+        cameras = fixture.control.discover_frigate_cameras(hass)
+        assert len(cameras) == 1
+        assert 'switch.front_audio_detection' in cameras[0]['available_switches']
+        assert fixture.control._persisted_targets_are_valid(hass, 'front', ['switch.front_audio_detection'], 'camera.front', True)
+    identity['suffix'] = 'other_audio'
+    assert fixture.control.discover_frigate_cameras(hass) == []

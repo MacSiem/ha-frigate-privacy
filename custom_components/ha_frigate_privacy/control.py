@@ -442,9 +442,15 @@ def _base_ownership_valid(hass: HomeAssistant, base: str) -> bool:
         logical = unique_id[len(prefix):]
         if domain == "switch":
             suffix = next((item for item in sorted(ALL_SUFFIXES, key=len, reverse=True) if slug.endswith(item)), None)
-            if not suffix or not logical.endswith(suffix):
+            if not suffix:
                 return False
-            logical = logical[:-len(suffix)]
+            # Upstream exposes descriptive "audio_detection" in HA while its
+            # unique ID and MQTT switch name use "audio".
+            unique_suffixes = ("_audio_detection", "_audio") if suffix == "_audio_detection" else (suffix,)
+            unique_suffix = next((item for item in unique_suffixes if logical.endswith(item)), None)
+            if not unique_suffix:
+                return False
+            logical = logical[:-len(unique_suffix)]
         if not logical:
             return False
         if domain == "camera":
