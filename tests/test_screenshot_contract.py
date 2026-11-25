@@ -43,6 +43,8 @@ def test_public_screenshots_are_source_bound_and_synthetic() -> None:
 
     assert _sha256(source) == manifest["source"]["sha256"]
     assert _sha256(harness) == manifest["harness"]["sha256"]
+    assert manifest["capture"]["captured_source"] == manifest["source"]
+    assert manifest["capture"]["captured_harness"] == manifest["harness"]
     assert 'data-fixture="privacy-safe-generic-home"' in harness.read_text()
     assert manifest["privacy"] == {
         "synthetic_only": True,
@@ -54,3 +56,7 @@ def test_public_screenshots_are_source_bound_and_synthetic() -> None:
         path = ROOT / image["path"]
         assert _sha256(path) == image["sha256"]
         assert _image_dimensions(path) == (image["width"], image["height"])
+
+    coverage = next(image for image in manifest["images"] if image["path"].endswith("card-stream-coverage-light.jpg"))
+    assert coverage["width"] == 1280
+    assert "stream_coverage" in manifest["capture"]["review"]

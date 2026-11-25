@@ -329,5 +329,19 @@ const hass={language,themes:{darkMode:theme==='dark'},config:{time_zone:'Europe/
   if(message.type==='ha_frigate_privacy/get_periods')return {...structuredClone(periods),days:message.days};
   throw new Error('Synthetic documentation does not control cameras');
  }};
-const card=document.getElementById('card');card.setConfig({type:'custom:ha-frigate-privacy',show_support:false,compact:params.get('compact')==='1',cameras:params.get('compact')==='1'?['garden']:undefined});card.hass=hass;
+if(params.get('coverage')==='1of3'){
+  cameras[0].stream_coverage={status:'best_effort',count:1};
+  cameras[1].stream_coverage={status:'best_effort',count:3};
+  periods.periods=[{
+    id:'9d7310c2f05e4b1a8d2c6f7190a3b5e7c4d8f1a2960e3b7c5d9a1f4e8b2c6073',camera_id:'front_door',generation:4,
+    started_at:'2026-10-13T14:00:00Z',ended_at:null,planned_ends_at:'2026-10-13T14:15:00Z',observed_at:'2026-10-13T14:00:02Z',
+    phase:'partial',source:'manual',reason:'pause_incomplete',end_reason:null,verified_restore:false,duration_seconds:null,
+    channels:[{channel:'detection',target:'switch.front_door_detect',pause_outcome:'paused',restore_outcome:'unknown',restore_expected:true,observed_state:'off',outcomes_seen:['paused']}],
+    unknown_channels:[
+      {channel:'unknown',target:'switch.front_door_recordings',pause_outcome:'pending',restore_outcome:'unknown',restore_expected:true,observed_state:'unknown',outcomes_seen:[]},
+      {channel:'unknown',target:'camera.front_door',pause_outcome:'pending',restore_outcome:'unknown',restore_expected:true,observed_state:'unknown',outcomes_seen:[]}
+    ],evidence_scope:'transition_intent'
+  }];
+}
+const card=document.getElementById('card');card.setConfig({type:'custom:ha-frigate-privacy',show_support:false,compact:params.get('compact')==='1',default_tab:undefined,cameras:params.get('compact')==='1'?['garden']:undefined});card.hass=hass;
 </script></body></html>

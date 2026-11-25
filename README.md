@@ -212,6 +212,10 @@ or household data.*
 
 ![Recorded privacy periods and restoration status](docs/screenshots/card-history-light.jpg)
 
+The stream coverage detail shows the best-effort number of related streams and the RTSP/go2rtc limitation. It does not count active connections.
+
+![Synthetic stream coverage detail](docs/screenshots/card-stream-coverage-light.jpg)
+
 ![Notification setup with saved settings](docs/screenshots/card-notifications-light.jpg)
 
 [Polski: ustawienia powiadomień](docs/screenshots/card-notifications-pl.jpg)

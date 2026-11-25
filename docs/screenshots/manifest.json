@@ -1,79 +1,87 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-18",
+  "generated_at": "2026-11-25",
   "fixture": "privacy-safe-generic-home",
   "source": {
     "path": "ha-frigate-privacy.js",
-    "sha256": "2850493fe52b71c86dbaaf5f56fc09c14062fba613af5c1dcbb20585b888fd23"
+    "sha256": "ca45d47040673fc59f78ebeab3f2eed6db6dfcb69340421315298f1bda6fc548"
   },
   "harness": {
     "path": "docs/screenshots/_harness.html",
-    "sha256": "76d7d1056ddd309956bc04b5278d6c5ab98d2966a5fcb982ca321445bd30dea1"
+    "sha256": "2e1c95e548d6d9344e2e0b118111a1402512689761060cc629e53e1bf1772f32"
   },
   "images": [
     {
       "path": "docs/screenshots/card-cameras-light.jpg",
       "theme": "light",
       "language": "en",
+      "height": 1383,
       "width": 1280,
-      "height": 1366,
-      "sha256": "cfebf0c41983265f1dbfab6bf8dea43d91a9ed6c6c0b60bb6f9f454a891592e1"
+      "sha256": "df001fd832b585c9935c54f3f71a93a65bffa7cc72eaabb5e2622794a30151a3"
     },
     {
       "path": "docs/screenshots/card-cameras-dark.jpg",
       "theme": "dark",
       "language": "en",
+      "height": 1301,
       "width": 1280,
-      "height": 1366,
-      "sha256": "156ebce6711b9939da43f31289ebe7aebdd6e2a0f39e60001fe6f619723e35b7"
+      "sha256": "3d5895f1940d196fb555b7f1f4588e4158fc75d134d5ccc00b7f06f4e07b78a3"
     },
     {
       "path": "docs/screenshots/card-history-light.jpg",
       "theme": "light",
       "language": "en",
+      "height": 1841,
       "width": 1280,
-      "height": 1981,
-      "sha256": "c70291936c386366727cf4e7e5c4f52f554d7be19dfeae9ef42d16202b8397a2"
+      "sha256": "52cd555e6acbe18b65a5ac21333082295f2c8a703df3d94ee1ae68eeec30c59d"
     },
     {
       "path": "docs/screenshots/card-notifications-light.jpg",
       "theme": "light",
       "language": "en",
+      "height": 1310,
       "width": 1280,
-      "height": 1593,
-      "sha256": "89646cccdbfb2f3bced640ce6c8d2d0a46363ce31db62b7176f342554b349b29"
+      "sha256": "0fb6ef3f218edd4a70fa0e9870bf64b14bc594160c724424fc2330ab9555658a"
     },
     {
       "path": "docs/screenshots/card-notifications-pl.jpg",
       "theme": "light",
       "language": "pl",
+      "height": 1310,
       "width": 1280,
-      "height": 1614,
-      "sha256": "ffbda7dedfa4bb1a8eb085dd20f1ddbe1553b180331a03ec1fd5990cd4845957"
+      "sha256": "f1fa93865603063568d34ae129336a16d18a5b5bbe5cf2e84dfc52a58cf0dccf"
     },
     {
       "path": "docs/screenshots/card-mobile-light.jpg",
       "theme": "light",
       "language": "en",
+      "height": 2147,
       "width": 390,
-      "height": 1777,
-      "sha256": "a1044e40ee9f3b861986bd29bc4bc1244fa2bb1c24d0e6533b9643914d633b90"
+      "sha256": "d02866221d3f9b96496b19ec486ce53c9f00172643babb33ebc8d24158ff0433"
     },
     {
       "path": "docs/screenshots/card-mobile-dark.jpg",
       "theme": "dark",
       "language": "pl",
+      "height": 2179,
       "width": 390,
-      "height": 1799,
-      "sha256": "d89434922ff4c5def8e354da182c9175bd9f2ab4b4071e66c85383f48a43a08c"
+      "sha256": "6ec567e2940a060acb388a10b16fd06e2f86de043abad8e9db6f70a581df2fdf"
     },
     {
       "path": "docs/screenshots/card-compact-dark.jpg",
       "theme": "dark",
       "language": "pl",
+      "height": 814,
       "width": 390,
-      "height": 800,
-      "sha256": "60e86f0089c68767c7834ce28bdcb2d14e82e3024c8e3088865000311fc7ebd5"
+      "sha256": "da46a2dc1c0c48b1521af3b0dd5495419e02f771c2c9136dfd8623eca67d77bd"
+    },
+    {
+      "path": "docs/screenshots/card-stream-coverage-light.jpg",
+      "theme": "light",
+      "language": "en",
+      "height": 1324,
+      "width": 1280,
+      "sha256": "2de2aaf9247a70564dabef1c59df5119f366a7625ea609c9ee8bb2f0e6815ed9"
     }
   ],
   "privacy": {
@@ -82,18 +90,18 @@
     "external_requests": false
   },
   "capture": {
-    "method": "Original Chrome full-document JPEG bytes through browser CDP with the document focused; no image editing, resizing or added overlays",
-    "source_head": "6ba46f021a0792c056938809c811d5455cbd3663",
-    "scope": "Synthetic documentation only: desktop CSS viewport1280x800 and mobile390x800; native HA/HACS and W22 qualification remain separate.",
-    "review": "All eight newly captured images personally read and visually reviewed, including PL saved destination and four-step setup. Generic Front Door/Garden only, no household data or camera images. Original pointer highlights retained. No repeated-head stitching artifact in accepted images.",
+    "method": "Original Chrome headless CDP JPEG bytes with captureBeyondViewport; no image editing, resizing or overlays",
+    "source_head": "81d5bc7f38a73d937e0d705f947beffe4c98aaee",
+    "scope": "Documentation capture of the candidate card with synthetic data. Live Home Assistant acceptance is separate.",
+    "review": "Nine newly captured images visually/OCR reviewed; generic Front Door/Garden only, no camera imagery or household data. Coverage frame uses synthetic stream_coverage count values 1 and 3 and shows the product RTSP/go2rtc boundary disclosure.",
     "captured_source": {
       "path": "ha-frigate-privacy.js",
-      "sha256": "a78b2e1b639476c3aa87753b2e99e8451d2dec7d1a6e7939688b6104d5609c70"
+      "sha256": "ca45d47040673fc59f78ebeab3f2eed6db6dfcb69340421315298f1bda6fc548"
     },
     "captured_harness": {
       "path": "docs/screenshots/_harness.html",
-      "sha256": "5ee2ff0cad7c83ab4a19c50529e8c8b38427bfc0917ef3373fb04acd50192c00"
+      "sha256": "2e1c95e548d6d9344e2e0b118111a1402512689761060cc629e53e1bf1772f32"
     },
-    "qualified_reuse": "From captured6ba46f0/rootd9: efb91cc changes only container widths <=280px (captured hosts366/980px) and explicit More options navigation (unused in these eight captures). Existing image bytes and their reviewed rendering remain applicable; current source/harness hashes verified separately. 42c2a91 only renews the integration read on reconnect without changing rendered successful content; synthetic documentation is captured already connected. Captured source/harness hashes remain the original values. Help-resize correction changes only default disclosure when actual card width crosses500px, preserving explicit gestures. These fixed-width captures show the same default wide-open/narrow-closed state; no resizing or deliberate help gestures occurred in accepted captures. Original captured hashes and HEAD stay unchanged; separate affected native resize proof required."
+    "qualified_reuse": "No prior screenshot bytes reused; all images were recaptured from the exact source and harness hashes above."
   }
 }
