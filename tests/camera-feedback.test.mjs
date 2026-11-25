@@ -41,6 +41,23 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
   c.hass=hass;await tick();
   return {c,w,dom,clock,state,calls,hass,created,async advance(ms){clock.now+=ms;for(const t of clock.timers)if(t.delay===1000)t.callback();await tick();},close(){c.remove();w.close();}};
  }
+ test(path+': PL and EN disclose go2rtc before quick actions, schedules and after a real backend pause',async()=>{
+  const f=await fixture();try{
+   for(const [lang,scope,warning] of [['en','Frigate processing',/go2rtc.*video and audio.*existing connections/i],['pl','Przetwarzanie we Frigate',/go2rtc.*obraz(?:em)? i dźwięk(?:iem)?.*otwartych połączeniach/i]]){
+    f.c.hass={...f.hass,language:lang}; f.c._applyState({...schedulePauses.toggled,paused:{}});
+    let root=f.c.shadowRoot;
+    assert.equal(root.querySelector('[data-scope="all"]').textContent,scope);
+    assert.ok(root.querySelector('[data-quick-camera="front"]'));
+    assert.match(root.querySelector('.camera-tile').textContent,warning);
+    f.c._applyState(schedulePauses.toggled); root=f.c.shadowRoot;
+    assert.equal(root.querySelector('[data-camera-phase]').dataset.cameraPhase,'paused');
+    assert.match(root.querySelector('[data-camera-feedback="front"]').textContent,warning);
+    assert.match(f.c._safeError({code:'success_pause'}),warning);
+    f.c.setActiveTab('schedule'); assert.match(f.c.shadowRoot.querySelector('[data-schedule-boundary]').textContent,warning);
+    f.c.setActiveTab('control');
+   }
+  }finally{f.close();}
+ });
  test(path+': independent server deadlines tick without DOM replacement or camera actions',async()=>{
   const f=await fixture();try{
    const a=f.c.shadowRoot.querySelector('[data-camera-countdown="front"]'),b=f.c.shadowRoot.querySelector('[data-camera-countdown="back"]');
@@ -142,14 +159,14 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
    assert.match(f.c.shadowRoot.querySelector('[data-camera-feedback="front"]').textContent,/Requested scope/);assert.doesNotMatch(f.c.shadowRoot.querySelector('[data-camera-feedback="front"]').textContent,/Applied scope/);
   }finally{f.close();}
  });
- test(path+': Everything does not imply confirmed video stop on a camera without direct video control',async()=>{
+ test(path+': Frigate processing does not imply confirmed video stop on a camera without direct video control',async()=>{
   const f=await fixture();try{
    // The actual producer marks every registered Frigate camera as can_toggle;
    // whether this action switched video is persisted separately in its plan.
    const state={...f.state,cameras:[{...f.state.cameras[0],camera_can_toggle:true,camera_state:'idle'}],paused:{front:{...f.state.paused.front,stream_type:'all',camera_planned:false}}};
    f.c._applyState(state);
    const tile=f.c.shadowRoot.querySelector('[data-camera-feedback="front"]');
-   assert.match(tile.textContent,/Requested scope: Everything/);assert.doesNotMatch(tile.textContent,/Applied scope/);
+   assert.match(tile.textContent,/Requested scope: Frigate processing/);assert.doesNotMatch(tile.textContent,/Applied scope/);
    assert.match(tile.querySelector('[data-video-stop-unconfirmed]')?.textContent||'',/external video stopped/i);
    assert.equal(f.c.shadowRoot.querySelector('[data-channel="video"]').dataset.channelState,'idle');
   }finally{f.close();}
@@ -166,7 +183,7 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
    assert.match(tile.textContent,/Pause.*switch.front_detect: paused/s);assert.match(tile.textContent,/Pause.*camera.front: paused/s);
   }finally{f.close();}
  });
- test(path+': real schedule extension retains confirmed idle video stop from the original pause',async()=>{
+ test(path+': real schedule extension retains confirmed Frigate camera idle state from the original pause',async()=>{
   const f=await fixture();try{
    const state=schedulePauses.toggled,record=state.paused.front;
    assert.equal(record.phase,'paused');assert.equal(record.camera_planned,false);assert.equal(record.camera_toggled,true);
@@ -177,7 +194,7 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
    assert.match(tile.querySelector('[data-video-stop-unconfirmed]').textContent,/external video stopped/i);
    assert.match(tile.textContent,/Pausing Frigate processing may leave the go2rtc restream available with video and audio/i);
    assert.match(tile.textContent,/Pause.*camera.front: paused/s);
-   // Missing evidence or a newly streaming camera cannot inherit the prior proof.
+   // Missing evidence or a newly streaming camera cannot inherit the prior entity-state evidence.
    for(const invalid of [
     {...state,cameras:[{...state.cameras[0],camera_state:'streaming'}]},
     {...state,paused:{front:{...record,target_outcomes:{}}}},

@@ -2,6 +2,8 @@
 
 ## 6.6.0 (2026-11-25)
 
+- Correct the v4.1.7 claim that full privacy stops live streaming: pausing Frigate does not stop go2rtc video or audio for new or existing clients. Rename the all scope and show this limitation in controls, schedules, results and onboarding.
+
 - Add individually selectable recording, snapshot, object detection, motion, sound detection, review alert, review detection and camera-operation scopes while preserving the existing grouped scopes.
 - Report unavailable or missing targets without claiming a confirmed pause; preserve a selected scope when camera capabilities change and block unsupported card actions.
 - Show motion and review states per camera and distinguish sound detection from unknown go2rtc listening and recording audio.
@@ -36,7 +38,7 @@
 - Give channel indicators semantic state colors in both themes, with text labels for on, off, idle, unknown, mixed and unavailable states.
 - Expand Preview inside the camera tile using Home Assistant's native camera card, only on demand. Close it on toggle, camera change, navigation or authority loss; discard late loads and require an explicit retry after loading errors.
 - Update countdown text without replacing controls or restarting a preview every second.
-- Distinguish the original requested scope from a schedule extension. Keep confirmed evidence that an earlier pause stopped camera video, while retaining warnings when that evidence is missing.
+- Distinguish the original requested scope from a schedule extension. Keep evidence of an earlier Frigate camera entity pause, while retaining warnings about external streams.
 
 ## 6.2.0 (2026-10-13)
 
@@ -239,7 +241,7 @@ UX clarity pass on the Control tab and Settings (no functional/entity changes):
 ### Fixed
 
 - **Pause re-entrancy + immediate user feedback.** The Quick Pause / Custom Pause flow could feel unresponsive on first click — the first `_ensureHAHelpers()` call on a fresh session issues a `config/automation/config` WS update to register the auto-resume automation, which can take ~1-2s on a busy HA. While that promise was in flight nothing visible happened, so users hit the button again. Now: a `_pauseInFlight` guard short-circuits re-entrant clicks, and a toast (`⏳ Pausing…`) fires synchronously the moment the button is clicked.
-- **Full privacy now stops live camera streaming.** The `All` pause mode turns off the selected `camera.*` entity after disabling Frigate feature switches, and resume turns the camera entity back on before restoring switches. Timer-expiry and schedule automations include the same hard-stop/hard-resume behavior so it works without an open browser.
+- **Correction (6.6.0): this did not stop go2rtc streaming.** The `All` pause mode turns off the selected `camera.*` entity after disabling Frigate feature switches, and resume turns the camera entity back on before restoring switches. Timer-expiry and schedule automations include the same Frigate camera off/on behavior so it works without an open browser.
 
 ## v4.1.6 — 2026-05-18
 

@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Frigate Privacy",
-        "description": "Registers the Frigate Privacy integration. Schedules and paused-camera state are stored server-side, and the bundled Lovelace card is loaded automatically."
+        "description": "Registers the Frigate Privacy integration. Schedules and paused-camera state are stored server-side, and the bundled Lovelace card is loaded automatically. go2rtc may still transmit video and audio during a Frigate pause, including on existing connections."
       }
     },
     "abort": {

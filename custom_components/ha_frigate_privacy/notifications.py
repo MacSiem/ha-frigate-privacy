@@ -41,7 +41,7 @@ class FrigatePrivacyNotifications:
             if phase in {'partial', 'error'} and options.get('notify_errors', True):
                 message = 'Privacy is not fully confirmed. An administrator should review the target evidence in Frigate Privacy.'
             elif phase == 'paused' and options.get('notify_scheduled' if scheduled else 'notify_paused', False):
-                message = ('Scheduled privacy scope is paused.' if scheduled else 'The selected privacy scope is paused.') + ' Check video status for cameras without supported stop actions.'
+                message = ('The scheduled Frigate scope is paused.' if scheduled else 'The selected Frigate scope is paused.') + ' go2rtc may still transmit video and audio, including on existing connections. Check target evidence.'
             elif phase == 'active' and options.get('notify_scheduled' if scheduled else 'notify_resumed', False) and record.get('reason') != 'manual_override':
                 message = ('The scheduled privacy window ended' if scheduled else 'The privacy window ended') + ' and the saved targets were restored after verification.'
             else:

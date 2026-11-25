@@ -1,5 +1,7 @@
 # Frigate Privacy
 
+> **Limitation:** Pausing Frigate processing does not stop go2rtc. Video and audio may remain available to new and already connected clients; neither a confirmed pause nor this card’s blocked preview proves that external streams stopped.
+
 ![Preview](banner.png)
 
 Pause and resume Frigate camera detection and recordings on a schedule or on demand.
@@ -22,7 +24,7 @@ created.
 2. **Pause / resume.** Pausing records its intent first, turns off only the selected
    scope, and verifies the reported state. Resume re-enables only targets that this
    integration successfully changed; pre-existing manual-off targets remain off.
-   In the **Everything** scope, Frigate's camera entity is also stopped and
+   In the **Frigate processing** scope, Frigate's camera entity is also stopped and
    resumed. This controls the HA entity, not external go2rtc/RTSP access or physical
    camera power. Turning the camera off in Frigate leaves the go2rtc restream active:
    external consumers, including already connected clients, may still receive video
@@ -83,7 +85,7 @@ A manual pause extended by a schedule retains its original requested scope. The 
 
 | Scope | Targets requested off |
 |---|---|
-| Everything (`all`) | Camera, when controllable, and recognized Frigate switches |
+| Frigate processing (`all`) | Camera, when controllable, and recognized Frigate switches |
 | Recording (`main`) | Recording and snapshot switches |
 | Detection (`sub`) | Detection, motion and audio-detection switches |
 | Recordings only (`recordings`) | Recording switch |
@@ -103,10 +105,10 @@ selected and pause is blocked until the cameras or scope are explicitly changed.
 A request with no matching target is not a confirmed privacy pause; check the
 operation result and per-target evidence.
 
-Everything and Camera operation pause Frigate processing. The go2rtc restream
+Frigate processing and Camera operation pause Frigate processing. The go2rtc restream
 may remain active: video and audio can remain accessible to new and
 existing clients. A camera without working HA turn-on/turn-off actions can also
-keep streaming in Everything scope. Check the video and per-target evidence rather
+keep streaming in Frigate processing scope. Check the video and per-target evidence rather
 than assuming that the live feed or physical camera is off.
 
 ### Channel indicators and preview
@@ -128,7 +130,7 @@ per-target evidence to see pause outcomes, resume outcomes and verified states.
 
 **Preview** expands Home Assistant's native camera card directly below that camera.
 Press **Close preview** to collapse it. Only one preview is open at a time; changing
-tabs, leaving the card or losing administrator authority closes it. An Everything or
+tabs, leaving the card or losing administrator authority closes it. A Frigate processing or
 Camera operation pause closes and blocks this card’s preview until the backend
 reports the operation is off, including while pausing, partially applied or resuming.
 Other scopes leave the preview available. Camera media is requested only after a click. A visible image alone does not confirm that privacy
@@ -370,7 +372,7 @@ names using the installation's language and existing registry entries. Existing
 |---|---|
 | `binary_sensor.<camera>_privacy_active` | `on` while a privacy transition record is active, including `pausing`, `paused`, `resuming`, `partial` and `error` |
 | `switch.<camera>_privacy` | Turn privacy on/off through the same guarded services; a partial or transitional pause is unknown, rather than a false confirmed ON. Turning on without a duration is indefinite. |
-| `button.<camera>_privacy_15_minutes` / `_30_minutes` / `_60_minutes` | Start the corresponding timer with Everything scope for this camera. |
+| `button.<camera>_privacy_15_minutes` / `_30_minutes` / `_60_minutes` | Start the corresponding timer with Frigate processing scope for this camera. |
 | `sensor.<camera>_privacy_until` | Backend deadline as an aware timestamp; unknown for inactive or indefinite privacy. |
 | `sensor.frigate_privacy_last_outcome` | Confirmed, partial or error for the latest completed control outcome; unknown before evidence exists. |
 

@@ -82,6 +82,7 @@ async def test_notify_entity_obeys_selected_events_and_live_preferences(hass: Ho
     assert len(delivered) == 2
     assert all(item['entity_id'] == 'notify.qa_phone' for item in delivered)
     assert 'paused' in delivered[0]['message'] and 'restored' in delivered[1]['message']
+    assert 'go2rtc' in delivered[0]['message'] and 'video and audio' in delivered[0]['message'] and 'existing connections' in delivered[0]['message']
     assert 'private' not in str(delivered)
     hass.config_entries.async_update_entry(entry, options={'notify_destination':''})
     await storage.async_set_paused('private_name', {'phase':'paused', 'operation_id':'new-operation'})

@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Frigate Privacy",
-        "description": "Rejestruje integrację Frigate Privacy. Harmonogramy i stan zapauzowanych kamer są zapisywane na serwerze, a wbudowana karta Lovelace ładuje się automatycznie."
+        "description": "Rejestruje integrację Frigate Privacy. Harmonogramy i stan zapauzowanych kamer są zapisywane na serwerze, a wbudowana karta Lovelace ładuje się automatycznie. Podczas pauzy we Frigate go2rtc może nadal przesyłać obraz i dźwięk, także w otwartych połączeniach."
       }
     },
     "abort": {

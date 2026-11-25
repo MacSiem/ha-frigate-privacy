@@ -11,7 +11,7 @@ const controlSource = readFileSync(
 assert.match(
   controlSource,
   /"camera",\s*"turn_off",\s*\{"entity_id": cam_entity\}/s,
-  'the integration backend must hard-stop the selected camera stream in all-stream mode',
+  'the integration backend must turn off the selected Frigate camera entity in all scope',
 );
 assert.match(
   controlSource,
@@ -75,4 +75,4 @@ assert.ok(
 );
 
 dom.window.close();
-console.log('integration-owned hard-stop assertions passed');
+console.log('integration-owned Frigate camera control assertions passed');
