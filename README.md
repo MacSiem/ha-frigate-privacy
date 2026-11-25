@@ -256,11 +256,24 @@ recorded separately from these documentation fixtures.*
 First install and configure the Frigate integration so its cameras and switches
 are available in Home Assistant. Frigate Privacy controls those existing entities.
 
+For Home Assistant 2026.10 and earlier, install with HACS:
+
 1. Open HACS → Custom repositories.
 2. Add `https://github.com/MacSiem/ha-frigate-privacy` as category **Integration**.
 3. Install **Frigate Privacy** and restart Home Assistant.
-4. Go to Settings → Devices & services → Add integration → **Frigate Privacy**.
-5. Administrators can open **Frigate Privacy** from the sidebar, or add the card below.
+
+Starting with Home Assistant 2026.11, use the [built-in Marketplace](https://www.home-assistant.io/integrations/marketplace/)
+under Settings → Marketplace. Search for **Frigate Privacy** if it is listed; otherwise,
+choose **Add from link** and enter
+`https://github.com/MacSiem/ha-frigate-privacy`, then install the repository.
+The Marketplace uses the same repository `hacs.json` metadata ([publisher details](https://contributors.home-assistant.io/marketplace/how-it-works/)).
+When upgrading Home Assistant, existing HACS installations migrate to the
+Marketplace. Existing My Home Assistant links for HACS repositories still open
+the repository there.
+
+After installation, go to Settings → Devices & services → Add integration →
+**Frigate Privacy**. Administrators can open **Frigate Privacy** from the sidebar,
+or add the card below.
 
 The integration registers one bundled Lovelace resource in storage mode; an
 existing HACS card resource is preserved. YAML mode uses Home Assistant's
