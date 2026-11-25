@@ -130,3 +130,102 @@ def test_two_entries_round_trip_period_history_and_export(storage_module, source
         await reloaded.async_load()
         assert (await reloaded.async_get_periods())['status'] == 'ready'
     asyncio.run(scenario())
+
+
+def test_upstream_names_aliases_collision_rename_and_real_history(storage_module):
+    """Uppercase and hyphen names must not collapse onto HA slug aliases."""
+    async def scenario():
+        hass = _Hass()
+        hass.states.values.clear()
+        hass.entity_registry.platforms.clear()
+        identities = {}
+        for slug, logical in [('front_yard', 'Front-Yard'), ('front_yard_2', 'front-yard'), ('front_yard_3', 'front_yard')]:
+            for domain, suffix in [('camera', ''), ('switch', '_detect'), ('switch', '_snapshots')]:
+                entity = f'{domain}.{slug}{suffix}'
+                hass.states.values[entity] = _State('streaming' if domain == 'camera' else 'on')
+                if domain == 'camera':
+                    hass.states.values[entity].attributes['camera_name'] = logical
+                hass.entity_registry.platforms[entity] = 'frigate'
+                identities[entity] = ('one', f'one:{domain}:{logical}{suffix}', 'device-' + logical)
+        original = hass.entity_registry.async_get
+        def registry(entity):
+            entry = original(entity)
+            if entry and entity in identities:
+                entry.config_entry_id, entry.unique_id, entry.device_id = identities[entity]
+            return entry
+        hass.entity_registry.async_get = registry
+        hass.data = {'frigate': {'one': {'config': {'cameras': {'Front-Yard': {'live': {'streams': {'Main':'yard_stream'}}}}, 'go2rtc': {'streams': {'yard_stream':'private'}}}}}}
+        cameras = control.discover_frigate_cameras(hass)
+        ids = {c['camera_id'] for c in cameras}
+        upper = control._logical_camera_token('Front-Yard')
+        hyphen = control._logical_camera_token('front-yard')
+        assert ids == {upper, hyphen, 'front_yard'}
+        assert next(c for c in cameras if c['camera_id'] == upper)['stream_coverage']['count'] == 1
+        assert control._resolve_camera_ref(hass, 'Front-Yard') == upper
+        assert control._resolve_camera_ref(hass, 'front-yard') == hyphen
+        assert control._resolve_camera_ref(hass, 'camera.front_yard') == upper
+        assert control._resolve_camera_ref(hass, 'front_yard') == 'front_yard'
+        storage = storage_module.FrigatePrivacyStorage(hass)
+        await storage.async_load()
+        assert (await control.async_pause_camera(hass, storage, 'Front-Yard', stream_type='snapshots'))['paused']
+        assert hass.states.get('switch.front_yard_snapshots').state == 'off'
+        assert hass.states.get('switch.front_yard_2_snapshots').state == 'on'
+        old, new = 'switch.front_yard_snapshots', 'switch.changed_snapshot_entity'
+        hass.states.values[new] = hass.states.values.pop(old)
+        hass.entity_registry.platforms[new] = hass.entity_registry.platforms.pop(old)
+        identities[new] = identities.pop(old)
+        assert (await control.async_resume_camera(hass, storage, 'camera.front_yard'))['resumed']
+        assert hass.states.get(new).state == 'on'
+        history = await storage.async_get_periods()
+        assert history['status'] == 'ready' and history['periods'][0]['camera_id'] == upper
+        # A pre-identity snapshot under the old slug must never attach to the
+        # separate camera whose logical name happens to equal that slug.
+        legacy = storage_module.FrigatePrivacyStorage(hass)
+        await legacy.async_load()
+        hass.states.values[new].state = 'off'
+        await legacy.async_set_paused('front_yard', {'phase':'paused', 'active':True,
+            'camera_entity_id':'camera.front_yard', 'switches':[new], 'camera_toggled':False})
+        view = control.project_camera_records(hass, await legacy.async_get_state())
+        assert set(view['paused']) == {upper}
+        conflict = await control.async_resume_camera(hass, legacy, 'front_yard')
+        assert not conflict['resumed'] and conflict['decision']['reason'] == 'identity_conflict'
+        assert hass.states.get(new).state == 'off'
+        assert (await control.async_resume_camera(hass, legacy, 'Front-Yard'))['resumed']
+        assert hass.states.get(new).state == 'on'
+    asyncio.run(scenario())
+
+
+def test_qualified_raw_name_stays_valid_after_second_instance_disappears(storage_module):
+    async def scenario():
+        hass = _Hass()
+        hass.states.values.clear()
+        hass.entity_registry.platforms.clear()
+        identities = {}
+        for entry, slug in [('one', 'yard_a'), ('two', 'yard_b')]:
+            for domain, suffix in [('camera', ''), ('switch', '_detect')]:
+                entity = f'{domain}.{slug}{suffix}'
+                hass.states.values[entity] = _State('streaming' if domain == 'camera' else 'on')
+                if domain == 'camera': hass.states.values[entity].attributes['camera_name'] = 'Front-Yard'
+                hass.entity_registry.platforms[entity] = 'frigate'
+                identities[entity] = (entry, f'{entry}:{domain}:Front-Yard{suffix}', 'device-' + entry)
+        original = hass.entity_registry.async_get
+        def registry(entity):
+            result = original(entity)
+            if result and entity in identities:
+                result.config_entry_id, result.unique_id, result.device_id = identities[entity]
+            return result
+        hass.entity_registry.async_get = registry
+        storage = storage_module.FrigatePrivacyStorage(hass)
+        await storage.async_load()
+        token = control._logical_camera_token('Front-Yard')
+        assert set(control._identity_groups(hass)) == {'one:' + token, 'two:' + token}
+        assert not (await control.async_pause_camera(hass, storage, 'Front-Yard', stream_type='detect'))['paused']
+        assert (await control.async_pause_camera(hass, storage, 'one:' + token, stream_type='detect'))['paused']
+        for entity in ('camera.yard_b', 'switch.yard_b_detect'):
+            del hass.states.values[entity]
+            del hass.entity_registry.platforms[entity]
+            del identities[entity]
+        assert (await control.async_resume_camera(hass, storage, 'Front-Yard'))['resumed']
+        assert hass.states.get('switch.yard_a_detect').state == 'on'
+        assert (await storage.async_get_periods())['status'] == 'ready'
+    asyncio.run(scenario())

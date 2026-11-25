@@ -471,6 +471,13 @@ def _identity_qualifier(entry_id: str) -> str:
     return "entry_" + hashlib.sha256(entry_id.encode()).hexdigest()
 
 
+def _logical_camera_token(logical: str) -> str:
+    """Keep existing slugs and encode other legal upstream camera names."""
+    if re.fullmatch(r"[a-z0-9_]{1,255}", logical):
+        return logical
+    return "camera_" + hashlib.sha256(logical.encode()).hexdigest()
+
+
 def _identity_groups(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
     """Group registered targets by upstream entry and logical camera identity."""
     groups: dict[tuple[str, str], dict[str, Any]] = {}
@@ -494,7 +501,7 @@ def _identity_groups(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
                 logical = logical[:-len(suffix)]
                 if suffix == "_audio":
                     suffix = "_audio_detection"
-            if not logical or not re.fullmatch(r"[a-z0-9_]{1,255}", logical):
+            if not logical or not re.fullmatch(r"[a-zA-Z0-9_-]+", logical):
                 continue
             key = (entry_id, logical)
             group = groups.setdefault(key, {"entry": entry_id, "logical": logical, "camera": None, "switches": {}, "devices": set(), "invalid": False})
@@ -522,7 +529,8 @@ def _identity_groups(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
             continue
         if any(len(slug_owners.get(camera_base(e), set())) > 1 for e in [*group["switches"].values(), *([group["camera"]] if group["camera"] else [])]):
             continue
-        identity = group["logical"] if counts[group["logical"]] == 1 else f'{_identity_qualifier(group["entry"])}:{group["logical"]}'
+        token = _logical_camera_token(group["logical"])
+        identity = token if counts[group["logical"]] == 1 else f'{_identity_qualifier(group["entry"])}:{token}'
         if len(identity) <= 255 and identity not in collisions:
             if identity in result:
                 result.pop(identity)
@@ -536,7 +544,10 @@ def _resolve_camera_ref(hass: HomeAssistant, ref: str) -> str:
     groups = _identity_groups(hass)
     if ref in groups:
         return ref
-    if sum(group["logical"] == camera_base(ref) for group in groups.values()) > 1 and "." not in ref:
+    raw_matches = [key for key, group in groups.items() if group["logical"] == ref]
+    if len(raw_matches) == 1:
+        return raw_matches[0]
+    if len(raw_matches) > 1:
         return camera_base(ref)
     matches = [key for key, group in groups.items() if ref in [group["camera"], *group["switches"].values()] or camera_base(ref) in {camera_base(e) for e in [*group["switches"].values(), *([group["camera"]] if group["camera"] else [])]}]
     return matches[0] if len(matches) == 1 else camera_base(ref)
@@ -545,7 +556,10 @@ def _resolve_camera_ref(hass: HomeAssistant, ref: str) -> str:
 def _record_matches_group(hass: HomeAssistant, record: dict[str, Any], group: dict[str, Any]) -> bool:
     identities = record.get("target_identities")
     if not identities:
-        return True  # Legacy records retain their exact-ID validation.
+        switches = [*(record.get("switches") or []), *(record.get("preexisting_off") or [])]
+        camera = record.get("camera_entity_id")
+        targets = set(group["switches"].values())
+        return bool((switches or camera) and all(target in targets for target in switches) and (not camera or camera == group["camera"]))
     if not isinstance(identities, dict):
         return False
     entities = [*group["switches"].values(), *([group["camera"]] if group["camera"] else [])]
@@ -563,7 +577,8 @@ async def _existing_camera_record_key(hass: HomeAssistant, storage: FrigatePriva
         return base
     entities = [*group["switches"].values(), *([group["camera"]] if group["camera"] else [])]
     current = list(_target_identities(hass, entities).values())
-    matches = [key for key, record in records.items() if any(value in current for value in (record.get("target_identities") or {}).values())]
+    aliases = {camera_base(entity) for entity in entities}
+    matches = [key for key, record in records.items() if (any(value in current for value in (record.get("target_identities") or {}).values()) or (not record.get("target_identities") and key in aliases and _persisted_targets_are_valid(hass, key, record.get("switches") or [], record.get("camera_entity_id"), bool(record.get("camera_toggled")))))]
     return matches[0] if len(matches) == 1 else base
 
 
@@ -621,7 +636,7 @@ def discover_frigate_cameras(hass: HomeAssistant) -> list[dict[str, Any]]:
         switches = _switches_for_base(hass, base, ALL_SUFFIXES)
         registry_entry = er.async_get(hass).async_get(cam_entity) if cam_entity else None
         entry_id = getattr(registry_entry, "config_entry_id", None)
-        camera_name = state.attributes.get("camera_name") if state is not None else None
+        camera_name = groups[base]["logical"] if base in groups else state.attributes.get("camera_name") if state is not None else None
         frigate_data = getattr(hass, "data", {}).get("frigate", {})
         entry_data = frigate_data.get(entry_id, {}) if isinstance(frigate_data, dict) and entry_id else {}
         config = entry_data.get("config") if isinstance(entry_data, dict) else None
@@ -667,7 +682,12 @@ def project_camera_records(hass: HomeAssistant, state: dict[str, Any]) -> dict[s
             if not isinstance(record, dict):
                 continue
             identities = record.get("target_identities") or {}
-            if not isinstance(identities, dict) or not identities:
+            if not isinstance(identities, dict):
+                continue
+            if not identities:
+                matching = [camera_id for camera_id, group in groups.items() if _record_matches_group(hass, record, group)]
+                if len(matching) == 1:
+                    destinations[key] = matching[0]
                 continue
             values = list(identities.values())
             matching = []
@@ -682,7 +702,7 @@ def project_camera_records(hass: HomeAssistant, state: dict[str, Any]) -> dict[s
         result = {}
         for key, record in records.items():
             target = destinations.get(key, key)
-            if key in groups and key not in destinations and isinstance(record, dict) and record.get("target_identities"):
+            if key in groups and key not in destinations and isinstance(record, dict) and not _record_matches_group(hass, record, groups[key]):
                 target = f"unmatched:{key}"
             if counts.get(target, 0) > 1 or (target != key and target in records):
                 target = key
@@ -1432,7 +1452,12 @@ async def async_resume_camera(
     base = _resolve_camera_ref(hass, camera_ref)
     all_paused = await storage.async_get_paused(None) or {}
     if camera_base(camera_ref) in all_paused:
-        base = camera_base(camera_ref)
+        legacy_key = camera_base(camera_ref)
+        group = _identity_groups(hass).get(base)
+        if group and not _record_matches_group(hass, all_paused[legacy_key], group):
+            decision = {"clear_paused": False, "keep_paused": True, "notification_required": False, "reason": "identity_conflict", "failed": [], "unavailable": []}
+            return _resume_result(base, False, decision, authority is not ResumeAuthority.ADMIN, phase="error")
+        base = legacy_key
     else:
         base = await _existing_camera_record_key(hass, storage, base)
     async with _camera_lock(storage, base):
@@ -2269,7 +2294,7 @@ def _persisted_targets_are_valid(
     if not isinstance(switches, list) or not all(isinstance(entity, str) for entity in switches):
         return False
     groups = _identity_groups(hass)
-    matching = [group for key, group in groups.items() if (key == camera_id or group["logical"] == camera_id or f'{_identity_qualifier(group["entry"])}:{group["logical"]}' == camera_id) and set(switches or []).issubset(set(group["switches"].values())) and (not camera_entity or camera_entity == group["camera"])]
+    matching = [group for key, group in groups.items() if (key == camera_id or _logical_camera_token(group["logical"]) == camera_id or f'{_identity_qualifier(group["entry"])}:{_logical_camera_token(group["logical"])}' == camera_id or camera_id in {camera_base(entity) for entity in [*group["switches"].values(), *([group["camera"]] if group["camera"] else [])]}) and set(switches or []).issubset(set(group["switches"].values())) and (not camera_entity or camera_entity == group["camera"])]
     if len(matching) == 1:
         return bool(isinstance(switches, list) and len(set(switches)) == len(switches) and all(_is_frigate_entity(hass, entity) for entity in switches) and (not camera_toggled or camera_entity and _is_frigate_entity(hass, camera_entity)))
     if not _base_ownership_valid(hass, camera_id):
