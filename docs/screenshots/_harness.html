@@ -21,7 +21,7 @@ customElements.define('ha-icon',class extends HTMLElement {
  }
 });
 </script>
-<script src="../../ha-frigate-privacy.js?sha256=2850493fe52b71c86dbaaf5f56fc09c14062fba613af5c1dcbb20585b888fd23"></script>
+<script src="../../ha-frigate-privacy.js"></script>
 <script>
 // Documentation fixture: synthetic state and actual periods.py projection only.
 // Mutations deliberately fail; integration acceptance uses a separate live HA fixture.
@@ -125,6 +125,7 @@ const cameras=[
     "name": "Front Door",
     "camera_state": "off",
     "camera_can_toggle": true,
+    "feature_scopes": ["recordings", "snapshots", "detect", "audio_detection", "camera"],
     "switches": [
       {
         "entity_id": "switch.front_door_detect",
@@ -171,6 +172,7 @@ const cameras=[
     "name": "Garden",
     "camera_state": "idle",
     "camera_can_toggle": true,
+    "feature_scopes": ["recordings", "snapshots", "detect", "audio_detection", "camera"],
     "switches": [
       {
         "entity_id": "switch.garden_detect",
