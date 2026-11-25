@@ -342,7 +342,7 @@ function createCardUi() {
       this._integrationChecked = false; this._integrationAvailable = false; this._recoveryReady = true; this._permissionDenied = false; this._declaredAdmin = false; this._busy = false; this._mutationWire = null; this._mutationOutcome = null; this._error = '';
       this._requestEpoch = 0; this._connectPromise = null; this._lastStatePollAt = 0; this._connection = null; this._userId = null; this._instanceId = null; this._declaredActive = true; this._cameras = []; this._schedules = []; this._paused = {}; this._lastOperations = {}; this._selectedCameras = new Set();
       this._customMinutes = Number(haToolsPersistence.loadSync('ha-frigate-privacy-pause-minutes')) || 30;
-      const storedScope = haToolsPersistence.loadSync('ha-frigate-privacy-pause-stream-type'); this._pauseStreamType = ['all','main','sub'].includes(storedScope) ? storedScope : 'all';
+      const storedScope = haToolsPersistence.loadSync('ha-frigate-privacy-pause-stream-type'); this._pauseStreamType = ['all','main','sub','recordings','snapshots','detect','motion','audio_detection','review_alerts','review_detections','camera'].includes(storedScope) ? storedScope : 'all';
       this._periodEpoch = 0; this._periods = []; this._periodInfo = null; this._periodState = 'idle';
       this._periodDays = 30; this._periodPage = 0; this._periodView = 'timeline'; this._periodSelected = null;
       this._periodWire = null; this._periodDeadline = null; this._periodContextKey = null; this._periodProducerKey = null;
@@ -464,6 +464,7 @@ function createCardUi() {
       this._periodProducerKey = producerKey;
       this._recoveryReady = safe.recovery_ready !== false; this._cameras = Array.isArray(safe.cameras) ? safe.cameras : []; this._schedules = Array.isArray(safe.schedules) ? safe.schedules : []; const records = safe.paused && typeof safe.paused === 'object' && !Array.isArray(safe.paused) ? safe.paused : {}; const terminal = safe.last_operations && typeof safe.last_operations === 'object' && !Array.isArray(safe.last_operations) ? safe.last_operations : {}; this._paused = Object.fromEntries(Object.entries(records).filter(([,record]) => record && record.active !== false && record.phase !== 'active')); this._lastOperations = Object.fromEntries(Object.entries(terminal).filter(([,record]) => record && record.active === false && record.phase === 'active'));
       const valid = new Set(this._cameras.map((camera) => camera.camera_id)); this._selectedCameras = new Set([...this._selectedCameras].filter((id) => valid.has(id)));
+      this._normalizeScope();
       if (this._previewCamera && !this._previewAllowed(this._previewCamera)) this._closePreview();
       this._updateUI();
     }
@@ -588,14 +589,23 @@ function createCardUi() {
         this._updateUI();
       }
     }
+    _scopeLabels() {
+      const pl=this._lang==='pl', t=this._t;
+      return {all:t.allScope,main:t.main,sub:t.sub,recordings:pl?'Same nagrania':'Recordings only',snapshots:t.snapshots,detect:pl?'Sama detekcja obiektów':'Object detection only',motion:pl?'Ruch':'Motion',audio_detection:t.soundDetection,review_alerts:pl?'Alerty przeglądu':'Review alerts',review_detections:pl?'Detekcje przeglądu':'Review detections',camera:pl?'Praca kamery we Frigate':'Camera operation in Frigate'};
+    }
+    _scopeSupported(cam, scope) { return ['all','main','sub'].includes(scope) || (Array.isArray(cam?.feature_scopes) && cam.feature_scopes.includes(scope)); }
+    _selectedScopeSupported(scope=this._pauseStreamType) {
+      const ids=this._selectedCameraIds(); return ids.length>0 && this._visibleCameras().filter(cam=>ids.includes(cam.camera_id)).every(cam=>this._scopeSupported(cam,scope));
+    }
+    _normalizeScope() { if (!this._selectedScopeSupported()) this._pauseStreamType='all'; }
     _selectedCameraIds() { return this._visibleCameras().filter(camera=>!this._selectedCameras.size||this._selectedCameras.has(camera.camera_id)).map(camera=>camera.camera_id); }
     _pause() {
-      const cameras=this._selectedCameraIds();if(!cameras.length)return false;
+      const cameras=this._selectedCameraIds();if(!cameras.length||!this._selectedScopeSupported())return false;
       const minutes=Math.max(1,Math.min(1440,Number.parseInt(this._customMinutes,10)||30));this._customMinutes=minutes;haToolsPersistence.save('ha-frigate-privacy-pause-minutes',minutes);
       return this._runMutation('pause_camera',{cameras,duration_minutes:minutes,stream_type:this._pauseStreamType,operation_id:this._newOperationId('pause')});
     }
     _quickPause(id,minutes) {
-      if(!this._visibleCameras().some(camera=>camera.camera_id===id)||![15,30,60].includes(minutes))return false;
+      if(!this._visibleCameras().some(camera=>camera.camera_id===id&&this._scopeSupported(camera,this._pauseStreamType))||![15,30,60].includes(minutes))return false;
       return this._runMutation('pause_camera',{cameras:[id],duration_minutes:minutes,stream_type:this._pauseStreamType,operation_id:this._newOperationId('quick-pause')});
     }
     _extendPrivacy(id) {
@@ -731,7 +741,7 @@ function createCardUi() {
       const request = attempt ? `<div class="helper" ${attempt.pending ? 'data-camera-pending' : ''}>${_esc(this._lang==='pl'?'Ostatnie żądanie':'Last request')}: ${attempt.pending ? _esc(labels.pending) : createUiV3({language:this._lang}).statusHtml(attempt.code)}</div>` : '';
       if (!record) return request ? `<div class="camera-feedback" data-camera-feedback="${_esc(cam.camera_id)}">${request}</div>` : '';
       const phase = ['pausing','paused','resuming','partial','error','active'].includes(record.phase) ? record.phase : 'unknown';
-      const scope = {all:t.allScope,main:t.main,sub:t.sub}[record.stream_type] || t.statusUnknown;
+      const scope = this._scopeLabels()[record.stream_type] || t.statusUnknown;
       const start = typeof record.started_at === 'string' ? Date.parse(record.started_at) : NaN;
       const end = typeof record.ends_at === 'string' ? Date.parse(record.ends_at) : NaN;
       const minutes = Number.isFinite(start) && Number.isFinite(end) && end > start ? Math.round((end-start)/60000) : null;
@@ -773,16 +783,16 @@ function createCardUi() {
       return `<span class="channel-badge" data-channel="${channel}" data-channel-state="${state}"><ha-icon icon="${icon}"></ha-icon>${_esc(label)}: ${_esc(states.map(s=>names[s]).join(' / '))}</span>`;
     }
     _quickControls(cam) {
-      const pl=this._lang==='pl',record=this._paused[cam.camera_id],disabled=this._busy||this._mutationWire||!this._recoveryReady;
+      const pl=this._lang==='pl',record=this._paused[cam.camera_id],disabled=this._busy||this._mutationWire||!this._recoveryReady, pauseDisabled=disabled||!this._scopeSupported(cam,this._pauseStreamType);
       if(record)return `<div class="camera-quick-actions">${record.active&&Number.isFinite(Date.parse(record.ends_at))?`<button class="btn btn-secondary" data-extend-camera="${_esc(cam.camera_id)}" ${disabled?'disabled':''}>+15 min</button>`:''}<button class="btn btn-danger" data-resume-camera="${_esc(cam.camera_id)}" ${disabled?'disabled':''}>${pl?'Wznów':'Resume'}</button></div>`;
-      return `<div class="camera-quick-actions"><span>${pl?'Prywatność':'Privacy'}:</span>${[15,30,60].map(minutes=>`<button class="btn btn-secondary" data-quick-camera="${_esc(cam.camera_id)}" data-quick-minutes="${minutes}" aria-label="${_esc((pl?'Prywatność':'Privacy')+' · '+cam.name+' · '+minutes+' min')}" ${disabled?'disabled':''}>${minutes===60?'1 h':minutes+' min'}</button>`).join('')}<button class="btn btn-secondary" data-camera-more="${_esc(cam.camera_id)}" aria-label="${pl?'Więcej opcji':'More options'} · ${_esc(cam.name)}">⋯</button></div>`;
+      return `<div class="camera-quick-actions"><span>${pl?'Prywatność':'Privacy'}:</span>${[15,30,60].map(minutes=>`<button class="btn btn-secondary" data-quick-camera="${_esc(cam.camera_id)}" data-quick-minutes="${minutes}" aria-label="${_esc((pl?'Prywatność':'Privacy')+' · '+cam.name+' · '+minutes+' min')}" ${pauseDisabled?'disabled':''}>${minutes===60?'1 h':minutes+' min'}</button>`).join('')}<button class="btn btn-secondary" data-camera-more="${_esc(cam.camera_id)}" aria-label="${pl?'Więcej opcji':'More options'} · ${_esc(cam.name)}">⋯</button></div>`;
     }
     _cameraTile(cam) {
       const selected = this._selectedCameras.has(cam.camera_id), t = this._t, p = this._cameraStrings();
       const values = suffixes => (cam.switches || []).filter(item=>suffixes.includes(item.suffix)).map(item=>item.state);
       const expanded = this._previewCamera === cam.entity_id;
       const validEntity = typeof cam.entity_id === 'string' && /^camera\.[a-z0-9_]+$/.test(cam.entity_id);
-      return `<div class="camera-tile"><div class="camera-card ${selected?'selected':''}" data-camera="${_esc(cam.camera_id)}" role="button" tabindex="0" aria-pressed="${selected}" aria-label="Camera: ${_esc(this._repairMojibake(cam.name))}"><ha-icon icon="mdi:cctv"></ha-icon><span class="camera-name">${_esc(this._repairMojibake(cam.name))}</span>${selected?'<ha-icon class="camera-check" icon="mdi:check-circle"></ha-icon>':''}</div><div class="channel-status">${this._channelBadge('video',this._lang==='pl'?'Encja kamery HA':'HA camera entity',[cam.camera_state],'mdi:video-outline')}${this._channelBadge('recording',t.recording,values(['_recordings']),'mdi:record-rec')}${this._channelBadge('snapshots',t.snapshots,values(['_snapshots']),'mdi:camera-outline')}${this._channelBadge('detection',t.detection,values(['_detect']),'mdi:motion-sensor')}${this._channelBadge('sound',t.soundDetection,values(['_audio_detection','_audio']),'mdi:microphone-outline')}</div>${this._cameraFeedback(cam)}${this._ownCameraRecord(this._paused,cam.camera_id)||this._ownCameraRecord(this._lastOperations,cam.camera_id)?'':this._streamBoundary(cam)}${this._quickControls(cam)}${validEntity?`<button class="preview-btn" data-preview-camera="${_esc(cam.entity_id)}" aria-expanded="${expanded}" aria-controls="preview-${_esc(cam.camera_id)}">${_esc(expanded?p.hide:p.preview)}</button>${expanded?`<div id="preview-${_esc(cam.camera_id)}" class="camera-preview"><div data-preview-host="${_esc(cam.entity_id)}" role="region" aria-label="${_esc(p.preview+' · '+cam.name)}"><p class="helper">${_esc(p.loading)}</p></div><p class="helper">${_esc(p.hint)}</p></div>`:''}`:''}</div>`;
+      return `<div class="camera-tile"><div class="camera-card ${selected?'selected':''}" data-camera="${_esc(cam.camera_id)}" role="button" tabindex="0" aria-pressed="${selected}" aria-label="Camera: ${_esc(this._repairMojibake(cam.name))}"><ha-icon icon="mdi:cctv"></ha-icon><span class="camera-name">${_esc(this._repairMojibake(cam.name))}</span>${selected?'<ha-icon class="camera-check" icon="mdi:check-circle"></ha-icon>':''}</div><div class="channel-status">${this._channelBadge('video',this._lang==='pl'?'Encja kamery HA':'HA camera entity',[cam.camera_state],'mdi:video-outline')}${this._channelBadge('recording',t.recording,values(['_recordings']),'mdi:record-rec')}${this._channelBadge('snapshots',t.snapshots,values(['_snapshots']),'mdi:camera-outline')}${this._channelBadge('detection',t.detection,values(['_detect']),'mdi:motion-sensor')}${this._channelBadge('sound',t.soundDetection,values(['_audio_detection','_audio']),'mdi:microphone-outline')}${this._channelBadge('listening',this._lang==='pl'?'Odsłuch':'Listening',[],'mdi:headphones')}${this._channelBadge('recording-audio',this._lang==='pl'?'Dźwięk nagrań':'Recording audio',[],'mdi:volume-high')}</div>${this._cameraFeedback(cam)}${this._ownCameraRecord(this._paused,cam.camera_id)||this._ownCameraRecord(this._lastOperations,cam.camera_id)?'':this._streamBoundary(cam)}${this._quickControls(cam)}${validEntity?`<button class="preview-btn" data-preview-camera="${_esc(cam.entity_id)}" aria-expanded="${expanded}" aria-controls="preview-${_esc(cam.camera_id)}">${_esc(expanded?p.hide:p.preview)}</button>${expanded?`<div id="preview-${_esc(cam.camera_id)}" class="camera-preview"><div data-preview-host="${_esc(cam.entity_id)}" role="region" aria-label="${_esc(p.preview+' · '+cam.name)}"><p class="helper">${_esc(p.loading)}</p></div><p class="helper">${_esc(p.hint)}</p></div>`:''}`:''}</div>`;
     }
     _previewAllowed(entity) {
       return this._periodAuthority() && this._integrationAvailable && this._recoveryReady &&
@@ -860,7 +870,7 @@ function createCardUi() {
       const lists=createListUi(this._hass?.language||this._lang);const cameras=[...this._visibleCameras()].sort((a,b)=>lists.compare(a.name,b.name)||lists.compare(a.camera_id,b.camera_id)).map(cam=>this._cameraTile(cam)).join('');
       const allSelected=this._selectedCameras.size===0; const phases=Object.values(this._visibleRecords(this._paused));
       return `<div class="section"><div class="section-head"><h3>${_esc(t.cameras)}</h3><span class="helper">${this._visibleCameras().length}</span></div><div class="camera-card ${allSelected?'selected':''}" data-camera="__all__" role="button" tabindex="0" aria-pressed="${allSelected}"><ha-icon icon="mdi:camera-outline"></ha-icon><span class="camera-name">${_esc(t.all)}</span>${allSelected?'<ha-icon class="camera-check" icon="mdi:check-circle"></ha-icon>':''}</div><div class="camera-grid">${cameras||`<div class="empty">${_esc(t.noCameras)}</div>`}</div><p class="helper channel-hint">${_esc(t.soundHint)}</p></div>
-      <div class="section"><div class="section-head"><h3>${_esc(t.scope)}</h3></div><div class="seg" role="radiogroup">${[['all',t.allScope],['main',t.main],['sub',t.sub]].map(([value,label])=>`<button class="seg-item ${this._pauseStreamType===value?'selected':''}" data-scope="${value}" role="radio" aria-checked="${this._pauseStreamType===value}">${_esc(label)}</button>`).join('')}</div><div class="duration-row"><label class="duration-label">${this._lang==='pl'?'Czas':'Duration'}<input class="input-minutes" type="number" min="1" max="1440" value="${_esc(this._customMinutes)}" aria-label="${_esc(t.duration)}"><span>min</span></label><div class="duration-presets">${[15,30,60].map(minutes=>`<button class="btn btn-secondary" data-duration="${minutes}">${minutes} min</button>`).join('')}</div><button class="btn btn-primary" data-action="pause-custom" ${this._busy||this._mutationWire||!this._visibleCameras().length?'disabled':''}>${_esc(t.pause)}</button></div>${phases.length?`<button class="btn btn-danger" data-action="resume" ${this._busy||this._mutationWire?'disabled':''}>${_esc(t.resume)}</button>`:''}</div>`;
+      <div class="section"><div class="section-head"><h3>${_esc(t.scope)}</h3></div><div class="seg" role="radiogroup">${Object.entries(this._scopeLabels()).map(([value,label])=>`<button class="seg-item ${this._pauseStreamType===value?'selected':''}" data-scope="${value}" role="radio" aria-checked="${this._pauseStreamType===value}" ${this._selectedScopeSupported(value)?'':'disabled'}>${_esc(label)}</button>`).join('')}</div><p class="helper">${_esc(this._lang==='pl'?'Dostępne funkcje muszą być obsługiwane przez wszystkie wybrane kamery. Zatrzymanie pracy kamery we Frigate nie zatrzymuje koniecznie obrazu ani dźwięku z go2rtc. Detekcja dźwięku nie potwierdza odsłuchu ani dźwięku nagrań.':'Individual features must be supported by every selected camera. Stopping camera operation in Frigate may leave video and audio available via go2rtc. Sound detection does not confirm listening or recording audio.')}</p><div class="duration-row"><label class="duration-label">${this._lang==='pl'?'Czas':'Duration'}<input class="input-minutes" type="number" min="1" max="1440" value="${_esc(this._customMinutes)}" aria-label="${_esc(t.duration)}"><span>min</span></label><div class="duration-presets">${[15,30,60].map(minutes=>`<button class="btn btn-secondary" data-duration="${minutes}">${minutes} min</button>`).join('')}</div><button class="btn btn-primary" data-action="pause-custom" ${this._busy||this._mutationWire||!this._visibleCameras().length?'disabled':''}>${_esc(t.pause)}</button></div>${phases.length?`<button class="btn btn-danger" data-action="resume" ${this._busy||this._mutationWire?'disabled':''}>${_esc(t.resume)}</button>`:''}</div>`;
     }
     _buildScheduleTab() {
       const filterNote=this._config.cameras?.length?`<p class="helper" data-schedule-scope>${_esc(this._lang==='pl'?'Harmonogramy obejmują wszystkie wykryte kamery, również ukryte przez filtr tej karty.':'Schedules apply to all discovered cameras, including cameras hidden by this card’s filter.')}</p>`:'';
@@ -1184,6 +1194,7 @@ function createCardUi() {
     _syncControlDraft() {
       // Draft selection is presentation only. Keep active media and controls mounted.
       const root = this.shadowRoot;
+      this._normalizeScope();
       for (const tile of root.querySelectorAll('[data-camera]')) {
         const id = tile.dataset.camera;
         const selected = id === '__all__' ? this._selectedCameras.size === 0 : this._selectedCameras.has(id);
@@ -1194,8 +1205,9 @@ function createCardUi() {
       }
       for (const button of root.querySelectorAll('[data-scope]')) {
         const selected = button.dataset.scope === this._pauseStreamType;
-        button.classList.toggle('selected', selected); button.setAttribute('aria-checked', String(selected));
+        button.classList.toggle('selected', selected); button.setAttribute('aria-checked', String(selected)); button.disabled=!this._selectedScopeSupported(button.dataset.scope);
       }
+      for (const button of root.querySelectorAll('[data-quick-camera]')) { const cam=this._visibleCameras().find(c=>c.camera_id===button.dataset.quickCamera); button.disabled=!!(this._busy||this._mutationWire||!this._recoveryReady||!this._scopeSupported(cam,this._pauseStreamType)); }
       const input = root.querySelector('.input-minutes'); if (input) input.value = String(this._customMinutes);
       this._lastHtml = this._buildHTML();
     }
