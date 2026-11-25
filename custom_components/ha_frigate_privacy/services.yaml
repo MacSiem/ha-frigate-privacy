@@ -36,6 +36,14 @@ pause_camera:
             - all
             - main
             - sub
+            - recordings
+            - snapshots
+            - detect
+            - motion
+            - audio_detection
+            - review_alerts
+            - review_detections
+            - camera
     operation_id:
       name: Operation ID
       description: Optional idempotency key for safe retries (maximum 128 characters).

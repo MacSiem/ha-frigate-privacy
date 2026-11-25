@@ -15,7 +15,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
-from .const import DOMAIN, EVENT_STATE_CHANGED
+from .const import DOMAIN, EVENT_STATE_CHANGED, FEATURE_SCOPES, STREAM_TYPES
 from .failsafe import decide_resume_exit
 from .storage import FrigatePrivacyStorage
 from .stream_coverage import stream_coverage
@@ -481,6 +481,12 @@ def suffixes_for_stream_type(stream_type: str | None) -> tuple[str, ...]:
         return ("_recordings", "_snapshots")
     if stream_type == "sub":
         return ("_detect", "_motion", "_audio", "_audio_detection")
+    if stream_type == "camera":
+        return ()
+    if stream_type == "audio_detection":
+        return ("_audio_detection", "_audio")
+    if stream_type in FEATURE_SCOPES:
+        return (f"_{stream_type}",)
     return ALL_SUFFIXES
 
 
@@ -523,6 +529,7 @@ def discover_frigate_cameras(hass: HomeAssistant) -> list[dict[str, Any]]:
                 "camera_can_toggle": bool(
                     state is not None and _is_frigate_entity(hass, cam_entity)
                 ),
+                "feature_scopes": [scope for scope in FEATURE_SCOPES if (cam_entity if scope == "camera" else any(item["suffix"] in suffixes_for_stream_type(scope) for item in switches))],
                 "switches": switches,
                 "available_switches": [item["entity_id"] for item in switches],
                 "missing_switches": [
@@ -684,6 +691,8 @@ async def async_pause_camera(
 ) -> dict[str, Any]:
     """Pause one allowlisted camera and persist truthful transition evidence."""
     base = camera_base(camera_ref)
+    if stream_type not in STREAM_TYPES:
+        return {"camera_id": base, "paused": False, "phase": "error", "reason": "invalid_stream_type"}
     if base not in _discovered_camera_ids(hass):
         return {
             "camera_id": base,
@@ -817,6 +826,13 @@ async def _async_pause_camera_locked(
         for suffix in suffixes
         if hass.states.get(f"switch.{base}{suffix}") is None
     ]
+    if stream_type == "audio_detection" and switches:
+        missing = []
+        if len(switches) > 1:
+            switches = []
+            missing = [f"switch.{base}_audio_detection"]
+    if stream_type == "camera" and not cam_entity:
+        missing = [f"camera.{base}"]
     skipped: list[str] = list(missing)
     failed: list[str] = []
     toggled: list[str] = []
@@ -837,12 +853,12 @@ async def _async_pause_camera_locked(
             planned_switches.append(entity_id)
 
     camera_planned = bool(
-        stream_type == "all"
+        stream_type in {"all", "camera"}
         and cam_entity
         and _is_frigate_entity(hass, cam_entity)
         and _camera_is_enabled(hass, cam_entity)
     )
-    if stream_type == "all" and cam_entity:
+    if stream_type in {"all", "camera"} and cam_entity:
         camera_state = hass.states.get(cam_entity)
         if camera_state is None or camera_state.state in UNAVAILABLE_STATES:
             unavailable.append(cam_entity)
@@ -855,7 +871,10 @@ async def _async_pause_camera_locked(
     }
     if camera_planned and cam_entity:
         target_outcomes[cam_entity] = "pending"
+    elif stream_type == "camera" and cam_entity and cam_entity not in unavailable:
+        target_outcomes[cam_entity] = "preexisting_off"
 
+    target_identities = _target_identities(hass, [*planned_switches, *preexisting_off, *([cam_entity] if cam_entity else [])])
     now = datetime.now(timezone.utc)
     ends_at = (
         now + timedelta(minutes=duration_minutes)
@@ -899,6 +918,7 @@ async def _async_pause_camera_locked(
             "stream_type": stream_type,
             "source": source,
             "schedule_id": schedule_id,
+            "target_identities": target_identities,
             "planned_switches": planned_switches,
             "switches": [],
             "preexisting_off": preexisting_off,
@@ -978,7 +998,7 @@ async def _async_pause_camera_locked(
             updated_at=datetime.now(timezone.utc).isoformat(),
         )
 
-    phase = "partial" if failed or unavailable or camera_failed else "paused"
+    phase = "partial" if failed or unavailable or camera_failed or (stream_type in FEATURE_SCOPES and missing) else "paused"
     paused = phase == "paused"
     observed_at = datetime.now(timezone.utc).isoformat()
     observed_targets = list(
@@ -1354,7 +1374,7 @@ async def _async_resume_camera_locked(
         expected_raw,
         cam_entity,
         bool(paused.get("camera_toggled")),
-    ):
+    ) or not _identities_match(hass, paused.get("target_identities")):
         decision = {
             "clear_paused": False,
             "keep_paused": True,
@@ -1986,6 +2006,27 @@ def _actual_state_snapshot(
         entity_id: (state.state if (state := hass.states.get(entity_id)) else None)
         for entity_id in entity_ids
     }
+
+
+def _target_identities(hass: HomeAssistant, targets: list[str]) -> dict[str, list[str]]:
+    """Persist registry identity to prevent restoration to replacement entities."""
+    identities = {}
+    for entity_id in targets:
+        entry = er.async_get(hass).async_get(entity_id)
+        if entry:
+            values = [getattr(entry, key, None) for key in ("config_entry_id", "unique_id", "device_id")]
+            if any(values):
+                identities[entity_id] = values
+    return identities
+
+
+def _identities_match(hass: HomeAssistant, identities: Any) -> bool:
+    if identities is None:  # Records predating identity snapshots.
+        return True
+    if not isinstance(identities, dict):
+        return False
+    return all(_target_identities(hass, [entity_id]).get(entity_id) == identity
+               for entity_id, identity in identities.items())
 
 
 def _persisted_targets_are_valid(
