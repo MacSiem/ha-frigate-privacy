@@ -24,8 +24,9 @@ created.
    integration successfully changed; pre-existing manual-off targets remain off.
    In the **Everything** scope, Frigate's camera entity is also stopped and
    resumed. This controls the HA entity, not external go2rtc/RTSP access or physical
-   camera power: external consumers may still receive video, even when Frigate live
-   view is disabled. The card shows a best-effort count of related configured streams
+   camera power. Turning the camera off in Frigate leaves the go2rtc restream active:
+   external consumers, including already connected clients, may still receive video
+   and audio even when Frigate live view is disabled. The card shows a best-effort count of related configured streams
    or unknown; it does not disclose aliases, URLs or credentials. Frigate reports an
    off camera as `idle` with no supported features,
    but its HA `camera.turn_on` action still works; the integration verifies the
@@ -69,7 +70,7 @@ i zakończenia prywatności. Termin i wynik pozostają widoczne pod kamerą.
 |---|---|
 | Discovering Frigate cameras | Pressing pause / resume in the card |
 | Auto-resume after a timed pause | Creating privacy schedules |
-| Fail-safe checks before resume | Choosing privacy scope (`all` / `main` / `sub`) |
+| Fail-safe checks before resume | Choosing a supported privacy scope per camera |
 | Per-camera `*_privacy_active` sensor | — |
 
 > **Administrator-only:** camera topology, privacy windows, and paused-state evidence
@@ -84,18 +85,39 @@ A manual pause extended by a schedule retains its original requested scope. The 
 |---|---|
 | Everything (`all`) | Camera, when controllable, and recognized Frigate switches |
 | Recording (`main`) | Recording and snapshot switches |
-| Detection (`sub`) | Detection, motion and audio switches |
+| Detection (`sub`) | Detection, motion and audio-detection switches |
+| Recordings only (`recordings`) | Recording switch |
+| Snapshots (`snapshots`) | Snapshot switch |
+| Object detection (`detect`) | Detection switch |
+| Motion (`motion`) | Motion switch |
+| Sound detection (`audio_detection`) | Sound-detection switch (including its legacy audio identity) |
+| Review alerts (`review_alerts`) | Review-alert switch |
+| Review detections (`review_detections`) | Review-detection switch |
+| Camera operation (`camera`) | Frigate camera control, when available |
 
-Recording and Detection leave the other channels running. A camera without
-working HA turn-on/turn-off actions can keep streaming in Everything scope;
-check the video and per-target evidence rather than assuming the live feed is off.
+Recording and Detection retain their existing grouped meanings and leave other
+channels running. Individual scopes depend on the discovered features of each
+camera. In the card, an individual scope is available for a selection only if all
+selected cameras support it. If a selected scope becomes unavailable, it stays
+selected and pause is blocked until the cameras or scope are explicitly changed.
+A request with no matching target is not a confirmed privacy pause; check the
+operation result and per-target evidence.
+
+Camera operation controls Frigate through its HA camera entity. Frigate camera OFF
+leaves the go2rtc restream active: video and audio can remain accessible to new and
+existing clients. A camera without working HA turn-on/turn-off actions can also
+keep streaming in Everything scope. Check the video and per-target evidence rather
+than assuming that the live feed or physical camera is off.
 
 ### Channel indicators and preview
 
-The card shows video, recording, snapshots, detection, and sound detection
-separately, with state colors and explicit on/off, unknown and unavailable labels.
-Green means a channel is on; it does not mean privacy is enforced. Sound detection
-does not confirm microphone capture or listening.
+The card shows the HA camera entity, recording, snapshots, object detection,
+motion, review alerts, review detections and sound detection separately, with state
+colors and explicit on/off, unknown and unavailable labels. Green means a channel
+is on; it does not mean privacy is enforced. Listening via go2rtc and audio in
+recordings are shown separately as unknown when there is no evidence for them.
+Sound detection does not confirm microphone capture, listening, or whether
+recordings contain audio.
 
 Each camera with an active timed operation shows its own backend deadline and
 remaining time and a progress indicator. The short deadline follows your profile
@@ -289,6 +311,26 @@ to full controls and notification settings. With several configured cameras,
 choose the camera from its selector. Help starts collapsed below 500 px; closing
 it is remembered for the signed-in user and HA instance in this browser.
 Full and compact cards support Sections (including 3 columns), Masonry and Panel.
+
+### Pause or resume from an automation
+
+Use Home Assistant actions `ha_frigate_privacy.pause_camera` and
+`ha_frigate_privacy.resume_camera`. The pause action accepts the `stream_type`
+values listed above; omitting it defaults to `all`. For example:
+
+```yaml
+action: ha_frigate_privacy.pause_camera
+data:
+  camera: front_door
+  stream_type: audio_detection
+  duration_minutes: 30
+```
+
+Resume with `ha_frigate_privacy.resume_camera` and the same `camera` identifier.
+The backend uses the existing Frigate HA entities and their `switch.turn_off` /
+`switch.turn_on` or `camera.turn_off` / `camera.turn_on` actions as appropriate;
+it verifies outcomes and restores only targets it changed. Action calls require an
+administrator or an explicitly trusted running automation or script.
 
 ### Add time from an automation
 
