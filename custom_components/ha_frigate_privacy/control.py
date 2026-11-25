@@ -463,8 +463,90 @@ def _base_ownership_valid(hass: HomeAssistant, base: str) -> bool:
     return len(owners) == 1 and len(devices) <= 1
 
 
+def _identity_groups(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
+    """Group registered targets by upstream entry and logical camera identity."""
+    groups: dict[tuple[str, str], dict[str, Any]] = {}
+    slug_owners: dict[str, set[tuple[str, str]]] = {}
+    for domain in ("camera", "switch"):
+        for entity_id in hass.states.async_entity_ids(domain):
+            entry = er.async_get(hass).async_get(entity_id)
+            if not entry or entry.platform != "frigate":
+                continue
+            entry_id = getattr(entry, "config_entry_id", None)
+            unique = getattr(entry, "unique_id", None)
+            prefix = f"{entry_id}:{domain}:"
+            if not entry_id or not isinstance(unique, str) or not unique.startswith(prefix):
+                continue
+            logical = unique[len(prefix):]
+            suffix = None
+            if domain == "switch":
+                suffix = next((v for v in sorted(ALL_SUFFIXES, key=len, reverse=True) if logical.endswith(v)), None)
+                if not suffix:
+                    continue
+                logical = logical[:-len(suffix)]
+                if suffix == "_audio":
+                    suffix = "_audio_detection"
+            if not logical:
+                continue
+            key = (entry_id, logical)
+            group = groups.setdefault(key, {"entry": entry_id, "logical": logical, "camera": None, "switches": {}, "devices": set(), "invalid": False})
+            device = getattr(entry, "device_id", None)
+            if device:
+                group["devices"].add(device)
+            state = hass.states.get(entity_id)
+            if domain == "camera":
+                camera_name = state.attributes.get("camera_name") if state else None
+                if group["camera"] or (camera_name is not None and camera_name != logical):
+                    group["invalid"] = True
+                group["camera"] = entity_id
+            else:
+                if suffix in group["switches"]:
+                    group["invalid"] = True
+                group["switches"][suffix] = entity_id
+            slug_owners.setdefault(camera_base(entity_id), set()).add(key)
+    counts: dict[str, int] = {}
+    for entry_id, logical in groups:
+        counts[logical] = counts.get(logical, 0) + 1
+    result = {}
+    for key, group in groups.items():
+        if group["invalid"] or len(group["devices"]) > 1 or not any(s in group["switches"] for s in DISCOVERY_SUFFIXES):
+            continue
+        if any(len(slug_owners.get(camera_base(e), set())) > 1 for e in [*group["switches"].values(), *([group["camera"]] if group["camera"] else [])]):
+            continue
+        identity = group["logical"] if counts[group["logical"]] == 1 else f'{group["entry"]}:{group["logical"]}'
+        result[identity] = group
+    return result
+
+
+def _resolve_camera_ref(hass: HomeAssistant, ref: str) -> str:
+    groups = _identity_groups(hass)
+    if ref in groups:
+        return ref
+    if sum(group["logical"] == camera_base(ref) for group in groups.values()) > 1 and "." not in ref:
+        return camera_base(ref)
+    matches = [key for key, group in groups.items() if ref in [group["camera"], *group["switches"].values()] or camera_base(ref) in {camera_base(e) for e in [*group["switches"].values(), *([group["camera"]] if group["camera"] else [])]}]
+    return matches[0] if len(matches) == 1 else camera_base(ref)
+
+
+async def _existing_camera_record_key(hass: HomeAssistant, storage: FrigatePrivacyStorage, base: str) -> str:
+    """Keep an active legacy record when discovery gains an instance qualifier."""
+    records = await storage.async_get_paused(None) or {}
+    if base in records:
+        return base
+    group = _identity_groups(hass).get(base)
+    if not group:
+        return base
+    entities = [*group["switches"].values(), *([group["camera"]] if group["camera"] else [])]
+    current = list(_target_identities(hass, entities).values())
+    matches = [key for key, record in records.items() if any(value in current for value in (record.get("target_identities") or {}).values())]
+    return matches[0] if len(matches) == 1 else base
+
+
 def camera_entity_id(hass: HomeAssistant, base: str) -> str | None:
     """Return the matching camera entity id when Home Assistant has one."""
+    group = _identity_groups(hass).get(base)
+    if group:
+        return group["camera"]
     entity_id = f"camera.{base}"
     return (
         entity_id
@@ -502,9 +584,12 @@ def discover_frigate_cameras(hass: HomeAssistant) -> list[dict[str, Any]]:
                 bases.add(name[: -len(suffix)])
                 break
 
+    groups = _identity_groups(hass)
+    managed_entities = {e for g in groups.values() for e in [*g["switches"].values(), *([g["camera"]] if g["camera"] else [])]}
+    bases = {base for base in bases if not any(camera_base(e) == base for e in managed_entities)} | set(groups)
     cameras: list[dict[str, Any]] = []
     for base in sorted(bases):
-        if not _base_ownership_valid(hass, base):
+        if base not in groups and not _base_ownership_valid(hass, base):
             continue
         cam_entity = camera_entity_id(hass, base)
         state = hass.states.get(cam_entity) if cam_entity else None
@@ -690,7 +775,7 @@ async def async_pause_camera(
     operation_id: str | None = None,
 ) -> dict[str, Any]:
     """Pause one allowlisted camera and persist truthful transition evidence."""
-    base = camera_base(camera_ref)
+    base = _resolve_camera_ref(hass, camera_ref)
     if stream_type not in STREAM_TYPES:
         return {"camera_id": base, "paused": False, "phase": "error", "reason": "invalid_stream_type"}
     if base not in _discovered_camera_ids(hass):
@@ -706,6 +791,7 @@ async def async_pause_camera(
             "camera_failed": False,
         }
 
+    base = await _existing_camera_record_key(hass, storage, base)
     async with _camera_lock(storage, base):
         return await _async_pause_camera_locked(
             hass,
@@ -833,6 +919,9 @@ async def _async_pause_camera_locked(
             missing = [f"switch.{base}_audio_detection"]
     if stream_type == "camera" and not cam_entity:
         missing = [f"camera.{base}"]
+    if stream_type != "camera" and _identity_groups(hass).get(base):
+        available_suffixes = {item["suffix"] for item in switches}
+        missing = [f"switch.{base}{suffix}" for suffix in suffixes if ("_audio_detection" if suffix == "_audio" else suffix) not in available_suffixes]
     skipped: list[str] = list(missing)
     failed: list[str] = []
     toggled: list[str] = []
@@ -1111,6 +1200,7 @@ async def _async_extend_schedule_pause_locked(
         schedule_id=coverage[0],
         active_schedule_ids=coverage,
         extension=True,
+        target_identities={**(existing.get("target_identities") or {}), **_target_identities(hass, [*extension_planned, *preexisting_off, *([cam_entity] if cam_entity else [])])},
         extension_base_switches=existing_switches,
         extension_planned_switches=extension_planned,
         camera_planned=camera_planned,
@@ -1261,7 +1351,12 @@ async def async_resume_camera(
     operation_id: str | None = None,
 ) -> dict[str, Any]:
     """Resume one camera once, with privacy-first fail-safe semantics."""
-    base = camera_base(camera_ref)
+    base = _resolve_camera_ref(hass, camera_ref)
+    all_paused = await storage.async_get_paused(None) or {}
+    if camera_base(camera_ref) in all_paused:
+        base = camera_base(camera_ref)
+    else:
+        base = await _existing_camera_record_key(hass, storage, base)
     async with _camera_lock(storage, base):
         return await _async_resume_camera_locked(
             hass,
@@ -1345,6 +1440,13 @@ async def _async_resume_camera_locked(
             "nothing_to_resume": True,
             "fail_safe": False,
         }
+    remapped = _remap_identity_snapshot(hass, paused)
+    if remapped is None:
+        await storage.async_mark_resume_blocked(base, reason="invalid_persisted_targets", failed=[], unavailable=[])
+        return _resume_result(base, False, {"clear_paused": False, "keep_paused": True, "notification_required": False, "reason": "invalid_persisted_targets", "failed": [], "unavailable": []}, automatic, phase="error")
+    if remapped and any(paused.get(key) != value for key, value in remapped.items()):
+        await _transition(storage, base, paused.get("phase") or "paused", **remapped)
+        paused = await storage.async_get_paused(base)
     if (paused.get("phase") or "paused") in {
         "pausing",
         "resuming",
@@ -1784,6 +1886,10 @@ async def async_recover_transitions(
     pending: list[str] = []
     for camera_id, state in paused_all.items():
         phase = state.get("phase") or "paused"
+        remapped = _remap_identity_snapshot(hass, state)
+        if remapped is not None and remapped and any(state.get(key) != value for key, value in remapped.items()):
+            await _transition(storage, camera_id, phase, **remapped)
+            state = await storage.async_get_paused(camera_id)
         if phase in {"pausing", "resuming"} and not _recovery_inputs_ready(
             hass, state
         ):
@@ -1968,6 +2074,17 @@ def _switches_for_base(
     hass: HomeAssistant, base: str, suffixes: tuple[str, ...]
 ) -> list[dict[str, Any]]:
     switches = []
+    group = _identity_groups(hass).get(base)
+    if group:
+        for suffix in suffixes:
+            normalized = "_audio_detection" if suffix == "_audio" else suffix
+            entity_id = group["switches"].get(normalized)
+            if not entity_id or any(item["entity_id"] == entity_id for item in switches):
+                continue
+            state = hass.states.get(entity_id)
+            if state:
+                switches.append({"entity_id": entity_id, "suffix": normalized, "state": state.state, "name": state.attributes.get("friendly_name") or entity_id})
+        return switches
     if not _base_ownership_valid(hass, base):
         return switches
     for suffix in suffixes:
@@ -2020,6 +2137,40 @@ def _target_identities(hass: HomeAssistant, targets: list[str]) -> dict[str, lis
     return identities
 
 
+def _remap_identity_snapshot(hass: HomeAssistant, state: dict[str, Any]) -> dict[str, Any] | None:
+    """Resolve only uniquely matching registry identities; never accept replacement."""
+    identities = state.get("target_identities")
+    if not identities:
+        return {} if identities is None or identities == {} else None
+    if not isinstance(identities, dict):
+        return None
+    available = [*hass.states.async_entity_ids("switch"), *hass.states.async_entity_ids("camera")]
+    mapping = {}
+    for old, identity in identities.items():
+        if not isinstance(old, str) or not isinstance(identity, list) or len(identity) != 3:
+            return None
+        if _is_frigate_entity(hass, old) and _target_identities(hass, [old]).get(old) != identity:
+            return None
+        matches = [entity for entity in available if _is_frigate_entity(hass, entity) and _target_identities(hass, [entity]).get(entity) == identity]
+        if len(matches) != 1 or matches[0].split(".", 1)[0] != old.split(".", 1)[0]:
+            return None
+        mapping[old] = matches[0]
+    if len(set(mapping.values())) != len(mapping):
+        return None
+    fields = ("camera_entity_id", "switches", "planned_switches", "preexisting_off", "unavailable", "failed", "skipped", "extension_base_switches", "extension_planned_switches", "overridden_switches", "target_outcomes", "resume_target_outcomes", "last_verified_actual_state")
+    def replace(value):
+        if isinstance(value, str):
+            return mapping.get(value, value)
+        if isinstance(value, list):
+            return [replace(item) for item in value]
+        if isinstance(value, dict):
+            return {mapping.get(key, key): replace(item) for key, item in value.items()}
+        return value
+    updates = {field: replace(state[field]) for field in fields if field in state}
+    updates["target_identities"] = {mapping[old]: identity for old, identity in identities.items()}
+    return updates
+
+
 def _identities_match(hass: HomeAssistant, identities: Any) -> bool:
     if identities is None:  # Records predating identity snapshots.
         return True
@@ -2037,6 +2188,12 @@ def _persisted_targets_are_valid(
     camera_toggled: bool,
 ) -> bool:
     """Fail closed when persisted control evidence contains unrelated targets."""
+    if not isinstance(switches, list) or not all(isinstance(entity, str) for entity in switches):
+        return False
+    groups = _identity_groups(hass)
+    matching = [group for key, group in groups.items() if (key == camera_id or group["logical"] == camera_id) and set(switches or []).issubset(set(group["switches"].values())) and (not camera_entity or camera_entity == group["camera"])]
+    if len(matching) == 1:
+        return bool(isinstance(switches, list) and len(set(switches)) == len(switches) and all(_is_frigate_entity(hass, entity) for entity in switches) and (not camera_toggled or camera_entity and _is_frigate_entity(hass, camera_entity)))
     if not _base_ownership_valid(hass, camera_id):
         return False
     if not isinstance(switches, list) or not all(
