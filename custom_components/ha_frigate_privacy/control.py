@@ -409,6 +409,54 @@ def camera_base(value: str) -> str:
     return item
 
 
+def _base_ownership_valid(hass: HomeAssistant, base: str) -> bool:
+    """Reject cross-entry/device or inconsistent upstream identities for a base.
+
+    Older registry fixtures and legacy entries without identity metadata retain the
+    existing exact-entity behavior; partial metadata cannot prove common ownership.
+    """
+    registry = er.async_get(hass)
+    entries = []
+    for entity_id in [f"camera.{base}", *(f"switch.{base}{suffix}" for suffix in ALL_SUFFIXES)]:
+        if hass.states.get(entity_id) is None:
+            continue
+        entry = registry.async_get(entity_id)
+        if not entry or entry.platform != "frigate":
+            continue
+        entries.append((entity_id, entry))
+    if not entries:
+        return True
+    metadata = [(getattr(e, "config_entry_id", None), getattr(e, "device_id", None), getattr(e, "unique_id", None)) for _, e in entries]
+    if not any(any(row) for row in metadata):
+        return True
+    # Upstream's unique IDs identify the logical camera even when HA slugs collide.
+    owners = set()
+    devices = set()
+    for (entity_id, _), (entry_id, device_id, unique_id) in zip(entries, metadata):
+        if not entry_id or not isinstance(unique_id, str):
+            return False
+        domain, slug = entity_id.split(".", 1)
+        prefix = f"{entry_id}:{domain}:"
+        if not unique_id.startswith(prefix):
+            return False
+        logical = unique_id[len(prefix):]
+        if domain == "switch":
+            suffix = next((item for item in sorted(ALL_SUFFIXES, key=len, reverse=True) if slug.endswith(item)), None)
+            if not suffix or not logical.endswith(suffix):
+                return False
+            logical = logical[:-len(suffix)]
+        if not logical:
+            return False
+        if domain == "camera":
+            camera_name = hass.states.get(entity_id).attributes.get("camera_name")
+            if camera_name is not None and camera_name != logical:
+                return False
+        owners.add((entry_id, logical))
+        if device_id:
+            devices.add(device_id)
+    return len(owners) == 1 and len(devices) <= 1
+
+
 def camera_entity_id(hass: HomeAssistant, base: str) -> str | None:
     """Return the matching camera entity id when Home Assistant has one."""
     entity_id = f"camera.{base}"
@@ -416,6 +464,7 @@ def camera_entity_id(hass: HomeAssistant, base: str) -> str | None:
         entity_id
         if hass.states.get(entity_id) is not None
         and _is_frigate_entity(hass, entity_id)
+        and _base_ownership_valid(hass, base)
         else None
     )
 
@@ -443,6 +492,8 @@ def discover_frigate_cameras(hass: HomeAssistant) -> list[dict[str, Any]]:
 
     cameras: list[dict[str, Any]] = []
     for base in sorted(bases):
+        if not _base_ownership_valid(hass, base):
+            continue
         cam_entity = camera_entity_id(hass, base)
         state = hass.states.get(cam_entity) if cam_entity else None
         switches = _switches_for_base(hass, base, ALL_SUFFIXES)
@@ -1891,6 +1942,8 @@ def _switches_for_base(
     hass: HomeAssistant, base: str, suffixes: tuple[str, ...]
 ) -> list[dict[str, Any]]:
     switches = []
+    if not _base_ownership_valid(hass, base):
+        return switches
     for suffix in suffixes:
         entity_id = f"switch.{base}{suffix}"
         state = hass.states.get(entity_id)

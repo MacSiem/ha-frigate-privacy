@@ -34,7 +34,10 @@ def test_discovery_uses_only_owned_entry_and_refreshes():
     def registry(entity_id):
         entry = original(entity_id)
         if entry:
-            entry.config_entry_id = 'own' if entity_id == 'camera.front' else 'other'
+            entry.config_entry_id = 'own'
+            entry.device_id = 'device-own'
+            domain, slug = entity_id.split('.', 1)
+            entry.unique_id = f'own:{domain}:{slug}'
         return entry
     hass.entity_registry.async_get = registry
     hass.data = {'frigate': {'own': {'config': {'cameras': {'front': {}}, 'go2rtc': {'streams': {'front': 'secret'}}}}, 'other': {'config': {'cameras': {'front': {}}, 'go2rtc': {'streams': {'front': 'secret', 'front_sub': 'secret'}}}}}}
@@ -45,3 +48,33 @@ def test_discovery_uses_only_owned_entry_and_refreshes():
     assert fixture.control.discover_frigate_cameras(hass)[0]['stream_coverage']['count'] == 2
     hass.entity_registry.platforms['camera.front'] = 'foreign'
     assert fixture.control.discover_frigate_cameras(hass)[0]['stream_coverage'] == {'status': 'unknown'}
+
+
+def test_conflicting_instances_and_suffixed_entities_fail_closed():
+    import importlib.util
+    import asyncio
+    spec = importlib.util.spec_from_file_location('recovery_fixture', Path('tests/test_restart_recovery.py'))
+    fixture = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fixture)
+    hass = fixture._Hass()
+    hass.states.values['camera.front'].attributes['camera_name'] = 'front'
+    original = hass.entity_registry.async_get
+    identities = {
+        'camera.front': ('one', 'device-one', 'one:camera:front'),
+        'switch.front_detect': ('two', 'device-two', 'two:switch:front_detect'),
+        'switch.front_recordings': ('one', 'device-one', 'one:switch:front_recordings'),
+    }
+    def registry(entity_id):
+        entry = original(entity_id)
+        if entry and entity_id in identities:
+            entry.config_entry_id, entry.device_id, entry.unique_id = identities[entity_id]
+        return entry
+    hass.entity_registry.async_get = registry
+    hass.data = {'frigate': {'one': {'config': {'cameras': {'front': {}}, 'go2rtc': {'streams': {'front': 'private'}}}}, 'two': {'config': {'cameras': {'front': {}}, 'go2rtc': {'streams': {'front': 'private', 'front_sub': 'private'}}}}}}
+    assert fixture.control.discover_frigate_cameras(hass) == []
+    assert not asyncio.run(fixture.control.async_pause_camera(hass, fixture._Storage(), 'front'))['paused']
+    assert hass.services.calls == []
+    identities['switch.front_detect'] = ('one', 'device-one', 'one:switch:front_detect')
+    assert fixture.control.discover_frigate_cameras(hass)[0]['stream_coverage']['count'] == 1
+    identities['switch.front_detect'] = ('one', 'device-one', 'one:switch:front_2_detect')
+    assert fixture.control.discover_frigate_cameras(hass) == []
