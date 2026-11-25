@@ -87,3 +87,46 @@ def test_recordings_and_snapshots_restore_exact_baseline(storage_module, recordi
         assert (await control.async_recover_transitions(hass, storage))["recovered"] == []
         assert hass.services.calls == calls
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("source", ["manual", "schedule"])
+@pytest.mark.parametrize("entry_ids", [("one", "two"), ("01HFIRSTENTRY", "01HSECONDENTRY")])
+def test_two_entries_round_trip_period_history_and_export(storage_module, source, entry_ids):
+    """Both qualified identities survive every durable history transition."""
+    import json
+    async def scenario():
+        hass = _Hass()
+        identities = {}
+        first, second = entry_ids
+        qualified = {control._identity_qualifier(first) + ':front', control._identity_qualifier(second) + ':front'}
+        for entity in list(hass.states.values):
+            domain, slug = entity.split('.')
+            identities[entity] = (first, f'{first}:{domain}:{slug}', 'device-one')
+        for entity, uid in [('camera.other', f'{second}:camera:front'), ('switch.other_detect', f'{second}:switch:front_detect')]:
+            hass.states.values[entity] = _State('streaming' if entity.startswith('camera.') else 'on')
+            hass.entity_registry.platforms[entity] = 'frigate'
+            identities[entity] = (second, uid, 'device-two')
+        original = hass.entity_registry.async_get
+        def registry(entity):
+            entry = original(entity)
+            if entry and entity in identities:
+                entry.config_entry_id, entry.unique_id, entry.device_id = identities[entity]
+            return entry
+        hass.entity_registry.async_get = registry
+        storage = storage_module.FrigatePrivacyStorage(hass)
+        await storage.async_load()
+        for camera in qualified:
+            result = await control.async_pause_cameras(hass, storage, [camera], stream_type='detect', source=source, schedule_id='schedule' if source == 'schedule' else None)
+            assert result['ok']
+            assert (await control.async_resume_camera(hass, storage, camera, authority=control.ResumeAuthority.SCHEDULE if source == 'schedule' else control.ResumeAuthority.ADMIN))['resumed']
+        history = await storage.async_get_periods()
+        assert history['status'] == 'ready'
+        assert {row['camera_id'] for row in history['periods']} == qualified
+        assert all(row['ended_at'] and not row['verified_restore'] for row in history['periods'])
+        exported = json.loads(json.dumps(history))
+        assert {row['camera_id'] for row in exported['periods']} == qualified
+        reloaded = storage_module.FrigatePrivacyStorage(hass)
+        reloaded._store.saved = deepcopy(storage._store.saved)
+        await reloaded.async_load()
+        assert (await reloaded.async_get_periods())['status'] == 'ready'
+    asyncio.run(scenario())

@@ -198,3 +198,13 @@ def test_persisted_positive_flag_requires_consistent_exact_channel_evidence():
         forged = {**positive,'channels':evidence}
         result = periods.read_history({'schema':1,'periods':[forged]}, {}, NOW)
         assert result['status'] == 'corrupt' and result['periods'] == []
+
+
+def test_camera_id_grammar_and_length_bound():
+    import pytest
+    for camera in ('front', 'entry_01:front', 'a' * 253 + ':b'):
+        row = periods.project_record(record(camera_id=camera), NOW)
+        assert periods._valid_row(row)
+    for camera in ('', ':front', 'entry:', 'a:b:c', 'UPPER:front', 'a-b:front', 'a' * 254 + ':b'):
+        with pytest.raises(ValueError):
+            periods.project_record(record(camera_id=camera), NOW)
