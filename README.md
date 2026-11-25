@@ -23,7 +23,11 @@ created.
    scope, and verifies the reported state. Resume re-enables only targets that this
    integration successfully changed; pre-existing manual-off targets remain off.
    In the **Everything** scope, Frigate's camera entity is also stopped and
-   resumed. Frigate reports an off camera as `idle` with no supported features,
+   resumed. This controls the HA entity, not external go2rtc/RTSP access or physical
+   camera power: external consumers may still receive video, even when Frigate live
+   view is disabled. The card shows a best-effort count of related configured streams
+   or unknown; it does not disclose aliases, URLs or credentials. Frigate reports an
+   off camera as `idle` with no supported features,
    but its HA `camera.turn_on` action still works; the integration verifies the
    resulting `streaming` state before claiming that resume succeeded.
 3. **Privacy schedules.** Create recurring windows (e.g. weekday mornings) during

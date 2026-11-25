@@ -18,6 +18,7 @@ from homeassistant.helpers import entity_registry as er
 from .const import DOMAIN, EVENT_STATE_CHANGED
 from .failsafe import decide_resume_exit
 from .storage import FrigatePrivacyStorage
+from .stream_coverage import stream_coverage
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -445,9 +446,16 @@ def discover_frigate_cameras(hass: HomeAssistant) -> list[dict[str, Any]]:
         cam_entity = camera_entity_id(hass, base)
         state = hass.states.get(cam_entity) if cam_entity else None
         switches = _switches_for_base(hass, base, ALL_SUFFIXES)
+        registry_entry = er.async_get(hass).async_get(cam_entity) if cam_entity else None
+        entry_id = getattr(registry_entry, "config_entry_id", None)
+        camera_name = state.attributes.get("camera_name") if state is not None else None
+        frigate_data = getattr(hass, "data", {}).get("frigate", {})
+        entry_data = frigate_data.get(entry_id, {}) if isinstance(frigate_data, dict) and entry_id else {}
+        config = entry_data.get("config") if isinstance(entry_data, dict) else None
         cameras.append(
             {
                 "camera_id": base,
+                "stream_coverage": stream_coverage(config, camera_name),
                 "entity_id": cam_entity,
                 "name": (
                     state.attributes.get("friendly_name")

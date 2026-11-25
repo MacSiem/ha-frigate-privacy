@@ -150,7 +150,7 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
    f.c._applyState(state);
    const tile=f.c.shadowRoot.querySelector('[data-camera-feedback="front"]');
    assert.match(tile.textContent,/Requested scope: Everything/);assert.doesNotMatch(tile.textContent,/Applied scope/);
-   assert.match(tile.querySelector('[data-video-stop-unconfirmed]')?.textContent||'',/video stop is not confirmed/i);
+   assert.match(tile.querySelector('[data-video-stop-unconfirmed]')?.textContent||'',/external video stopped/i);
    assert.equal(f.c.shadowRoot.querySelector('[data-channel="video"]').dataset.channelState,'idle');
   }finally{f.close();}
  });
@@ -174,8 +174,8 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
    assert.equal(state.cameras[0].camera_state,'idle');
    f.c._applyState(state);
    const tile=f.c.shadowRoot.querySelector('[data-camera-feedback="front"]');
-   assert.equal(tile.querySelector('[data-video-stop-unconfirmed]'),null);
-   assert.doesNotMatch(tile.textContent,/video was not switched|video stop is not confirmed/i);
+   assert.match(tile.querySelector('[data-video-stop-unconfirmed]').textContent,/external video stopped/i);
+   assert.match(tile.textContent,/External RTSP\/go2rtc may still work/i);
    assert.match(tile.textContent,/Pause.*camera.front: paused/s);
    // Missing evidence or a newly streaming camera cannot inherit the prior proof.
    for(const invalid of [
@@ -193,7 +193,20 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
    const state=schedulePauses.neverToggled,record=state.paused.front;
    assert.equal(record.camera_planned,false);assert.equal(record.camera_toggled,false);assert.equal(record.phase,'paused');
    f.c._applyState(state);
-   assert.match(f.c.shadowRoot.querySelector('[data-video-stop-unconfirmed]')?.textContent||'',/video stop is not confirmed/i);
+   assert.match(f.c.shadowRoot.querySelector('[data-video-stop-unconfirmed]')?.textContent||'',/external video stopped/i);
+  }finally{f.close();}
+ });
+ test(path+': coverage refresh is bounded and shown alongside state without rendering untrusted content',async()=>{
+  const f=await fixture();try{
+   const camera={...f.state.cameras[0],stream_coverage:{status:'best_effort',count:1}};
+   f.c._applyState({...f.state,cameras:[camera]});
+   assert.match(f.c.shadowRoot.querySelector('[data-stream-boundary]').textContent,/streams in configuration: 1/);
+   f.c._applyState({...f.state,cameras:[{...camera,stream_coverage:{status:'best_effort',count:3}}]});
+   assert.match(f.c.shadowRoot.querySelector('[data-stream-boundary]').textContent,/streams in configuration: 3/);
+   f.c._applyState({...f.state,cameras:[{...camera,stream_coverage:{status:'best_effort',count:'<img src=x onerror=alert(1)>'}}]});
+   assert.match(f.c.shadowRoot.querySelector('[data-stream-boundary]').textContent,/unknown/);
+   assert.equal(f.c.shadowRoot.querySelector('[data-stream-boundary] img'),null);
+   assert.match(f.c._buildStateTab(),/External RTSP\/go2rtc may still work/);
   }finally{f.close();}
  });
  test(path+': unrecognized channel states cannot inherit Object prototype entries',async()=>{

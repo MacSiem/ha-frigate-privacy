@@ -1,5 +1,10 @@
 # Changelog
 
+## 6.5.1 (2026-11-25)
+
+- Show a best-effort count of related go2rtc streams and clearly distinguish HA camera state from external video and physical camera power.
+- Keep stream configuration and aliases private; unavailable metadata is reported as unknown.
+
 ## 6.5.0 (2026-10-18)
 
 - Keep camera selection, scope and duration drafts mounted so they do not disconnect active previews or replace focused controls.

@@ -59,7 +59,7 @@ const initial = {
   card._hass.callWS = async () => { reads += 1; return { ...initial, cameras: [{ camera_id: 'front', entity_id: 'camera.front', name: 'Front', camera_state: 'idle', switches: [{ suffix: '_recordings', state: 'off' }] }] }; };
   await clock.advance(15000);
   assert.match(card.shadowRoot.textContent, /Recording: Off/, 'external privacy actions must refresh even without another hass setter call');
-  assert.match(card.shadowRoot.textContent, /Video: Idle/);
+  assert.match(card.shadowRoot.textContent, /HA camera entity: Idle/);
   const beforeRemoval = reads;
   card.remove(); await clock.advance(15000);
   assert.equal(reads, beforeRemoval, 'detached cards must stop background reads');
@@ -100,7 +100,7 @@ const initial = {
   };
   const { dom, card } = createCard(status);
   await new Promise((resolve) => setTimeout(resolve, 30));
-  assert.match(card.shadowRoot.textContent, /Video: Idle/);
+  assert.match(card.shadowRoot.textContent, /HA camera entity: Idle/);
   assert.match(card.shadowRoot.textContent, /Recording: Off/);
   assert.match(card.shadowRoot.textContent, /Sound detection: Unavailable/);
   let previewEntity = null;
