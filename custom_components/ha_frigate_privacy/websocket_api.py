@@ -23,6 +23,7 @@ from .control import (
     async_pause_cameras,
     async_resume_cameras,
     discover_frigate_cameras,
+    project_camera_records,
 )
 from .replay import ReplayFilterSaturatedError
 from .storage import (
@@ -222,7 +223,7 @@ async def _ws_pause_camera(
         )
         return
     _kick_scheduler_watch(hass)
-    result["state"] = await _storage(hass).async_get_state()
+    result["state"] = project_camera_records(hass, await _storage(hass).async_get_state())
     connection.send_result(msg["id"], result)
 
 
@@ -285,7 +286,7 @@ async def _ws_extend_privacy(
         )
         return
     _kick_scheduler_watch(hass)
-    result["state"] = await _storage(hass).async_get_state()
+    result["state"] = project_camera_records(hass, await _storage(hass).async_get_state())
     connection.send_result(msg["id"], result)
 
 
@@ -344,7 +345,7 @@ async def _ws_resume_camera(
         )
         return
     _kick_scheduler_watch(hass)
-    result["state"] = await _storage(hass).async_get_state()
+    result["state"] = project_camera_records(hass, await _storage(hass).async_get_state())
     connection.send_result(msg["id"], result)
 
 
@@ -386,6 +387,7 @@ async def _ws_get_state(
     if bucket.get(DATA_STORAGE) is not storage or bucket.get("notifications") is not notifier:
         connection.send_error(msg["id"], "integration_unavailable", "Integration unavailable")
         return
+    state = project_camera_records(hass, state)
     state["recovery_ready"] = bucket.get(DATA_RECOVERY_READY, False)
     state["cameras"] = discover_frigate_cameras(hass)
     state["notifications"] = notifier.snapshot()

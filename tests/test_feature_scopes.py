@@ -108,3 +108,91 @@ def test_schedule_expands_feature_pause_to_all_and_restores():
         assert hass.states.get('switch.front_detect').state == 'on'
         assert hass.states.get('switch.front_recordings').state == 'on'
     asyncio.run(run())
+
+
+def test_record_projection_and_resume_when_instance_count_changes():
+    async def run():
+        hass, storage = _Hass(), _Storage()
+        identities = {}
+        for entity in hass.states.values:
+            domain, slug = entity.split('.')
+            identities[entity] = ('one', f'one:{domain}:{slug}', 'device-one')
+        original = hass.entity_registry.async_get
+        def registry(entity):
+            entry = original(entity)
+            if entry and entity in identities:
+                entry.config_entry_id, entry.unique_id, entry.device_id = identities[entity]
+            return entry
+        hass.entity_registry.async_get = registry
+        assert (await control.async_pause_camera(hass, storage, 'front', stream_type='detect'))['paused']
+        for entity, uid in [('camera.other', 'two:camera:front'), ('switch.other_detect', 'two:switch:front_detect')]:
+            hass.states.values[entity] = _State('streaming' if entity.startswith('camera.') else 'on')
+            hass.entity_registry.platforms[entity] = 'frigate'
+            identities[entity] = ('two', uid, 'device-two')
+        state = {'paused': dict(storage.paused)}
+        view = control.project_camera_records(hass, state)
+        assert set(view['paused']) == {'one:front'}
+        assert set(state['paused']) == {'front'}
+        assert (await control.async_resume_camera(hass, storage, 'one:front'))['resumed']
+        assert (await control.async_pause_camera(hass, storage, 'one:front', stream_type='detect'))['paused']
+        for entity in ('camera.other', 'switch.other_detect'):
+            del hass.states.values[entity]
+            del hass.entity_registry.platforms[entity]
+            del identities[entity]
+        view = control.project_camera_records(hass, {'paused': await storage.async_get_paused(None)})
+        assert set(view['paused']) == {'front'}
+        assert (await control.async_resume_camera(hass, storage, 'front'))['resumed']
+        assert hass.states.get('switch.front_detect').state == 'on'
+    asyncio.run(run())
+
+
+def test_extend_renamed_switch_and_deduplicate_aliases():
+    async def run():
+        hass, storage = _Hass(), _Storage()
+        identities = {}
+        for entity in list(hass.states.values):
+            domain, slug = entity.split('.')
+            identities[entity] = ('one', f'one:{domain}:{slug}', 'device-one')
+        old, new = 'switch.front_detect', 'switch.renamed_control'
+        hass.states.values[new] = hass.states.values.pop(old)
+        hass.entity_registry.platforms[new] = hass.entity_registry.platforms.pop(old)
+        identities[new] = identities.pop(old)
+        original = hass.entity_registry.async_get
+        def registry(entity):
+            entry = original(entity)
+            if entry and entity in identities:
+                entry.config_entry_id, entry.unique_id, entry.device_id = identities[entity]
+            return entry
+        hass.entity_registry.async_get = registry
+        assert (await control.async_pause_camera(hass, storage, new, duration_minutes=10, stream_type='detect'))['paused']
+        result = await control.async_extend_privacy(hass, storage, [new, 'front'], duration_minutes=5)
+        assert result['ok'] and len(result['results']) == 1
+    asyncio.run(run())
+
+
+def test_replacement_does_not_inherit_previous_camera_record():
+    async def run():
+        hass, storage = _Hass(), _Storage()
+        owner = {'entry': 'old'}
+        original = hass.entity_registry.async_get
+        def registry(entity):
+            entry = original(entity)
+            if entry:
+                domain, slug = entity.split('.')
+                entry.config_entry_id = owner['entry']
+                entry.unique_id = f"{owner['entry']}:{domain}:{slug}"
+                entry.device_id = owner['entry'] + '-device'
+            return entry
+        hass.entity_registry.async_get = registry
+        assert (await control.async_pause_camera(hass, storage, 'front', duration_minutes=10, stream_type='detect'))['paused']
+        snapshot = storage.paused['front']['target_identities'].copy()
+        owner['entry'] = 'replacement'
+        view = control.project_camera_records(hass, {'paused': await storage.async_get_paused(None)})
+        assert 'front' not in view['paused']
+        result = await control.async_pause_camera(hass, storage, 'front', stream_type='detect')
+        assert result['reason'] == 'identity_conflict'
+        result = await control.async_resume_camera(hass, storage, 'front')
+        assert not result['resumed']
+        assert storage.paused['front']['target_identities'] == snapshot
+        assert ('switch', 'turn_on', 'switch.front_detect') not in hass.services.calls
+    asyncio.run(run())
