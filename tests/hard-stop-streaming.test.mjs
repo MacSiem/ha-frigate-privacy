@@ -15,8 +15,8 @@ assert.match(
 );
 assert.match(
   controlSource,
-  /stream_type == "all"/,
-  'hard camera stop must be limited to the all-stream privacy scope',
+  /camera_planned = bool\(\s*stream_type in \{"all", "camera"\}\s+and cam_entity\s+and _is_frigate_entity\(hass, cam_entity\)\s+and _camera_is_enabled\(hass, cam_entity\)\s*\)/,
+  'manual camera stop must be planned only for all or camera scope and a valid enabled Frigate camera',
 );
 assert.match(
   controlSource,
