@@ -47,4 +47,27 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
    if(stalled){f.release();await tick();assert.equal(f.made.length,0);}
   }finally{f.close();}}
  });
+ test(path+': whole camera pause closes media before sending and waits for authoritative state',async()=>{
+  for(const scope of ['all','camera']){const f=await fixture();try{
+   f.open();await tick();assert.equal(f.made[0].isConnected,true);
+   let resolvePause,resolveState;const original=f.c._callIntegration.bind(f.c);
+   f.c._callIntegration=(command,payload)=>{if(command==='pause_camera'){assert.equal(f.made[0].isConnected,false);assert.equal(f.c._previewAllowed('camera.front'),false);return new Promise(resolve=>{resolvePause=resolve;});}if(command==='get_state')return new Promise(resolve=>{resolveState=resolve;});return original(command,payload);};
+   const pending=f.c._runMutation('pause_camera',{cameras:['front'],stream_type:scope});assert.equal(f.c.shadowRoot.querySelector('[data-preview-camera]').disabled,true);
+   resolvePause({paused:true,phase:'paused'});await tick();resolveState({cameras:[{camera_id:'front',entity_id:'camera.front',name:'Front',switches:[]}],schedules:[],paused:{front:{active:true,phase:'paused',stream_type:scope}}});await pending;
+   assert.equal(f.c._previewAllowed('camera.front'),false);assert.equal(f.c.shadowRoot.querySelector('[data-preview-camera]').disabled,true);
+   f.c._applyState({cameras:f.c._cameras,schedules:[],paused:{},last_operations:{}});assert.equal(f.c._previewAllowed('camera.front'),true);
+  }finally{f.close();}}
+ });
+ test(path+': external transitions block only all and camera previews until off',async()=>{
+  const f=await fixture();try{
+   for(const scope of ['all','camera'])for(const phase of ['pausing','paused','partial','resuming','error']){
+    f.c._applyState({cameras:f.c._cameras,schedules:[],paused:{},last_operations:{}});f.open();await tick();const node=f.made.at(-1);assert.equal(node.isConnected,true);
+    f.c._applyState({cameras:f.c._cameras,schedules:[],paused:{front:{active:phase!=='partial',phase,stream_type:scope}},last_operations:{}});assert.equal(node.isConnected,false);assert.equal(f.c.shadowRoot.querySelector('[data-preview-camera]').disabled,true);
+   }
+   for(const scope of ['recordings','snapshots','audio_detection','main','sub','detect','motion','review_alerts','review_detections']){
+    f.c._applyState({cameras:f.c._cameras,schedules:[],paused:{front:{active:true,phase:'paused',stream_type:scope}},last_operations:{}});assert.equal(f.c._previewAllowed('camera.front'),true);assert.equal(f.c.shadowRoot.querySelector('[data-preview-camera]').disabled,false);
+   }
+  }finally{f.close();}
+ });
+
 }

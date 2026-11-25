@@ -103,8 +103,8 @@ selected and pause is blocked until the cameras or scope are explicitly changed.
 A request with no matching target is not a confirmed privacy pause; check the
 operation result and per-target evidence.
 
-Camera operation controls Frigate through its HA camera entity. Frigate camera OFF
-leaves the go2rtc restream active: video and audio can remain accessible to new and
+Everything and Camera operation pause Frigate processing. The go2rtc restream
+may remain active: video and audio can remain accessible to new and
 existing clients. A camera without working HA turn-on/turn-off actions can also
 keep streaming in Everything scope. Check the video and per-target evidence rather
 than assuming that the live feed or physical camera is off.
@@ -128,8 +128,10 @@ per-target evidence to see pause outcomes, resume outcomes and verified states.
 
 **Preview** expands Home Assistant's native camera card directly below that camera.
 Press **Close preview** to collapse it. Only one preview is open at a time; changing
-tabs, leaving the card or losing administrator authority closes it. Camera media is
-requested only after a click. A visible image alone does not confirm that privacy
+tabs, leaving the card or losing administrator authority closes it. An Everything or
+Camera operation pause closes and blocks this card’s preview until the backend
+reports the operation is off, including while pausing, partially applied or resuming.
+Other scopes leave the preview available. Camera media is requested only after a click. A visible image alone does not confirm that privacy
 is active, and the preview does not change camera controls.
 
 ### Period history

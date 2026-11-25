@@ -175,7 +175,7 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
    f.c._applyState(state);
    const tile=f.c.shadowRoot.querySelector('[data-camera-feedback="front"]');
    assert.match(tile.querySelector('[data-video-stop-unconfirmed]').textContent,/external video stopped/i);
-   assert.match(tile.textContent,/External RTSP\/go2rtc may still work/i);
+   assert.match(tile.textContent,/Pausing Frigate processing may leave the go2rtc restream available with video and audio/i);
    assert.match(tile.textContent,/Pause.*camera.front: paused/s);
    // Missing evidence or a newly streaming camera cannot inherit the prior proof.
    for(const invalid of [
@@ -206,7 +206,7 @@ for(const path of ['ha-frigate-privacy.js','custom_components/ha_frigate_privacy
    f.c._applyState({...f.state,cameras:[{...camera,stream_coverage:{status:'best_effort',count:'<img src=x onerror=alert(1)>'}}]});
    assert.match(f.c.shadowRoot.querySelector('[data-stream-boundary]').textContent,/unknown/);
    assert.equal(f.c.shadowRoot.querySelector('[data-stream-boundary] img'),null);
-   assert.match(f.c._buildStateTab(),/External RTSP\/go2rtc may still work/);
+   assert.match(f.c._buildStateTab(),/Pausing Frigate processing may leave the go2rtc restream available with video and audio/);
   }finally{f.close();}
  });
  test(path+': unrecognized channel states cannot inherit Object prototype entries',async()=>{
