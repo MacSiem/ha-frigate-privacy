@@ -4,7 +4,7 @@
   "fixture": "privacy-safe-generic-home",
   "source": {
     "path": "ha-frigate-privacy.js",
-    "sha256": "49f0ddbf8c60054cf29d4d279b1011259b9d45b2e16417df6f54c70660cc45aa"
+    "sha256": "0643dfdef3d3994c59ce0f8a55f72ac9c4a59900cf4ccb849adfca92d454af86"
   },
   "harness": {
     "path": "docs/screenshots/_harness.html",
@@ -17,7 +17,7 @@
       "language": "en",
       "height": 1572,
       "width": 1280,
-      "sha256": "d409dfe966295479bbdb8cb66aa2e9d00edd7b7207a91d13ddd3576434dda0bb"
+      "sha256": "31483a1d51e41d357d5d66825646676f8b4101a4da78eb60287084af17b0a564"
     },
     {
       "path": "docs/screenshots/card-cameras-dark.jpg",
@@ -25,7 +25,7 @@
       "language": "en",
       "height": 1490,
       "width": 1280,
-      "sha256": "ec83620db87b53ea64cf419a342638dc9cec89cb56ce4d8f5db6eb9e95e0f21d"
+      "sha256": "d9bcd228c22d5c55fd65126a23477d86649b8dccd2f1c81ca422e2b45508b7d9"
     },
     {
       "path": "docs/screenshots/card-history-light.jpg",
@@ -57,7 +57,7 @@
       "language": "en",
       "height": 2843,
       "width": 390,
-      "sha256": "455255818053d58ec12aa26a1b4e27d4eb9f59e8c93e5f7e31f37b68d155d323"
+      "sha256": "bd18832241c77ea501c9245077fac3d7726f652acda8e1397ab5e48dddca8f83"
     },
     {
       "path": "docs/screenshots/card-mobile-dark.jpg",
@@ -65,7 +65,7 @@
       "language": "pl",
       "height": 2843,
       "width": 390,
-      "sha256": "766d71414200d69549192e6c56275cfd23fc98edc1f0162df439f231ef9f9221"
+      "sha256": "917035e8377c89e4d173a8c4e178a25d4029859c6a37c62a65fe6782ab8c53cb"
     },
     {
       "path": "docs/screenshots/card-compact-dark.jpg",
@@ -73,7 +73,7 @@
       "language": "pl",
       "height": 972,
       "width": 390,
-      "sha256": "a81f81dd18a0ab30bd9ec967ed4f27f5d669d8748d6e6cf56d0ad4da58076f35"
+      "sha256": "cd0f9fff078e90a89ec3f1f019b782a18da6ed54314b3ccded2fee702b290414"
     },
     {
       "path": "docs/screenshots/card-stream-coverage-light.jpg",
@@ -81,7 +81,7 @@
       "language": "en",
       "height": 1512,
       "width": 1280,
-      "sha256": "35899f58e990dd010d0a8369fb7052c0565ee089217555d2adf0a8511498752b"
+      "sha256": "83ea7464ee01b486f47817ed5c814c33be1a23763e0d899abd3b3e48255966db"
     }
   ],
   "privacy": {
@@ -91,12 +91,12 @@
   },
   "capture": {
     "method": "Original Chrome headless CDP JPEG bytes with captureBeyondViewport; no image editing, resizing or overlays",
-    "source_head": "0e2d46b63e45c409f7043093ec0c1acdf6c4bb27",
+    "source_head": "d6cbbe8c487a8f3d078cfdad2b876534037446fa",
     "scope": "Synthetic documentation only; public product UI not modified; live HA/HACS remains separate.",
     "review": "Nine newly captured images OCR reviewed; camera-control frame visually reviewed with synthetic sound-detection scope selected. Generic Front Door/Garden only, no camera imagery or household data. Coverage frame uses synthetic stream_coverage count values 1 and 3 and shows the product RTSP/go2rtc boundary disclosure.",
     "captured_source": {
       "path": "ha-frigate-privacy.js",
-      "sha256": "49f0ddbf8c60054cf29d4d279b1011259b9d45b2e16417df6f54c70660cc45aa"
+      "sha256": "0643dfdef3d3994c59ce0f8a55f72ac9c4a59900cf4ccb849adfca92d454af86"
     },
     "captured_harness": {
       "path": "docs/screenshots/_harness.html",

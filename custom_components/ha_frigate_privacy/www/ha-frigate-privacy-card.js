@@ -958,7 +958,7 @@ function createCardUi() {
       if (!payload || payload.schema !== 1 || !['ready','legacy_latest','corrupt','unsupported','unavailable'].includes(payload.status) || !Array.isArray(payload.periods) || payload.periods.length > 200) fail();
       const ids = new Set();
       const rows = payload.periods.map(row => {
-        if (!row || typeof row.id !== 'string' || !/^[a-f0-9]{64}$/.test(row.id) || ids.has(row.id) || typeof row.camera_id !== 'string' || !/^[a-z0-9_]{1,255}$/.test(row.camera_id)) fail();
+        if (!row || typeof row.id !== 'string' || !/^[a-f0-9]{64}$/.test(row.id) || ids.has(row.id) || typeof row.camera_id !== 'string' || !(row.camera_id.length <= 255 && /^[a-z0-9_]+(?::[a-z0-9_]+)?$/.test(row.camera_id))) fail();
         ids.add(row.id);
         if (row.generation !== null && (!Number.isSafeInteger(row.generation) || row.generation < 0)) fail();
         for (const field of ['started_at','ended_at','planned_ends_at','observed_at']) if (!date(row[field])) fail();
