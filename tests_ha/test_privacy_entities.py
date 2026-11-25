@@ -17,7 +17,7 @@ async def test_late_camera_adds_native_entities_with_unknown_deadline_and_guarde
     source=MockConfigEntry(domain="frigate",data={},unique_id="synthetic-frigate")
     source.add_to_hass(hass)
     registry=er.async_get(hass)
-    target=registry.async_get_or_create("switch","frigate","synthetic_front_detect",suggested_object_id="synthetic_front_detect",config_entry=source)
+    target=registry.async_get_or_create("switch","frigate",f"{source.entry_id}:switch:synthetic_front_detect",suggested_object_id="synthetic_front_detect",config_entry=source)
     hass.states.async_set(target.entity_id,"on",{"friendly_name":"Synthetic Front Detection"})
     await hass.async_block_till_done()
     entities=er.async_entries_for_config_entry(registry,entry.entry_id)
