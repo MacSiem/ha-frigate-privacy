@@ -528,6 +528,17 @@ def _resolve_camera_ref(hass: HomeAssistant, ref: str) -> str:
     return matches[0] if len(matches) == 1 else camera_base(ref)
 
 
+def _record_matches_group(hass: HomeAssistant, record: dict[str, Any], group: dict[str, Any]) -> bool:
+    identities = record.get("target_identities")
+    if not identities:
+        return True  # Legacy records retain their exact-ID validation.
+    if not isinstance(identities, dict):
+        return False
+    entities = [*group["switches"].values(), *([group["camera"]] if group["camera"] else [])]
+    current = list(_target_identities(hass, entities).values())
+    return any(value in current for value in identities.values())
+
+
 async def _existing_camera_record_key(hass: HomeAssistant, storage: FrigatePrivacyStorage, base: str) -> str:
     """Keep an active legacy record when discovery gains an instance qualifier."""
     records = await storage.async_get_paused(None) or {}
@@ -627,6 +638,45 @@ def discover_frigate_cameras(hass: HomeAssistant) -> list[dict[str, Any]]:
     return cameras
 
 
+def project_camera_records(hass: HomeAssistant, state: dict[str, Any]) -> dict[str, Any]:
+    """Present durable record keys under the uniquely matching current camera ID."""
+    if not any(state.get(field) for field in ("paused", "last_operations")):
+        return dict(state)
+    groups = _identity_groups(hass)
+    projected = dict(state)
+    for field in ("paused", "last_operations"):
+        records = state.get(field)
+        if not isinstance(records, dict):
+            continue
+        destinations: dict[str, str] = {}
+        for key, record in records.items():
+            if not isinstance(record, dict):
+                continue
+            identities = record.get("target_identities") or {}
+            if not isinstance(identities, dict) or not identities:
+                continue
+            values = list(identities.values())
+            matching = []
+            for camera_id, group in groups.items():
+                entities = [*group["switches"].values(), *([group["camera"]] if group["camera"] else [])]
+                current = list(_target_identities(hass, entities).values())
+                if any(value in current for value in values):
+                    matching.append(camera_id)
+            if len(matching) == 1:
+                destinations[key] = matching[0]
+        counts = {target: list(destinations.values()).count(target) for target in destinations.values()}
+        result = {}
+        for key, record in records.items():
+            target = destinations.get(key, key)
+            if key in groups and key not in destinations and isinstance(record, dict) and record.get("target_identities"):
+                target = f"unmatched:{key}"
+            if counts.get(target, 0) > 1 or (target != key and target in records):
+                target = key
+            result[target] = record
+        projected[field] = result
+    return projected
+
+
 async def _publish_outcome(hass, storage, result):
     """Persist aggregate action results before notifying entities."""
     recorder = getattr(storage, "async_record_outcome", None)
@@ -693,7 +743,16 @@ async def async_extend_privacy(
         raise ValueError("invalid operation_id")
     refs = camera_refs or [item["camera_id"] for item in discover_frigate_cameras(hass)]
     # Aliases in the same request must not add time twice.
-    bases = list(dict.fromkeys(camera_base(ref) for ref in refs))
+    bases = []
+    for ref in refs:
+        resolved = _resolve_camera_ref(hass, ref)
+        key = await _existing_camera_record_key(hass, storage, resolved)
+        group = _identity_groups(hass).get(resolved)
+        existing = await storage.async_get_paused(key)
+        if group and existing and not _record_matches_group(hass, existing, group):
+            key = "identity-conflict:" + resolved
+        if key not in bases:
+            bases.append(key)
     results = []
     for base in bases:
         async with _camera_lock(storage, base):
@@ -724,7 +783,8 @@ async def _async_extend_privacy_locked(
         if int(prior.get("generation") or 0) != generation:
             return {**result, "reason": "stale_operation"}
         return _replayed_result(prior)
-    if base not in _discovered_camera_ids(hass):
+    discovered_keys = [await _existing_camera_record_key(hass, storage, camera_id) for camera_id in _discovered_camera_ids(hass)]
+    if base not in discovered_keys:
         return {**result, "reason": "camera_not_discovered"}
     operation_id = operation_id or _new_operation_id("extend", base)
     result["operation_id"] = operation_id
@@ -791,6 +851,10 @@ async def async_pause_camera(
             "camera_failed": False,
         }
 
+    group = _identity_groups(hass).get(base)
+    existing_at_key = await storage.async_get_paused(base)
+    if group and existing_at_key and not _record_matches_group(hass, existing_at_key, group):
+        return {"camera_id": base, "paused": False, "phase": "error", "reason": "identity_conflict"}
     base = await _existing_camera_record_key(hass, storage, base)
     async with _camera_lock(storage, base):
         return await _async_pause_camera_locked(
@@ -2191,7 +2255,7 @@ def _persisted_targets_are_valid(
     if not isinstance(switches, list) or not all(isinstance(entity, str) for entity in switches):
         return False
     groups = _identity_groups(hass)
-    matching = [group for key, group in groups.items() if (key == camera_id or group["logical"] == camera_id) and set(switches or []).issubset(set(group["switches"].values())) and (not camera_entity or camera_entity == group["camera"])]
+    matching = [group for key, group in groups.items() if (key == camera_id or group["logical"] == camera_id or f'{group["entry"]}:{group["logical"]}' == camera_id) and set(switches or []).issubset(set(group["switches"].values())) and (not camera_entity or camera_entity == group["camera"])]
     if len(matching) == 1:
         return bool(isinstance(switches, list) and len(set(switches)) == len(switches) and all(_is_frigate_entity(hass, entity) for entity in switches) and (not camera_toggled or camera_entity and _is_frigate_entity(hass, camera_entity)))
     if not _base_ownership_valid(hass, camera_id):
